@@ -189,6 +189,7 @@ async function handleUser(user){
   if(!user){if(!S.erased)S.phase='auth';render();return}
   if(!user.emailVerified){S.phase='verify';render();verifyTimer=setInterval(checkVerified,5000);return}
   S.phase='loading';render();
+  try{await user.getIdToken(true)}catch{}
   const {doc,getDoc}=S.fb,email=(user.email||'').toLowerCase();
   let isOwner=false;
   try{await getDoc(doc(S.db,'adminCheck','probe'));isOwner=true}catch{}
@@ -205,7 +206,11 @@ async function checkVerified(){
   try{await S.fb.reload(u)}catch{return}
   if(u.emailVerified){stopVerifyPoll();await u.getIdToken(true);handleUser(u)}
 }
-function lostAccess(){if(S.phase==='notinvited')return;stopSubs();S.phase='notinvited';render()}
+let retried=false;
+function lostAccess(){if(S.phase==='notinvited')return;stopSubs();
+  const u=S.auth.currentUser;
+  if(u&&!retried){retried=true;u.getIdToken(true).then(()=>handleUser(u),()=>{S.phase='notinvited';render()});return}
+  S.phase='notinvited';render()}
 function startSubs(){
   const {doc,collection,onSnapshot,query,where,orderBy,limit}=S.fb,db=S.db,me=S.me.id;
   S.ready={config:false,people:false,priv:false};S.config={};S.peopleDocs={};S.priv={};S.threadDocs={};S.invites={};S.reports=[];
