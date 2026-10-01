@@ -47,7 +47,8 @@ const S={
   authMode:inviteParam||codeParam?'signup':'login', authErr:'', authMsg:'', busy:false,
   form:{name:'',email:inviteParam,pw:''},
   ready:{config:false,people:false,priv:false}, subs:[],
-  config:{}, peopleDocs:{}, priv:{}, threadDocs:{}, pitchIn:{}, pitchMine:{}, friendDocs:{}, myCodes:{}, lastCode:null, invites:{}, reports:[], myInvite:null,
+  config:{}, peopleDocs:{}, priv:{}, threadDocs:{}, pitchIn:{}, pitchMine:{}, offersIn:{}, offersOut:{}, myCodes:{}, lastCode:null,
+  offer:{to:null,prevJob:null,text:'',price:'',when:'Next hour',where:''}, invites:{}, reports:[], myInvite:null,
   myDoc:null, pendingMine:0,
   view:'board', openJob:null, personOf:null, sort:'high',
   draft:blankDraft(), bid:{key:null,amt:'',say:''}, chatDraft:{text:''},
@@ -112,18 +113,17 @@ function derive(){
   const D={members,jobs,jobByKey,bidsByJob,blocked};
   D.threads=threadsOf(D);D.unread=D.threads.filter(t=>t.unread).length;
   D.toConfirm=jobs.filter(j=>j.accepted===me&&j.status==='done'&&!payOf(j)?.ok).length;
-  D.requests=incomingRequests(D);D.friends=friendsList(D);
+  D.offersWaiting=offerList(S.offersIn).filter(o=>o.status==='pending'&&D.members.includes(o.owner)&&!D.blocked.has(o.owner)).length;
   return D;
 }
 function pitchFor(jobKey,bidder){const k=jobKey+'~'+bidder,p=S.pitchMine[k]||S.pitchIn[k];return p?str(p.say,90):''}
 function threadOpen(k){return !!S.threadDocs[k]}
-const pairKey=(a,b)=>[a,b].sort().join('~');
-function friendState(uid){const f=S.friendDocs[pairKey(S.me.id,uid)];if(!f)return null;if(f.status==='accepted')return'friends';return f.by===S.me.id?'sent':'incoming'}
-function friendsList(D){return Object.values(S.friendDocs).filter(f=>f&&f.status==='accepted'&&Array.isArray(f.members)).map(f=>f.members.find(x=>x!==S.me.id)).filter(u=>u&&D.members.includes(u)&&!D.blocked.has(u))}
-function incomingRequests(D){return Object.values(S.friendDocs).filter(f=>f&&f.status==='pending'&&f.by!==S.me.id&&Array.isArray(f.members)).map(f=>f.by).filter(u=>D.members.includes(u)&&!D.blocked.has(u))}
 function canMessage(t,D){const me=S.me.id;
-  if(t.jobKey){const j=D.jobByKey[t.jobKey];if(!j)return threadOpen(t.key);return j.owner===me||j.accepted===me||threadOpen(t.key)}
-  return threadOpen(t.key)||friendState(t.other)==='friends'||num(pdoc(t.other).freeUntil)>Date.now()}
+  if(!t.jobKey)return false;
+  const j=D.jobByKey[t.jobKey];if(!j)return threadOpen(t.key);return j.owner===me||j.accepted===me||threadOpen(t.key)}
+function workedWith(uid,D){const me=S.me.id;return D.jobs.filter(j=>(j.status==='assigned'||j.status==='done')&&((j.owner===me&&j.accepted===uid)||(j.owner===uid&&j.accepted===me)))}
+function lastJobFor(uid,D){return D.jobs.filter(j=>j.owner===S.me.id&&j.accepted===uid&&(j.status==='assigned'||j.status==='done')).sort((a,b)=>b.at-a.at)[0]||null}
+const offerList=o=>Object.entries(o).map(([k,v])=>({key:k,...v})).filter(x=>x&&typeof x.text==='string');
 function bidsFor(D,key){return (D.bidsByJob[key]||[]).filter(b=>!D.blocked.has(b.by))}
 function boardJobs(D){
   const now=Date.now();
@@ -173,6 +173,16 @@ function prune(d){
   const rest=jobs.filter(([,j])=>!(j.status==='open'||j.status==='assigned')).sort((a,b)=>num(b[1].at)-num(a[1].at)).slice(0,80);
   d.jobs=Object.fromEntries([...live,...rest]);d.bids=keep(d.bids,150,b=>num(b.at));d.paid=keep(d.paid,150,x=>num(x.at));
   return d;
+}
+const converting=new Set();
+function convertOffers(){
+  for(const o of offerList(S.offersOut)){
+    if(o.status!=='accepted'||converting.has(o.key)||!JOB_RE.test(o.job||''))continue;converting.add(o.key);
+    const at=num(o.at)||Date.now();
+    saveMine(x=>{x.jobs={...(x.jobs||{})};if(!x.jobs[o.job])x.jobs[o.job]={text:str(o.text,200),more:'',price:num(o.price),kind:'Other',when:str(o.when,20),where:str(o.where,40),at,deadline:deadlineFor(o.when,at),
+      status:'assigned',accepted:o.to,agreed:num(o.price),assignedAt:num(o.respondedAt)||Date.now(),offer:true};return x});
+    enqueue('me',()=>S.fb.deleteDoc(S.fb.doc(S.db,'offers',o.key))).catch(()=>{});
+  }
 }
 function savePitch(jobKey,say){const {doc,setDoc,deleteDoc}=S.fb,me=S.me.id,id=jobKey+'~'+me,owner=jobKey.split('~')[0];
   if(say){const p={owner,by:me,job:jobKey,say:say.slice(0,90),at:Date.now()};S.pitchMine={...S.pitchMine,[id]:p};return setDoc(doc(S.db,'pitches',id),p).catch(writeErr)}
@@ -240,7 +250,8 @@ function startSubs(){
     S.peopleDocs=d;if(!S.pendingMine)S.myDoc=d[me]?clone(d[me]):null;S.ready.people=true;afterData();
   },fail));
   S.subs.push(onSnapshot(doc(db,'private',me),s=>{S.priv=s.exists()?s.data():{};S.ready.priv=true;afterData()},fail));
-  S.subs.push(onSnapshot(query(collection(db,'friends'),where('members','array-contains',me)),snap=>{const f={};snap.forEach(x=>{f[x.id]=x.data()});S.friendDocs=f;if(S.phase==='app')render()},e=>console.warn(e)));
+  S.subs.push(onSnapshot(query(collection(db,'offers'),where('to','==',me)),snap=>{const o={};snap.forEach(x=>{o[x.id]=x.data()});S.offersIn=o;if(S.phase==='app')render()},e=>console.warn(e)));
+  S.subs.push(onSnapshot(query(collection(db,'offers'),where('owner','==',me)),snap=>{const o={};snap.forEach(x=>{o[x.id]=x.data()});S.offersOut=o;convertOffers();if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'invcodes'),where('by','==',me)),snap=>{const c={};snap.forEach(x=>{c[x.id]=x.data()});S.myCodes=c;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'pitches'),where('owner','==',me)),snap=>{const p={};snap.forEach(x=>{p[x.id]=x.data()});S.pitchIn=p;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'pitches'),where('by','==',me)),snap=>{const p={};snap.forEach(x=>{p[x.id]=x.data()});S.pitchMine=p;if(S.phase==='app')render()},e=>console.warn(e)));
@@ -260,8 +271,6 @@ function afterData(){
     firstLoadDone=true;
     if(S.me.isOwner&&ownerId()!==me)setDoc(doc(S.db,'config','app'),{...S.config,adminUid:me,campus:str(S.config.campus,40)||DEFAULT_CAMPUS}).catch(writeErr);
     if(!S.me.isOwner&&S.myInvite&&S.myInvite.uid!==me)updateDoc(doc(S.db,'invites',S.me.email),{uid:me,joinedAt:Date.now()}).catch(()=>{});
-    const iv=S.myInvite;if(iv&&typeof iv.code==='string'&&typeof iv.by==='string'&&iv.by!==me)
-      setDoc(doc(S.db,'friends',pairKey(me,iv.by)),{members:[me,iv.by].sort(),by:me,status:'accepted',via:'invite',code:iv.code,at:Date.now()}).catch(()=>{});
     if(S.myDoc&&S.myDoc.removed)saveMine(d=>{delete d.removed;return d});
     const old=Object.entries(S.myDoc?.bids||{}).filter(([,b])=>b&&b.say);
     if(old.length){for(const[k,b]of old)savePitch(k,str(b.say,90));saveMine(d=>{for(const[k]of old)if(d.bids?.[k])delete d.bids[k].say;return d})}
@@ -387,7 +396,7 @@ function authHTML(){
     <button type="button" role="tab" aria-selected="${m==='signup'}" class="${m==='signup'?'on':''}" data-auth="signup">Sign up</button></div>`;
   let body='';
   if(m==='signup')body=`<form class="stack" id="authForm" data-form="signup" novalidate style="gap:14px">
-     ${inviteParam?`<div class="invitebanner">You're invited. Create your account with <b>${esc(inviteParam)}</b>, the address your invite went to.</div>`:codeParam?`<div class="invitebanner">A friend invited you to tack. Sign up with any email you use. You'll be friends here as soon as you join.</div>`:''}
+     ${inviteParam?`<div class="invitebanner">You're invited. Create your account with <b>${esc(inviteParam)}</b>, the address your invite went to.</div>`:codeParam?`<div class="invitebanner">A friend invited you to tack. Sign up with any email you use.</div>`:''}
      ${field('fName','Full name','text','name','Sana Qureshi','name')}
      ${field('fEmail','Email','email','email',codeParam?'you@college.edu.in':'The address you were invited on','email')}
      ${field('fPw','Password','password','pw','At least 8 characters','new-password')}
@@ -485,7 +494,7 @@ function viewBoard(D){
   <section class="stripwrap" aria-label="Free right now"><p class="label">Free right now${free.length?' <span class="labelhint">· tap a face to ask for a favour</span>':''}</p>
     <div class="strip">
       <button class="person" data-sheet="free" aria-label="${meFree?'Change when you’re free':'Mark yourself free'}">${meFree?ring(S.me.id,50):`<span class="add">${ic('plus',18)}</span>`}<span>You</span></button>
-      ${free.map(u=>`<button class="person" data-person="${esc(u)}">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}
+      ${free.map(u=>`<button class="person" data-ask="${esc(u)}" aria-label="Ask ${esc(firstName(u))} for a favour">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}
       ${free.length?'':`<span class="stripnote">Nobody else is marked free. Tap + to say you're around.</span>`}
     </div></section>
   <div class="dhead"><h1 class="h1">The board</h1><span class="muted">${list.length} pinned at ${esc(campus())}</span></div>
@@ -594,8 +603,20 @@ function viewBids(D){
   const bidLine=({j})=>{const st=jobState(j);return j.accepted===me?(st==='done'?(payOf(j)?.ok?['Done · Paid ✓','ok']:['Done · confirm you got paid','warn']):[`Accepted · ₹${fmt(j.agreed)}`,'ok']):j.accepted?['Went to someone else','']:st==='open'?[`Waiting · ${bidsFor(D,j.key).length} bids in`,'']:['Closed','']};
   const row=(j,[line,cls],amt)=>`<button class="item" data-job="${esc(j.key)}"><span class="itext"><span class="t1" style="font-weight:600;color:var(--fg)">${esc(j.text)}</span>
     <span style="font-size:var(--t-11);font-weight:700;color:${cls==='ok'?'var(--accent)':cls==='warn'?'var(--coral-ink)':'var(--muted)'}">${esc(line)}</span></span><span class="amt" style="font-size:var(--t-16);color:var(--fg2)">₹${fmt(amt)}</span></button>`;
+  const oin=offerList(S.offersIn).filter(o=>D.members.includes(o.owner)&&!D.blocked.has(o.owner)&&o.status!=='declined').sort((a,b)=>num(b.at)-num(a.at));
+  const oout=offerList(S.offersOut).filter(o=>o.status!=='accepted').sort((a,b)=>num(b.at)-num(a.at));
+  const doing=D.jobs.filter(j=>j.accepted===me&&!(S.myDoc?.bids||{})[j.key]&&j.status!=='removed').sort((a,b)=>b.at-a.at);
+  const offerCard=o=>`<div class="box stack" style="gap:10px;border:1px solid rgba(198,242,78,.3)">
+    <div style="display:flex;align-items:center;gap:10px">${ring(o.owner,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.owner))} asked you</span><span class="t2">${esc([o.where,o.when].filter(Boolean).join(' · '))}</span></span><span class="amt" style="color:var(--accent)">₹${fmt(o.price)}</span></div>
+    <span style="font-size:var(--t-14);line-height:1.4;color:var(--fg);overflow-wrap:anywhere">${esc(o.text)}</span>
+    ${o.status==='pending'?`<div style="display:flex;gap:8px"><button class="pick" style="flex:1;padding:11px" data-act="acceptOffer" data-key="${esc(o.key)}">Accept</button><button class="btn2" style="flex:1;padding:11px" data-act="declineOffer" data-key="${esc(o.key)}">Can't do it</button></div>`
+      :`<p class="okmsg">Accepted. ${esc(firstName(o.owner))} will message you here.</p>`}</div>`;
   return`<div class="pad narrow"><h1 class="pageh">Bids</h1>
    <div class="stack">
+    ${oin.length?`<div class="sect"><h2 class="h2">Offers for you</h2></div><div class="stack gap8">${oin.map(offerCard).join('')}</div>`:''}
+    ${oout.length?`<div class="sect"><h2 class="h2">Offers you sent</h2></div><div class="stack gap8">${oout.map(o=>`<div class="row">${ring(o.to,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.to))} · ₹${fmt(o.price)}</span><span class="t2">${o.status==='declined'?'Can\u2019t do it this time':'Waiting for them to answer'} · ${esc(o.text)}</span></span>
+      <button class="btn2" style="width:auto;padding:8px 12px;font-size:var(--t-12)" data-act="withdrawOffer" data-key="${esc(o.key)}">${o.status==='declined'?'Dismiss':'Withdraw'}</button></div>`).join('')}</div>`:''}
+    ${doing.length?`<div class="sect"><h2 class="h2">Jobs you're doing</h2></div><div class="stack gap8">${doing.map(j=>row(j,bidLine({j}),j.agreed||j.price)).join('')}</div>`:''}
     <div class="sect"><h2 class="h2">On your jobs</h2><button class="linkbtn" data-go="post" style="padding:0">Pin a job</button></div>
     ${myJobs.length?`<div class="stack gap8">${myJobs.map(j=>row(j,jobLine(j),j.price)).join('')}</div>`:'<p class="note" style="text-align:left">You haven’t pinned anything yet.</p>'}
     <div class="sect"><h2 class="h2">Your bids</h2></div>
@@ -612,21 +633,16 @@ function inviteCard(D,big){
   if(S.config.memberInvites===false&&!S.me.isOwner)return big?'<div class="empty" style="margin:8px 0"><b>No chats yet</b><p>Bid on a job, or tap Ask on someone who\u2019s free, to start talking.</p></div>':'';
   const used=Object.values(S.myCodes).filter(c=>c&&c.usedBy).length;
   return`<div class="${big?'empty':'box stack'}" style="${big?'margin:8px 0':'gap:10px'}">
-    ${big?'<b>No chats yet</b><p>Bring your friends. Each link lets one person join, and you\u2019ll be friends here straight away.</p>':'<span class="t1" style="font-size:var(--t-16)">Invite friends to tack</span><span class="t2">Each link lets one person join. You\u2019ll be friends here straight away.</span>'}
+    ${big?'<b>No chats yet</b><p>Chats open when you work with someone: message your bidders, or ask someone who\u2019s free for a favour. Bring your friends onto the board too.</p>':'<span class="t1" style="font-size:var(--t-16)">Invite friends to tack</span><span class="t2">More people on the board means jobs get picked up faster. Each link lets one person join.</span>'}
     <button class="${big?'cta':'btn2'}" data-sheet="invitefriend">Invite a friend</button>
-    ${used?`<p class="note">${used} ${used===1?'friend has':'friends have'} joined with your links.</p>`:''}</div>`}
+    ${used?`<p class="note">${used} ${used===1?'person has':'people have'} joined with your links.</p>`:''}</div>`}
 function viewChats(D){
   return`<div class="pad narrow"><h1 class="pageh">Chats</h1>
-  ${D.requests.length?`<div class="stack gap8" style="margin-bottom:18px"><span class="label">Friend requests</span>${D.requests.map(u=>`<div class="row"><button class="rowmain" data-person="${esc(u)}">${ring(u,42)}<span class="rowtext"><span class="t1">${esc(shortName(u))}</span><span class="t2">${esc(metaOf(u)||'Wants to be friends')}</span></span></button>
-    <button class="pick" data-act="acceptFriend" data-uid="${esc(u)}">Accept</button><button class="iconbtn" data-act="removeFriend" data-uid="${esc(u)}" aria-label="Decline ${esc(firstName(u))}">${ic('trash',16)}</button></div>`).join('')}</div>`:''}
-  ${D.friends.length?`<div style="margin-bottom:18px"><span class="label">Friends</span><div class="strip" style="padding:0">
-    <button class="person" data-sheet="invitefriend" aria-label="Invite a friend"><span class="add">${ic('plus',18)}</span><span>Invite</span></button>
-    ${D.friends.map(u=>`<button class="person" data-dm="${esc(u)}" aria-label="Message ${esc(firstName(u))}">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}</div></div>`:''}
   ${D.threads.length?`<div class="stack gap8">${D.threads.map(t=>`<button class="item" data-thread="${esc(t.key)}">${ring(t.other,46)}
     <span class="itext"><span class="t1">${esc(shortName(t.other))}${t.job?` <span class="muted">· ₹${fmt(t.job.agreed||t.job.price)}</span>`:''}</span><span class="t2" style="${t.unread?'color:var(--fg);font-weight:600':''}">${esc(t.sub)}</span></span>
     <span class="iend"><span class="time">${t.last?ago(t.last.at):''}</span>${t.unread?'<span class="udot" aria-label="Unread"></span>':''}</span></button>`).join('')}</div>`
    :inviteCard(D,true)}
-  ${D.threads.length&&D.friends.length<3?`<div style="margin-top:18px">${inviteCard(D,false)}</div>`:''}
+  ${D.threads.length?`<div style="margin-top:18px">${inviteCard(D,false)}</div>`:''}
   </div><div style="height:24px"></div>`;
 }
 function viewChat(D){
@@ -646,7 +662,7 @@ function viewChat(D){
    ${c.msgs.map(m=>`<div class="${m.by===me?'out':'in'}">${esc(m.t)}<span class="time">${stamp(m.at)}</span></div>`).join('')}
    <p class="note" style="margin-top:4px">Keep it here. If you report someone, we can see this chat.</p>
   </div>
-  ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`You can message ${esc(firstName(c.other))} when they're marked Free right now, or after they message you.`}</p></div>`:`
+  ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats now happen inside jobs: ask ${esc(firstName(c.other))} for a favour when they're free, or hire them again from their profile.`}</p></div>`:`
   <div class="foot" style="position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%)"><div style="display:flex;gap:9px">
     <label class="field" for="msg"><input id="msg" type="text" maxlength="1000" placeholder="Message…" value="${esc(S.chatDraft.text)}" data-bind="chatDraft.text" aria-label="Message ${esc(firstName(c.other))}" autocomplete="off"></label>
     <button data-act="send" aria-label="Send" style="width:50px;height:50px;flex-shrink:0;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(198,242,78,.35)">${ic('send',19,2,'var(--bg)')}</button>
@@ -662,7 +678,7 @@ function viewPerson(uid,D){
      <span class="ring" style="border-color:${ringOf(uid)};width:108px;height:108px;box-shadow:0 0 34px ${GLOW[ringOf(uid)]}">${face(uid,94)}</span>
      <span class="pname">${esc(shortName(uid))}</span>
      <div class="chips" style="justify-content:center">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campus())}</span>
-       <span class="chip vio">${uid===ownerId()?'Organiser':'Invited member'}</span>${uid!==S.me.id&&friendState(uid)==='friends'?'<span class="chip on">Friends</span>':''}${free?'<span class="chip on">Free right now</span>':''}</div>
+       <span class="chip vio">${uid===ownerId()?'Organiser':'Invited member'}</span>${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${free?'<span class="chip on">Free right now</span>':''}</div>
    </div>
    <div class="stats"><div><b>${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b style="color:var(--accent)">${st.avg??'New'}</b><span>rating</span></div><div><b>${fmt(st.earned)}</b><span>₹ earned</span></div></div>
    ${isMe?`<button class="card" data-sheet="free">${ic('clock',20)}<span class="rowtext"><span class="t1">${free?'You’re free until '+clock(num(d.freeUntil)):'Free right now?'}</span><span class="t2">${free?'Anyone can message you until then. Tap to change.':'Show you’re around and open to quick requests'}</span></span><span class="chev">${ic('chev',18)}</span></button>`:''}
@@ -676,13 +692,10 @@ function viewPerson(uid,D){
        <button data-act="logout">${ic('out',18)} Log out</button>
        <button data-sheet="erase" class="danger">${ic('trash',18)} Delete my account</button></div>
        <p class="note">Logged in as ${esc(S.me.email)}</p>`
-     :`${(()=>{const fs=friendState(uid),fn=esc(firstName(uid)),can=canMessage({key:dmKey(S.me.id,uid),other:uid,jobKey:null},D);
-        return (can?`<button class="cta" data-dm="${esc(uid)}">Message ${fn}</button>`:'')
-          +(fs==='friends'?`<p class="note">You and ${fn} are friends. <button class="linkbtn" style="padding:0" data-act="removeFriend" data-uid="${esc(uid)}">Remove friend</button></p>`
-           :fs==='incoming'?`<button class="${can?'btn2':'cta'}" data-act="acceptFriend" data-uid="${esc(uid)}">Accept friend request</button>`
-           :fs==='sent'?`<button class="btn2" disabled>Friend request sent</button>`
-           :`<button class="${can?'btn2':'cta'}" data-act="addFriend" data-uid="${esc(uid)}">Add friend</button>`)
-          +(!can&&fs!=='friends'?`<p class="note">Friends can message each other any time.</p>`:'')})()}
+     :`${(()=>{const fn=esc(firstName(uid)),freeNow=num(d.freeUntil)>Date.now(),prev=lastJobFor(uid,D);
+        return (freeNow?`<button class="cta" data-ask="${esc(uid)}">Ask ${fn} for a favour</button>`:'')
+          +(prev?`<button class="${freeNow?'btn2':'cta'}" data-ask="${esc(uid)}" data-prev="${esc(prev.id)}">Hire ${fn} again</button>`:'')
+          +(!freeNow&&!prev?`<p class="note">You can ask ${fn} for a favour when they're marked Free right now.</p>`:'')})()}
        <button class="linkbtn" data-sheet="report" data-about="${esc(uid)}">Report or block</button>`}
   </div></div><div style="height:24px"></div>`;
 }
@@ -694,10 +707,10 @@ function viewPrivacy(){
    <p>Your email address and a password to log in. Your name, photo, year, branch, what you're good at and your ring colour. The jobs you pin, the bids you place, the ratings you give and your messages. When you mark yourself free, the time it ends.</p>
    <h2>What other members see</h2>
    <p>Your name, photo, year and branch, your jobs, bids, ratings and reviews. They never see your email address.</p>
-   <h2>Friends and invite links</h2>
-   <p>Friends can message each other any time. You become friends when you accept a request, when a poster picks you for a job, or when someone joins with your invite link. Invite links are personal: whoever joins with yours is recorded as invited by you.</p>
+   <h2>Invite links</h2>
+   <p>Invite links are personal: whoever joins with yours is recorded as invited by you.</p>
    <h2>Chats</h2>
-   <p>Only you and the other person can read a chat in the app. ${esc(organiser())} runs this board and can read chats to handle a report.</p>
+   <p>Chats only happen inside a job: between a poster and their bidders, or between two people working on a job together, including favours you ask for and accept. There are no direct messages. Only the two people in a chat can read it in the app. ${esc(organiser())} runs this board and can read chats to handle a report.</p>
    <h2>Money</h2>
    <p>tack never touches money. You pay each other directly in cash or UPI.</p>
    <h2>Deleting your account</h2>
@@ -751,7 +764,7 @@ function railHTML(D){
   return`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">Free right now</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--dim)">${D.members.length} on the board</span></div>
   <div class="stack gap8">${free.length?free.map(u=>`<div style="display:flex;align-items:center;gap:10px"><button class="rowmain" data-person="${esc(u)}">${ring(u,40)}
      <span class="rowtext"><span style="font-size:var(--t-14);font-weight:700">${esc(shortName(u))}</span><span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc([metaOf(u),str(pdoc(u).does,40)].filter(Boolean).join(' · '))}</span></span></button>
-     <button data-dm="${esc(u)}" style="background:var(--surface2);border-radius:999px;padding:7px 13px;font-size:var(--t-12);font-weight:700">Ask</button></div>`).join('')
+     <button data-ask="${esc(u)}" style="background:var(--surface2);border-radius:999px;padding:7px 13px;font-size:var(--t-12);font-weight:700">Ask</button></div>`).join('')
    :`<p class="note" style="text-align:left">Nobody else is marked free right now.</p>`}
    <button class="btn2" style="padding:10px;font-size:var(--t-12)" data-sheet="free">${num(S.myDoc?.freeUntil)>Date.now()?'You’re free until '+clock(num(S.myDoc.freeUntil)):'I’m free right now'}</button></div>
   <div style="height:1px;background:var(--line)"></div>
@@ -783,9 +796,18 @@ function sheetHTML(D){
     <button class="cta destructive" data-act="confirmRemove">Remove job</button><button class="linkbtn" data-act="closeSheet">Cancel</button>`;break;
   case'uninvite':b=`<h2 id="sheetT">Remove ${esc(s.about)}?</h2><p>They can't sign up with this email, and if they already joined they're locked out straight away and their jobs leave the board.</p>
     <button class="cta destructive" data-act="confirmUninvite">Remove</button><button class="linkbtn" data-act="closeSheet">Keep them</button>`;break;
+  case'offer':{const o=S.offer,fn=esc(firstName(o.to));
+    b=`<h2 id="sheetT">${o.prevJob?`Hire ${fn} again`:`Ask ${fn} for a favour`}</h2>
+    <p>Only ${fn} sees this. If they accept, it becomes a job between you two, and you can chat about it.</p>
+    <textarea id="oft" class="inp" rows="2" maxlength="200" style="resize:none" placeholder="Grab my print-outs from Sai Xerox on your way back?" data-bind="offer.text" aria-label="What do you need?">${esc(o.text)}</textarea>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><label class="field" for="ofp" style="flex:1 1 140px"><span class="fl">You'll pay ₹</span><input id="ofp" inputmode="numeric" maxlength="5" placeholder="60" value="${esc(o.price)}" data-bind="offer.price"></label>
+      <input id="ofw" class="inp" style="flex:1 1 140px;border-radius:999px" maxlength="40" placeholder="Where? Gate 1" value="${esc(o.where)}" data-bind="offer.where" aria-label="Where"></div>
+    <div class="chips" role="group" aria-label="By when">${WHENS.map(w=>`<button class="chip ${o.when===w?'on':''}" data-ofwhen="${w}" aria-pressed="${o.when===w}">${w}</button>`).join('')}</div>
+    ${S.err.offer?`<p class="err">${esc(S.err.offer)}</p>`:''}
+    <button class="cta" data-act="sendOffer">Send to ${fn}</button>`;break}
   case'invitefriend':{const off=S.config.memberInvites===false&&!S.me.isOwner,c=S.lastCode;
     b=off?`<h2 id="sheetT">Invites are off</h2><p>${esc(Organiser())} has turned off member invites for now.</p><button class="linkbtn" data-act="closeSheet">OK</button>`
-     :`<h2 id="sheetT">Invite a friend</h2><p>Each link works for one person. They sign up with any email, and you'll be friends on tack as soon as they join. You're vouching for them, so only invite people you know.</p>
+     :`<h2 id="sheetT">Invite a friend</h2><p>Each link works for one person. They sign up with any email. You're vouching for them, so only invite people you know.</p>
       ${c?codeShare(c):`<button class="cta" data-act="makeCode">Create invite link</button>`}
       ${c?'<button class="linkbtn" data-act="makeCode">Make another link</button>':''}`;break}
   case'reshare':b=`<h2 id="sheetT">Send the invite again</h2><p>${esc(s.about)}</p>${shareButtons(s.about)}<button class="linkbtn" data-act="closeSheet">Done</button>`;break;
@@ -823,12 +845,12 @@ function render(){
     $('sidebar').innerHTML=`<div style="padding:0 6px"><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${esc(campus())} · ${boardJobs(D).length} pinned</span></div></div>
       <button class="cta" data-go="post" style="padding:13px 10px;font-size:var(--t-16)">+ Pin a job</button>
       <nav style="display:flex;flex-direction:column;gap:3px" aria-label="Sections">${[['board','Board','board'],['bids','Bids','bids'],['chats','Chats','chat'],['me','Profile','me']].concat(S.me.isOwner?[['invites','Invites','users']]:[])
-        .map(([v,l,i])=>`<button class="navitem ${navOn(v)?'on':''}" data-go="${v}" ${navOn(v)?'aria-current="page"':''}>${ic(i,18)} ${l}${v==='chats'&&(D.unread||D.requests.length)?'<span class="udot" aria-label="Unread"></span>':''}${v==='bids'&&D.toConfirm?'<span class="udot" aria-label="Payment to confirm"></span>':''}</button>`).join('')}</nav>
+        .map(([v,l,i])=>`<button class="navitem ${navOn(v)?'on':''}" data-go="${v}" ${navOn(v)?'aria-current="page"':''}>${ic(i,18)} ${l}${v==='chats'&&D.unread?'<span class="udot" aria-label="Unread"></span>':''}${v==='bids'&&(D.toConfirm||D.offersWaiting)?'<span class="udot" aria-label="Needs your answer"></span>':''}</button>`).join('')}</nav>
       <button class="card" style="margin-top:auto;padding:10px 12px;border-radius:var(--r-sm)" data-go="me">${ring(S.me.id,38)}<span class="rowtext"><span style="font-size:var(--t-12);font-weight:700">${esc(shortName(S.me.id))}</span>
         <span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc(metaOf(S.me.id)||campus())}</span></span></button>`;
     $('tabbar').innerHTML=[['board','Board','board'],['bids','Bids','bids'],['post','','plus'],['chats','Chats','chat'],['me','Me','me']].map(([v,l,i])=>v==='post'
       ?`<button class="tab" data-go="post" aria-label="Pin a job"><span class="fab">${ic('plus',24,3,'var(--bg)')}</span></button>`
-      :`<button class="tab ${navOn(v)||(v==='me'&&S.view==='invites')?'on':''}" data-go="${v}">${ic(i,20)}<span>${l}</span>${(v==='chats'&&(D.unread||D.requests.length))||(v==='bids'&&D.toConfirm)?'<span class="udot"></span>':''}</button>`).join('');
+      :`<button class="tab ${navOn(v)||(v==='me'&&S.view==='invites')?'on':''}" data-go="${v}">${ic(i,20)}<span>${l}</span>${(v==='chats'&&D.unread)||(v==='bids'&&(D.toConfirm||D.offersWaiting))?'<span class="udot"></span>':''}</button>`).join('');
     const st=S.sheet?S.sheet.type:null;$('sheetRoot').innerHTML=sheetHTML(D);
     if(st&&st!==lastSheet)$('sheetRoot').classList.add('enter');else if(!st)$('sheetRoot').classList.remove('enter');
     if(st!==lastSheet&&st)requestAnimationFrame(()=>requestAnimationFrame(()=>$('sheetRoot').classList.remove('enter')));
@@ -885,7 +907,6 @@ const ACT={
   withdraw(){const k=S.openJob;saveMine(x=>{if(x.bids)delete x.bids[k];return x});savePitch(k,'');S.bid={key:null};toast('Bid withdrawn')},
   confirmPick(){const j=derive().jobByKey[S.openJob],s=S.sheet;if(!j||!s)return;
     saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.status='assigned';o.accepted=s.uid;o.agreed=s.amt;o.assignedAt=Date.now()}return x});
-    if(friendState(s.uid)!=='friends'){const fk=pairKey(S.me.id,s.uid);enqueue('me',()=>S.fb.setDoc(S.fb.doc(S.db,'friends',fk),{members:[S.me.id,s.uid].sort(),by:S.me.id,status:'accepted',via:'job',job:j.id,at:Date.now()})).catch(()=>{})}
     S.sheet=null;toast('Picked '+firstName(s.uid)+'. Sort out the details in chat.');openThread({key:jobThreadKey(j.key,s.uid),other:s.uid,jobKey:j.key})},
   confirmDone(){const j=derive().jobByKey[S.openJob];if(!j)return;if(!need(S.rate.stars>0,'rate','Pick a star rating.'))return;
     const r={stars:S.rate.stars,text:S.rate.text.trim().slice(0,140),at:Date.now()};
@@ -906,9 +927,9 @@ const ACT={
     catch(e){S.busy=false;S.err={erase:e.code==='auth/too-many-requests'?authMsg(e):'That password isn\u2019t right.'};render();return}
     try{
       for(const[k,t]of Object.entries(S.threadDocs)){const q=await getDocs(query(collection(S.db,'threads',k,'msgs'),where('by','==',me)));for(const m of q.docs)await deleteDoc(m.ref);
-        if(t&&t.lastBy===me)await S.fb.setDoc(doc(S.db,'threads',k),{lastText:'Message deleted'},{merge:true})}
+        if(t&&t.lastBy===me)await S.fb.setDoc(doc(S.db,'threads',k),{lastText:'Message deleted'},{merge:true}).catch(()=>{})}
       for(const id of Object.keys(S.pitchMine))await deleteDoc(doc(S.db,'pitches',id));
-      for(const id of Object.keys(S.friendDocs))await deleteDoc(doc(S.db,'friends',id)).catch(()=>{});
+      for(const id of Object.keys(S.offersOut))await deleteDoc(doc(S.db,'offers',id)).catch(()=>{});
       for(const[id,c]of Object.entries(S.myCodes))if(!c.usedBy)await deleteDoc(doc(S.db,'invcodes',id)).catch(()=>{});
       await deleteDoc(doc(S.db,'people',me));await deleteDoc(doc(S.db,'private',me));
       S.erased=true;stopSubs();await deleteUser(user);
@@ -934,11 +955,15 @@ const ACT={
     const c=Array.from(crypto.getRandomValues(new Uint8Array(10)),x=>'abcdefghjkmnpqrstuvwxyz23456789'[x%31]).join('');
     try{await setDoc(doc(S.db,'invcodes',c),{by:S.me.id,at:Date.now()});S.lastCode=c;render()}catch(e){writeErr(e)}},
   async shareCode(el){const c=el.dataset.code;try{await navigator.share({title:'Join me on tack',text:codeText(c).replace(/\n.*$/s,''),url:codeLink(c)})}catch{}},
-  addFriend(el){const u=el.dataset.uid,me=S.me.id,k=pairKey(me,u),d={members:[me,u].sort(),by:me,status:'pending',at:Date.now()};
-    S.friendDocs={...S.friendDocs,[k]:d};render();S.fb.setDoc(S.fb.doc(S.db,'friends',k),d).catch(writeErr);toast('Friend request sent')},
-  acceptFriend(el){const u=el.dataset.uid,k=pairKey(S.me.id,u),f=S.friendDocs[k];if(!f)return;
-    S.friendDocs={...S.friendDocs,[k]:{...f,status:'accepted'}};render();S.fb.updateDoc(S.fb.doc(S.db,'friends',k),{status:'accepted',acceptedAt:Date.now()}).catch(writeErr);toast('You\u2019re now friends with '+firstName(u))},
-  removeFriend(el){const u=el.dataset.uid,k=pairKey(S.me.id,u),m={...S.friendDocs};delete m[k];S.friendDocs=m;render();S.fb.deleteDoc(S.fb.doc(S.db,'friends',k)).catch(writeErr)},
+  sendOffer(){const o=S.offer,text=o.text.trim(),price=digits(o.price),me=S.me.id;
+    if(!need(text.length>=6,'offer','Say what you need in a few more words.')||!need(price>=10&&price<=20000,'offer','Set a price between ₹10 and ₹20,000.'))return;
+    const id=rid(),key=`${me}~${id}~${o.to}`,d={owner:me,to:o.to,job:id,text:text.slice(0,200),price,when:o.when,where:o.where.trim().slice(0,40),at:Date.now(),status:'pending',...(o.prevJob?{prevJob:o.prevJob}:{})};
+    S.offersOut={...S.offersOut,[key]:d};S.sheet=null;render();
+    S.fb.setDoc(S.fb.doc(S.db,'offers',key),d).then(()=>toast('Sent to '+firstName(o.to)+'. You\u2019ll see their answer in Bids.')).catch(e=>{const m={...S.offersOut};delete m[key];S.offersOut=m;render();
+      toast(e&&e.code==='permission-denied'?firstName(o.to)+' isn\u2019t free any more. Try again when they are.':'Couldn\u2019t send it. Try again.')})},
+  acceptOffer(el){const k=el.dataset.key;S.fb.updateDoc(S.fb.doc(S.db,'offers',k),{status:'accepted',respondedAt:Date.now()}).then(()=>toast('Accepted. It\u2019s now a job between you two.')).catch(writeErr)},
+  declineOffer(el){const k=el.dataset.key;S.fb.updateDoc(S.fb.doc(S.db,'offers',k),{status:'declined',respondedAt:Date.now()}).then(()=>toast('Declined')).catch(writeErr)},
+  withdrawOffer(el){const k=el.dataset.key,m={...S.offersOut};delete m[k];S.offersOut=m;render();S.fb.deleteDoc(S.fb.doc(S.db,'offers',k)).catch(writeErr)},
   toggleMemberInvites(el){saveConfig(c=>({...c,memberInvites:!!el.checked}));toast(el.checked?'Members can invite friends':'Member invites are off')},
   saveCampus(){const c=(S.inv.campus||'').trim();if(!c)return;const {doc,setDoc}=S.fb;
     S.config={...S.config,campus:c.slice(0,40)};setDoc(doc(S.db,'config','app'),S.config).catch(writeErr);toast('Campus name saved');render()},
@@ -947,8 +972,10 @@ const ACT={
 };
 
 document.addEventListener('click',e=>{
-  const el=e.target.closest('[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-dm],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth]');
+  const el=e.target.closest('[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
   if(!el)return;const ds=el.dataset;
+  if(ds.ask!==undefined){if(ds.ask===S.me?.id)return;S.offer={to:ds.ask,prevJob:ds.prev||null,text:'',price:'',when:'Next hour',where:''};S.err={};S.sheet={type:'offer'};render();return}
+  if(ds.ofwhen!==undefined){S.offer.when=ds.ofwhen;render();return}
   if(ds.auth!==undefined){S.authMode=ds.auth;S.authErr='';S.authMsg='';render();return}
   if(ds.act!==undefined){const f=ACT[ds.act];if(f){e.preventDefault();f(el)}return}
   if(ds.go!==undefined){go(ds.go);return}
@@ -968,7 +995,6 @@ document.addEventListener('click',e=>{
   if(ds.thread!==undefined){const t=D.threads.find(x=>x.key===ds.thread);if(t)openThread(t);return}
   if(ds.threadJob!==undefined){const j=D.jobByKey[S.openJob];if(j&&canMessage({key:jobThreadKey(j.key,me),other:j.owner,jobKey:j.key},D))openThread({key:jobThreadKey(j.key,me),other:j.owner,jobKey:j.key});return}
   if(ds.threadWith!==undefined){const j=D.jobByKey[S.openJob];if(j)openThread({key:jobThreadKey(j.key,ds.threadWith),other:ds.threadWith,jobKey:j.key});return}
-  if(ds.dm!==undefined){if(ds.dm!==me&&canMessage({key:dmKey(me,ds.dm),other:ds.dm,jobKey:null},D))openThread({key:dmKey(me,ds.dm),other:ds.dm,jobKey:null});return}
 });
 document.addEventListener('submit',e=>{
   const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();
