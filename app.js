@@ -31,6 +31,7 @@ const I={
  trash:'<polyline points="3 6 5 6 21 6"/><path d="M19 6 18 20a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/>',
  star:'<polygon points="12 2.5 15 8.8 21.9 9.6 16.8 14.3 18.2 21.2 12 17.8 5.8 21.2 7.2 14.3 2.1 9.6 9 8.8 12 2.5"/>',
  chev:'<polyline points="9 6 15 12 9 18"/>',
+ place:'<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/>',
  clock:'<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
  out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/>',
@@ -446,6 +447,7 @@ function tile(j,D,i=0){
     <span class="price">₹${fmt(j.price)}</span>
     ${left<36e5?`<span class="flag">${Math.max(1,Math.round(left/6e4))} min left</span>`:''}
     <p>${esc(j.text)}</p>
+    ${j.where?`<span class="where">${ic('place',12,2.2)}<span>${esc(j.where)}</span></span>`:''}
     <span class="by">${face(j.owner,22)}<span class="nm">${esc(firstName(j.owner))}</span><span class="n">${n} ${n===1?'bid':'bids'}</span></span>
   </button>`;
 }
@@ -460,7 +462,7 @@ function viewBoard(D){
     <div><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${esc(campus())} · ${list.length} pinned</span></div></div>
     <button data-go="me" aria-label="Your profile">${ring(S.me.id,48)}</button>
   </header>
-  <section class="stripwrap" aria-label="Free right now"><p class="label">Free right now</p>
+  <section class="stripwrap" aria-label="Free right now"><p class="label">Free right now${free.length?' <span class="labelhint">· tap a face to ask for a favour</span>':''}</p>
     <div class="strip">
       <button class="person" data-sheet="free" aria-label="${meFree?'Change when you’re free':'Mark yourself free'}">${meFree?ring(S.me.id,50):`<span class="add">${ic('plus',18)}</span>`}<span>You</span></button>
       ${free.map(u=>`<button class="person" data-person="${esc(u)}">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}
@@ -623,7 +625,7 @@ function viewPerson(uid,D){
        <span class="chip vio">${uid===ownerId()?'Organiser':'Invited member'}</span>${free?'<span class="chip on">Free right now</span>':''}</div>
    </div>
    <div class="stats"><div><b>${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b style="color:var(--accent)">${st.avg??'–'}</b><span>rating</span></div><div><b>${fmt(st.earned)}</b><span>₹ earned</span></div></div>
-   ${isMe?`<button class="card" data-sheet="free">${ic('clock',20)}<span class="rowtext"><span class="t1">${free?'You’re free until '+clock(num(d.freeUntil)):'Free right now?'}</span><span class="t2">${free?'Tap to change or turn it off':'Show classmates you’re around for a job'}</span></span><span class="chev">${ic('chev',18)}</span></button>`:''}
+   ${isMe?`<button class="card" data-sheet="free">${ic('clock',20)}<span class="rowtext"><span class="t1">${free?'You’re free until '+clock(num(d.freeUntil)):'Free right now?'}</span><span class="t2">${free?'Anyone can message you until then. Tap to change.':'Show you’re around and open to quick requests'}</span></span><span class="chev">${ic('chev',18)}</span></button>`:''}
    ${does.length?`<div class="chips">${does.map((x,i)=>`<span class="chip" style="background:${tints[i%4][0]};color:${tints[i%4][1]};font-weight:700">${esc(x)}</span>`).join('')}</div>`:''}
    ${st.reviews.length?`<h2 class="h2">What people said</h2>${st.reviews.map(r=>`<div class="row" style="align-items:flex-start">${face(r.from,36)}<span class="rowtext" style="gap:3px">
        <span class="t1" style="font-size:var(--t-12)">${esc(shortName(r.from))} <span class="muted">· ${'★'.repeat(r.stars)}</span></span><span style="font-size:var(--t-14);line-height:1.45;color:var(--fg2);overflow-wrap:anywhere">${esc(r.text)}</span></span></div>`).join('')}`:''}
@@ -716,7 +718,7 @@ function sheetHTML(D){
   const j=S.openJob?D.jobByKey[S.openJob]:null;
   switch(s.type){
   case'free':{const f=num(S.myDoc?.freeUntil)>Date.now();
-    b=`<h2 id="sheetT">When are you free?</h2><p>Classmates see you at the top of the board until then.</p>
+    b=`<h2 id="sheetT">When are you free?</h2><p>You'll show at the top of the board, and anyone can message you directly until then.</p>
     <div class="stack gap8">${[['1h','For the next hour'],['3h','Next 3 hours'],['day','Rest of today']].map(([k,l])=>`<button class="btn2" data-free="${k}">${l}</button>`).join('')}
     ${f?'<button class="btn2 danger" data-free="off">I’m not free any more</button>':''}</div>`;break}
   case'pick':b=`<h2 id="sheetT">Pick ${esc(firstName(s.uid))} for ₹${fmt(s.amt)}?</h2><p>The job leaves the board and you two can sort out the details in chat. Pay them on UPI or cash after.</p>
