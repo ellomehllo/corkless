@@ -209,7 +209,7 @@ button.chip{min-height:34px}
   .sheet{left:50%;right:auto;bottom:auto;top:50%;transform:translate(-50%,-50%);width:440px;border-radius:26px;padding:24px}
   .toast{bottom:28px}
 }
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
 
 .authtabs{display:flex;background:var(--surface);border-radius:999px;padding:4px}
 .authtabs button{flex:1;padding:11px 10px;border-radius:999px;font-weight:700;font-size:13.5px;color:var(--muted)}
@@ -224,3 +224,40 @@ button.chip{min-height:34px}
 .sharebtns a,.sharebtns button{display:inline-flex;align-items:center;gap:7px;background:var(--surface2);color:var(--fg);border-radius:999px;padding:10px 15px;font-size:12.5px;font-weight:700;text-decoration:none}
 .sharebtns .primary{background:var(--accent);color:var(--bg)}
 .btn2[disabled],.cta[disabled]{opacity:.55;cursor:default}
+
+button,a,label{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.cta,.btn2,.pill,.chip,.pick,.iconbtn,.item,.card,.person,.navitem,.tab,.star,.swatch,.upload,.sharebtns a,.sharebtns button,.menu button{transition:transform .14s cubic-bezier(.2,.8,.2,1),background-color .18s,color .18s}
+.cta:active,.btn2:active,.pill:active,.chip:active,.pick:active,.iconbtn:active,.person:active,.tab:active,.star:active,.swatch:active,.upload:active,.sharebtns a:active,.sharebtns button:active{transform:scale(.95)}
+.item:active,.card:active,.navitem:active,.menu button:active{transform:scale(.985)}
+
+#main{view-transition-name:main}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.18s}
+::view-transition-old(main),::view-transition-new(main){animation-duration:.28s;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
+html[data-nav="fwd"]::view-transition-old(main){animation-name:navOutL}
+html[data-nav="fwd"]::view-transition-new(main){animation-name:navInR}
+html[data-nav="back"]::view-transition-old(main){animation-name:navOutR}
+html[data-nav="back"]::view-transition-new(main){animation-name:navInL}
+html[data-nav="tab"]::view-transition-old(main){animation:fadeOut .14s ease both}
+html[data-nav="tab"]::view-transition-new(main){animation:fadeIn .2s ease both}
+::view-transition-group(jp){animation-duration:.34s;animation-timing-function:cubic-bezier(.2,.8,.2,1);z-index:2}
+@keyframes navInR{from{transform:translateX(32px);opacity:0}}
+@keyframes navOutL{to{transform:translateX(-24px);opacity:0}}
+@keyframes navInL{from{transform:translateX(-32px);opacity:0}}
+@keyframes navOutR{to{transform:translateX(24px);opacity:0}}
+@keyframes fadeIn{from{opacity:0}}
+@keyframes fadeOut{to{opacity:0}}
+
+.scrim{transition:opacity .18s ease}
+.sheet{transition:transform .26s cubic-bezier(.2,.8,.2,1),opacity .2s ease}
+#sheetRoot.enter .scrim,#sheetRoot.leave .scrim{opacity:0}
+#sheetRoot.enter .sheet,#sheetRoot.leave .sheet{transform:translateY(100%)}
+#sheetRoot.leave .sheet{transition-duration:.17s}
+.toast{animation:toastIn .22s cubic-bezier(.2,.8,.2,1)}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,10px)}}
+@media (min-width:900px){
+  #sheetRoot.enter .sheet,#sheetRoot.leave .sheet{transform:translate(-50%,-46%);opacity:0}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+  ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}
+}

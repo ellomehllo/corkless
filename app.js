@@ -482,7 +482,7 @@ function viewJob(D){
   return`<div class="pad">${back('board','Back to the board')}
   <div class="wide">
    <div class="stack" style="margin-top:6px">
-    <span class="big">₹${fmt(j.price)}</span>
+    <span class="big" style="view-transition-name:jp">₹${fmt(j.price)}</span>
     <h1 class="h1">${esc(j.text)}</h1>
     <div class="chips">${[j.when,j.where,j.kind].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${stTag}</div>
     ${j.more?`<p style="margin:0;font-size:14px;line-height:1.55;color:var(--fg2);max-width:52ch;overflow-wrap:anywhere;white-space:pre-wrap">${esc(j.more)}</p>`:''}
@@ -710,7 +710,7 @@ function sheetHTML(D){
 }
 
 const VIEWS={board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewPrivacy,invites:viewInvites,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
-let lastView=null;
+let lastView=null,lastSheet=null;const scrollMem={};
 function render(){
   const a=document.activeElement,fid=a&&a.id;let s0=null,s1=null;try{s0=a.selectionStart;s1=a.selectionEnd}catch{}
   const gate=$('gate'),app=$('app');
@@ -718,7 +718,8 @@ function render(){
     app.hidden=true;gate.hidden=false;gate.className='gate'+(['onboard','auth'].includes(S.phase)?' scroll':'');gate.innerHTML=gateHTML();$('sheetRoot').innerHTML='';lastView=null;
   }else{
     gate.hidden=true;app.hidden=false;
-    const D=derive(),main=$('main'),keep=lastView===S.view?main.scrollTop:0;
+    const D=derive(),main=$('main');if(lastView&&lastView!==S.view)scrollMem[lastView]=main.scrollTop;
+    const keep=lastView===S.view?main.scrollTop:((DEPTH[S.view]??1)===0?scrollMem[S.view]||0:0);
     main.innerHTML=(VIEWS[S.view]||viewBoard)(D);main.scrollTop=keep;
     if(lastView!==S.view&&S.view==='chat')requestAnimationFrame(()=>{main.scrollTop=main.scrollHeight});
     lastView=S.view;
@@ -733,19 +734,40 @@ function render(){
     $('tabbar').innerHTML=[['board','Board','board'],['bids','Bids','bids'],['post','','plus'],['chats','Chats','chat'],['me','Me','me']].map(([v,l,i])=>v==='post'
       ?`<button class="tab" data-go="post" aria-label="Pin a job"><span class="fab">${ic('plus',24,3,'var(--bg)')}</span></button>`
       :`<button class="tab ${navOn(v)||(v==='me'&&S.view==='invites')?'on':''}" data-go="${v}">${ic(i,20)}<span>${l}</span>${v==='chats'&&D.unread?'<span class="udot"></span>':''}</button>`).join('');
-    $('sheetRoot').innerHTML=sheetHTML(D);
+    const st=S.sheet?S.sheet.type:null;$('sheetRoot').innerHTML=sheetHTML(D);
+    if(st&&st!==lastSheet)$('sheetRoot').classList.add('enter');else if(!st)$('sheetRoot').classList.remove('enter');
+    if(st!==lastSheet&&st)requestAnimationFrame(()=>requestAnimationFrame(()=>$('sheetRoot').classList.remove('enter')));
+    lastSheet=st;
   }
   if(fid){const el=$(fid);if(el&&el!==document.activeElement){el.focus({preventScroll:true});try{if(s0!=null)el.setSelectionRange(s0,s1)}catch{}}}
 }
 let toastT;
 function toast(msg){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},2800)}
-function go(v,keepThread){if(v!=='chat'&&!keepThread)closeThread();S.view=v;S.sheet=null;S.err={};if(v==='edit')seedOnb();if(v==='invites')S.inv.campus='';render()}
+const DEPTH={board:0,bids:0,chats:0,me:0,invites:1,post:1,job:1,person:1,chat:1,privacy:1,edit:1};
+const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
+function go(v,keepThread){
+  const from=S.view;
+  if(v!=='chat'&&!keepThread)closeThread();
+  const apply=()=>{S.view=v;S.sheet=null;S.err={};if(v==='edit')seedOnb();if(v==='invites')S.inv.campus='';render();
+    if(v==='board'&&from==='job'&&S.openJob){const p=document.querySelector(`.tile[data-job="${CSS.escape(S.openJob)}"] .price`);if(p)p.style.viewTransitionName='jp'}};
+  if(from===v||S.phase!=='app'||!document.startViewTransition||reduceMotion.matches){apply();return}
+  const d=(DEPTH[v]??1)-(DEPTH[from]??1),root=document.documentElement;
+  root.dataset.nav=d>0?'fwd':d<0?'back':'tab';
+  const t=document.startViewTransition(apply);
+  t.ready.catch(()=>{});t.updateCallbackDone.catch(()=>{});
+  t.finished.catch(()=>{}).finally(()=>{document.querySelectorAll('.tile .price').forEach(e=>{e.style.viewTransitionName=''});delete root.dataset.nav});
+}
+function closeSheet(){
+  const r=$('sheetRoot');if(!S.sheet)return;
+  if(reduceMotion.matches){S.sheet=null;S.err={};render();return}
+  r.classList.add('leave');setTimeout(()=>{r.classList.remove('leave');S.sheet=null;S.err={};render()},170);
+}
 
 function need(ok,key,msg){if(!ok){S.err={[key]:msg};render();return false}return true}
 const ACT={
   reload(){location.reload()},
   logout(){logOut()},
-  closeSheet(){S.sheet=null;S.err={};render()},
+  closeSheet(){closeSheet()},
   checkVerified(){checkVerified().then(()=>{if(S.phase==='verify')toast('Not confirmed yet. Open the link in the email first.')})},
   async resendVerify(){try{await sendVerify(S.auth.currentUser);toast('Sent. Check your inbox and spam.')}catch(e){toast(authMsg(e))}},
   clearPhoto(){S.onb.photo='';render()},
@@ -818,7 +840,7 @@ document.addEventListener('click',e=>{
   if(ds.auth!==undefined){S.authMode=ds.auth;S.authErr='';S.authMsg='';render();return}
   if(ds.act!==undefined){const f=ACT[ds.act];if(f){e.preventDefault();f(el)}return}
   if(ds.go!==undefined){go(ds.go);return}
-  if(ds.job!==undefined){S.openJob=ds.job;S.bid={key:null};go('job');return}
+  if(ds.job!==undefined){const pr=el.classList.contains('tile')&&el.querySelector('.price');if(pr&&document.startViewTransition&&!reduceMotion.matches)pr.style.viewTransitionName='jp';S.openJob=ds.job;S.bid={key:null};go('job');return}
   if(ds.sort!==undefined){S.sort=ds.sort;render();return}
   if(ds.set!==undefined){S.draft[ds.set]=ds.val;if(ds.set==='where')S.draft.whereText='';render();return}
   if(ds.bump!==undefined){S.draft.price=String((digits(S.draft.price)||0)+ +ds.bump);render();return}
@@ -850,7 +872,7 @@ document.addEventListener('change',async e=>{
   }
 });
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'&&S.sheet){S.sheet=null;render();return}
+  if(e.key==='Escape'&&S.sheet){closeSheet();return}
   if(e.key==='Enter'&&e.target.id==='msg'){e.preventDefault();sendMsg();return}
   if(e.key==='Enter'&&e.target.id==='invE'){e.preventDefault();ACT.invite();return}
 });
