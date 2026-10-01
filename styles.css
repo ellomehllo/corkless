@@ -287,3 +287,12 @@ html[data-nav="tab"]::view-transition-new(main){animation:fadeIn .2s ease both}
 .endpin{width:10px;height:10px;border-radius:50%;background:var(--edge)}
 .reportrow{display:flex;justify-content:center;gap:18px;padding:0 16px 24px}
 .empty{margin-bottom:auto}
+.critrow{display:grid;grid-template-columns:7.5em 1fr 2.4em;align-items:center;gap:10px;font-size:var(--t-12);font-weight:600;color:var(--fg2)}
+.critrow b{font-family:var(--display);font-size:var(--t-14);color:var(--fg);text-align:right;font-variant-numeric:tabular-nums}
+.critbar{height:6px;border-radius:999px;background:var(--surface2);overflow:hidden}
+.critbar span{display:block;height:100%;border-radius:999px;background:var(--accent)}
+.critpick{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.stars.sm{gap:2px}
+.stars.sm .star{width:34px;height:34px;background:transparent}
+.overall{display:flex;align-items:baseline;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px;font-weight:700;color:var(--fg2)}
+.overall b{font-family:var(--display);font-size:var(--t-23);color:var(--accent)}
