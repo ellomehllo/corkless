@@ -273,3 +273,5 @@ html[data-nav="tab"]::view-transition-new(main){animation:fadeIn .2s ease both}
 .by .nm{font-size:var(--t-12)}
 .danger,.menu button.danger{color:var(--danger)}
 .cta.destructive{background:transparent;color:var(--danger);box-shadow:inset 0 0 0 1.5px var(--danger)}
+.banner.warnbanner{background:rgba(255,91,110,.14);color:var(--coral-ink)}
+.banner.mutedbanner{background:var(--surface2);color:var(--fg2)}

@@ -92,7 +92,7 @@ function normJob(id,j,uid){
   const r=j.rating&&typeof j.rating==='object'?j.rating:null;
   return{id,owner:uid,key:uid+'~'+id,text:str(j.text,200),more:str(j.more,600),price:num(j.price),kind:str(j.kind,20),
     when:str(j.when,20),where:str(j.where,40),at:num(j.at),deadline:num(j.deadline),
-    status:STATUSES.includes(j.status)?j.status:'open',accepted:typeof j.accepted==='string'?j.accepted:null,agreed:num(j.agreed),
+    status:STATUSES.includes(j.status)?j.status:'open',doneAt:num(j.doneAt),accepted:typeof j.accepted==='string'?j.accepted:null,agreed:num(j.agreed),
     rating:r?{stars:Math.max(1,Math.min(5,Math.round(num(r.stars))||1)),text:str(r.text,140),at:num(r.at)}:null};
 }
 function jobState(j){return j.status==='open'&&j.deadline<Date.now()?'expired':j.status}
@@ -109,6 +109,7 @@ function derive(){
   }
   const D={members,jobs,jobByKey,bidsByJob,blocked};
   D.threads=threadsOf(D);D.unread=D.threads.filter(t=>t.unread).length;
+  D.toConfirm=jobs.filter(j=>j.accepted===me&&j.status==='done'&&!payOf(j)?.ok).length;
   return D;
 }
 function bidsFor(D,key){return (D.bidsByJob[key]||[]).filter(b=>!D.blocked.has(b.by))}
@@ -121,9 +122,12 @@ function boardJobs(D){
   return l;
 }
 function freePeople(D){const now=Date.now();return D.members.filter(u=>num(pdoc(u).freeUntil)>now&&!D.blocked.has(u))}
+function payOf(j){if(!j.accepted)return null;const p=pdoc(j.accepted).paid,x=p&&typeof p==='object'?p[j.key]:null;
+  return x&&typeof x==='object'&&typeof x.ok==='boolean'?{ok:x.ok,at:num(x.at)}:null}
+const PAY_GRACE=3*864e5;
 function stats(uid,D){
   let done=0,earned=0,sum=0,cnt=0;const reviews=[];
-  for(const j of D.jobs){if(j.accepted===uid&&j.status==='done'){done++;earned+=j.agreed||j.price;if(j.rating){sum+=j.rating.stars;cnt++;if(j.rating.text)reviews.push({from:j.owner,text:j.rating.text,stars:j.rating.stars,at:j.rating.at})}}}
+  for(const j of D.jobs){if(j.accepted===uid&&j.status==='done'){done++;if(payOf(j)?.ok)earned+=j.agreed||j.price;if(j.rating){sum+=j.rating.stars;cnt++;if(j.rating.text)reviews.push({from:j.owner,text:j.rating.text,stars:j.rating.stars,at:j.rating.at})}}}
   return{done,earned,avg:cnt?(sum/cnt).toFixed(1):null,cnt,reviews:reviews.sort((a,b)=>b.at-a.at).slice(0,6)};
 }
 function rateLine(uid,D){const s=stats(uid,D);return s.avg?` · ★${s.avg} from ${s.done} ${s.done===1?'job':'jobs'}`:''}
@@ -155,7 +159,7 @@ function prune(d){
   const keep=(o,n,by)=>{if(!o||typeof o!=='object')return{};const e=Object.entries(o);if(e.length<=n)return o;e.sort((a,b)=>by(b[1])-by(a[1]));return Object.fromEntries(e.slice(0,n))};
   const jobs=Object.entries(d.jobs||{});const live=jobs.filter(([,j])=>j.status==='open'||j.status==='assigned');
   const rest=jobs.filter(([,j])=>!(j.status==='open'||j.status==='assigned')).sort((a,b)=>num(b[1].at)-num(a[1].at)).slice(0,80);
-  d.jobs=Object.fromEntries([...live,...rest]);d.bids=keep(d.bids,150,b=>num(b.at));
+  d.jobs=Object.fromEntries([...live,...rest]);d.bids=keep(d.bids,150,b=>num(b.at));d.paid=keep(d.paid,150,x=>num(x.at));
   return d;
 }
 function saveMine(mut){
@@ -460,13 +464,17 @@ function viewJob(D){
   const myBid=(S.myDoc?.bids||{})[j.key];
   if(S.bid.key!==j.key)S.bid={key:j.key,amt:String(myBid?num(myBid.amt):j.price),say:myBid?str(myBid.say,90):''};
   const stTag={expired:'<span class="tag warn">Closed · time ran out</span>',closed:'<span class="tag">Closed</span>',removed:'<span class="tag warn">Removed</span>',
-    assigned:`<span class="tag ok">Picked ${esc(shortName(j.accepted))}</span>`,done:'<span class="tag ok">Done</span>'}[st]||'';
+    assigned:`<span class="tag ok">Picked ${esc(shortName(j.accepted))}</span>`,done:payOf(j)?.ok?'<span class="tag ok">Done · Paid ✓</span>':'<span class="tag ok">Done</span>'}[st]||'';
   let foot='';
   if(mine){
     if(st==='open')foot=`<div class="foot"><button class="btn2" data-sheet="close">Close this job</button><p class="note">Pick someone from the bids to take it off the board.</p></div>`;
     else if(st==='assigned')foot=`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} You picked ${esc(firstName(j.accepted))} for ₹${fmt(j.agreed)}. Pay on UPI after.</div>
       <button class="cta" data-sheet="done">Mark as done</button><button class="btn2" data-thread-with="${esc(j.accepted)}">Message ${esc(firstName(j.accepted))}</button></div>`;
-    else if(st==='done')foot=`<div class="foot"><p class="note">Done. You rated ${esc(firstName(j.accepted))} ${j.rating?'★'+j.rating.stars:''}.</p></div>`;
+    else if(st==='done'){const pay=payOf(j),dn=esc(firstName(j.accepted));
+      foot=`<div class="foot">${pay?.ok?`<div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${dn} confirmed they got ₹${fmt(j.agreed)}</div>`
+        :pay?`<div class="banner warnbanner">${dn} hasn’t got your payment yet</div><p class="note">Pay ₹${fmt(j.agreed)} on UPI or cash, then they’ll confirm it here.</p>`
+        :`<div class="banner mutedbanner">Waiting for ${dn} to confirm they got ₹${fmt(j.agreed)}</div>`}
+        <p class="note">You rated ${dn} ${j.rating?'★'+j.rating.stars:''}.</p></div>`}
     else if(st==='expired')foot=`<div class="foot"><button class="btn2" data-act="repost">Pin it again</button></div>`;
   }else{
     if(st==='open')foot=`<div class="foot">
@@ -479,6 +487,16 @@ function viewJob(D){
       <button class="cta" data-act="bid">${myBid?'Update my bid':'Place bid'}</button>
       ${myBid?'<button class="linkbtn" data-act="withdraw">Withdraw my bid</button>':''}
       <p class="note">You pay each other on UPI. tack never holds your money.</p></div>`;
+    else if(j.accepted===me&&st==='done'){const pay=payOf(j),pn=esc(firstName(j.owner)),late=pay&&!pay.ok&&Date.now()-(j.doneAt||pay.at)>PAY_GRACE;
+      foot=pay?.ok?`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} Paid · you confirmed ₹${fmt(j.agreed)} ${since(pay.at)}</div>
+          <button class="linkbtn" data-act="paid" data-val="no">I marked this by mistake</button></div>`
+        :`<div class="foot"><div class="stack gap8 box" style="border:1px solid rgba(198,242,78,.3)">
+          <span class="t1" style="font-size:var(--t-16)">Did ${pn} pay you ₹${fmt(j.agreed)}?</span>
+          <span class="t2">${pay?'You said not yet. Tap Yes once the money reaches you.':`${pn} marked this job done. Confirm once the money reaches you.`}</span></div>
+          <button class="cta" data-act="paid" data-val="yes">Yes, I got it</button>
+          ${pay?'':'<button class="btn2" data-act="paid" data-val="no">Not yet</button>'}
+          ${late?`<button class="linkbtn" data-sheet="report" data-about="${esc(j.owner)}" data-prewhy="No-show or didn’t pay">Still not paid? Report it</button>`:''}
+          <p class="note">tack never holds your money. This only records what you tell us.</p></div>`}
     else if(j.accepted===me)foot=`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${esc(firstName(j.owner))} picked you for ₹${fmt(j.agreed)}</div>
       <button class="cta" data-thread-job>Message ${esc(firstName(j.owner))}</button><p class="note">You pay each other on UPI. tack never holds your money.</p></div>`;
     else foot=`<div class="foot"><p class="note">${st==='assigned'||st==='done'?'This job went to someone else.':'This job is closed.'}</p></div>`;
@@ -536,8 +554,8 @@ function viewBids(D){
   const myJobs=D.jobs.filter(j=>j.owner===me&&j.status!=='removed').sort((a,b)=>{const o=x=>({open:0,assigned:1}[jobState(x)]??2);return o(a)-o(b)||b.at-a.at});
   const myBids=Object.entries(S.myDoc?.bids||{}).map(([k,b])=>({k,b,j:D.jobByKey[k]})).filter(x=>x.j&&x.j.owner!==me).sort((a,b)=>num(b.b.at)-num(a.b.at));
   const jobLine=j=>{const st=jobState(j),n=bidsFor(D,j.key).length;
-    return st==='open'?[`${n} ${n===1?'bid':'bids'} in`,'']:st==='assigned'?[`Picked ${shortName(j.accepted)} · ₹${fmt(j.agreed)}`,'ok']:st==='done'?[`Done${j.rating?' · you gave ★'+j.rating.stars:''}`,'ok']:st==='expired'?['Time ran out','warn']:['Closed','']};
-  const bidLine=({j})=>{const st=jobState(j);return j.accepted===me?[`Accepted · ₹${fmt(j.agreed)}`,'ok']:j.accepted?['Went to someone else','']:st==='open'?[`Waiting · ${bidsFor(D,j.key).length} bids in`,'']:['Closed','']};
+    return st==='open'?[`${n} ${n===1?'bid':'bids'} in`,'']:st==='assigned'?[`Picked ${shortName(j.accepted)} · ₹${fmt(j.agreed)}`,'ok']:st==='done'?(payOf(j)?.ok?['Done · Paid ✓','ok']:[`Done · ${payOf(j)?'they haven\u2019t got your payment':'waiting for them to confirm payment'}`,payOf(j)?'warn':'']):st==='expired'?['Time ran out','warn']:['Closed','']};
+  const bidLine=({j})=>{const st=jobState(j);return j.accepted===me?(st==='done'?(payOf(j)?.ok?['Done · Paid ✓','ok']:['Done · confirm you got paid','warn']):[`Accepted · ₹${fmt(j.agreed)}`,'ok']):j.accepted?['Went to someone else','']:st==='open'?[`Waiting · ${bidsFor(D,j.key).length} bids in`,'']:['Closed','']};
   const row=(j,[line,cls],amt)=>`<button class="item" data-job="${esc(j.key)}"><span class="itext"><span class="t1" style="font-weight:600;color:var(--fg)">${esc(j.text)}</span>
     <span style="font-size:var(--t-11);font-weight:700;color:${cls==='ok'?'var(--accent)':cls==='warn'?'var(--coral-ink)':'var(--muted)'}">${esc(line)}</span></span><span class="amt" style="font-size:var(--t-16);color:var(--fg2)">₹${fmt(amt)}</span></button>`;
   return`<div class="pad narrow"><h1 class="pageh">Bids</h1>
@@ -566,7 +584,7 @@ function viewChat(D){
        <span style="font-size:var(--t-12);font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${j?`₹${fmt(j.agreed||j.price)} · ${esc(j.text)}`:esc(metaOf(c.other)||campus())}</span></span></button>
      <button class="iconbtn" data-sheet="report" data-about="${esc(c.other)}" aria-label="Report or block">${ic('flag',17)}</button></div></div>
   <div class="msgs">
-   ${accepted?`<div class="banner">${ic('tick',13,3.4,'var(--accent)')} Bid accepted · ₹${fmt(j.agreed)} · pay on UPI after</div>`:''}
+   ${accepted?`<div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${payOf(j)?.ok?`Paid ✓ · ₹${fmt(j.agreed)}`:`Bid accepted · ₹${fmt(j.agreed)} · pay on UPI after`}</div>`:''}
    ${j&&!accepted?`<button class="banner" style="background:var(--surface2);color:var(--fg2)" data-job="${esc(j.key)}">About: ${esc(j.text.slice(0,40))}${j.text.length>40?'…':''}</button>`:''}
    ${!c.msgs.length?`<p class="note" style="margin:10px 0">${c.loaded?'Say hi. Sort out the time and place here.':'Loading messages…'}</p>`:''}
    ${c.msgs.map(m=>`<div class="${m.by===me?'out':'in'}">${esc(m.t)}<span class="time">${stamp(m.at)}</span></div>`).join('')}
@@ -589,7 +607,7 @@ function viewPerson(uid,D){
      <div class="chips" style="justify-content:center">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campus())}</span>
        <span class="chip vio">${uid===ownerId()?'Organiser':'Invited member'}</span>${free?'<span class="chip on">Free right now</span>':''}</div>
    </div>
-   <div class="stats"><div><b>${st.done}</b><span>jobs done</span></div><div><b style="color:var(--accent)">${st.avg??'–'}</b><span>rating</span></div><div><b>${fmt(st.earned)}</b><span>₹ earned</span></div></div>
+   <div class="stats"><div><b>${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b style="color:var(--accent)">${st.avg??'–'}</b><span>rating</span></div><div><b>${fmt(st.earned)}</b><span>₹ earned</span></div></div>
    ${isMe?`<button class="card" data-sheet="free">${ic('clock',20)}<span class="rowtext"><span class="t1">${free?'You’re free until '+clock(num(d.freeUntil)):'Free right now?'}</span><span class="t2">${free?'Tap to change or turn it off':'Show classmates you’re around for a job'}</span></span><span class="chev">${ic('chev',18)}</span></button>`:''}
    ${does.length?`<div class="chips">${does.map((x,i)=>`<span class="chip" style="background:${tints[i%4][0]};color:${tints[i%4][1]};font-weight:700">${esc(x)}</span>`).join('')}</div>`:''}
    ${st.reviews.length?`<h2 class="h2">What people said</h2>${st.reviews.map(r=>`<div class="row" style="align-items:flex-start">${face(r.from,36)}<span class="rowtext" style="gap:3px">
@@ -733,12 +751,12 @@ function render(){
     $('sidebar').innerHTML=`<div style="padding:0 6px"><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${esc(campus())} · ${boardJobs(D).length} pinned</span></div></div>
       <button class="cta" data-go="post" style="padding:13px 10px;font-size:var(--t-16)">+ Pin a job</button>
       <nav style="display:flex;flex-direction:column;gap:3px" aria-label="Sections">${[['board','Board','board'],['bids','Bids','bids'],['chats','Chats','chat'],['me','Profile','me']].concat(S.me.isOwner?[['invites','Invites','users']]:[])
-        .map(([v,l,i])=>`<button class="navitem ${navOn(v)?'on':''}" data-go="${v}" ${navOn(v)?'aria-current="page"':''}>${ic(i,18)} ${l}${v==='chats'&&D.unread?'<span class="udot" aria-label="Unread"></span>':''}</button>`).join('')}</nav>
+        .map(([v,l,i])=>`<button class="navitem ${navOn(v)?'on':''}" data-go="${v}" ${navOn(v)?'aria-current="page"':''}>${ic(i,18)} ${l}${v==='chats'&&D.unread?'<span class="udot" aria-label="Unread"></span>':''}${v==='bids'&&D.toConfirm?'<span class="udot" aria-label="Payment to confirm"></span>':''}</button>`).join('')}</nav>
       <button class="card" style="margin-top:auto;padding:10px 12px;border-radius:var(--r-sm)" data-go="me">${ring(S.me.id,38)}<span class="rowtext"><span style="font-size:var(--t-12);font-weight:700">${esc(shortName(S.me.id))}</span>
         <span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc(metaOf(S.me.id)||campus())}</span></span></button>`;
     $('tabbar').innerHTML=[['board','Board','board'],['bids','Bids','bids'],['post','','plus'],['chats','Chats','chat'],['me','Me','me']].map(([v,l,i])=>v==='post'
       ?`<button class="tab" data-go="post" aria-label="Pin a job"><span class="fab">${ic('plus',24,3,'var(--bg)')}</span></button>`
-      :`<button class="tab ${navOn(v)||(v==='me'&&S.view==='invites')?'on':''}" data-go="${v}">${ic(i,20)}<span>${l}</span>${v==='chats'&&D.unread?'<span class="udot"></span>':''}</button>`).join('');
+      :`<button class="tab ${navOn(v)||(v==='me'&&S.view==='invites')?'on':''}" data-go="${v}">${ic(i,20)}<span>${l}</span>${(v==='chats'&&D.unread)||(v==='bids'&&D.toConfirm)?'<span class="udot"></span>':''}</button>`).join('');
     const st=S.sheet?S.sheet.type:null;$('sheetRoot').innerHTML=sheetHTML(D);
     if(st&&st!==lastSheet)$('sheetRoot').classList.add('enter');else if(!st)$('sheetRoot').classList.remove('enter');
     if(st!==lastSheet&&st)requestAnimationFrame(()=>requestAnimationFrame(()=>$('sheetRoot').classList.remove('enter')));
@@ -820,6 +838,8 @@ const ACT={
       S.erased=true;stopSubs();await deleteUser(user);
       S.busy=false;S.sheet=null;S.erase={pw:''};S.phase='erased';render();
     }catch(e){S.busy=false;S.err={erase:'Couldn\u2019t delete everything. Check your connection and try again.'};render();console.warn(e)}},
+  paid(el){const j=derive().jobByKey[S.openJob];if(!j||j.accepted!==S.me.id)return;const ok=el.dataset.val==='yes';
+    saveMine(x=>{x.paid={...(x.paid||{}),[j.key]:{ok,at:Date.now()}};return x});toast(ok?'Marked as paid. Thanks!':'Noted. '+firstName(j.owner)+' will see it.')},
   send(){sendMsg()},
   invite(){const e=S.inv.email.trim().toLowerCase();
     if(!need(validEmail(e),'inv','That doesn’t look like an email address.'))return;
@@ -852,7 +872,7 @@ document.addEventListener('click',e=>{
   if(ds.person!==undefined){if(ds.person===S.me?.id){go('me');return}S.personOf=ds.person;go('person');return}
   if(ds.onb!==undefined){S.onb[ds.onb]=ds.val;render();return}
   if(ds.pick!==undefined){const b=bidsFor(derive(),S.openJob).find(x=>x.by===ds.pick);if(b){S.sheet={type:'pick',uid:b.by,amt:b.amt};render()}return}
-  if(ds.sheet!==undefined){S.err={};S.erase={pw:''};if(ds.sheet==='done')S.rate={stars:0,text:''};if(ds.sheet==='report')S.rep={why:'',note:'',block:false};S.sheet={type:ds.sheet,about:ds.about};render();return}
+  if(ds.sheet!==undefined){S.err={};S.erase={pw:''};if(ds.sheet==='done')S.rate={stars:0,text:''};if(ds.sheet==='report')S.rep={why:ds.prewhy||'',note:'',block:false};S.sheet={type:ds.sheet,about:ds.about};render();return}
   if(ds.free!==undefined){const now=new Date(),t={'1h':+now+36e5,'3h':+now+3*36e5,day:new Date(now).setHours(23,59,0,0),off:0}[ds.free];
     saveMine(d=>{d.freeUntil=t;return d});S.sheet=null;toast(t?'You’re on the Free right now row':'Marked not free');return}
   if(ds.star!==undefined){S.rate.stars=+ds.star;render();return}
