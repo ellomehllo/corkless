@@ -45,7 +45,7 @@ const S={
   authMode:inviteParam?'signup':'login', authErr:'', authMsg:'', busy:false,
   form:{name:'',email:inviteParam,pw:''},
   ready:{config:false,people:false,priv:false}, subs:[],
-  config:{}, peopleDocs:{}, priv:{}, threadDocs:{}, invites:{}, reports:[], myInvite:null,
+  config:{}, peopleDocs:{}, priv:{}, threadDocs:{}, pitchIn:{}, pitchMine:{}, invites:{}, reports:[], myInvite:null,
   myDoc:null, pendingMine:0,
   view:'board', openJob:null, personOf:null, sort:'high',
   draft:blankDraft(), bid:{key:null,amt:'',say:''}, chatDraft:{text:''},
@@ -105,13 +105,18 @@ function derive(){
     if(d.jobs&&typeof d.jobs==='object')for(const[id,j]of Object.entries(d.jobs)){if(!JOB_RE.test(id)||!j||typeof j!=='object')continue;const n=normJob(id,j,uid);jobs.push(n);jobByKey[n.key]=n}
   }
   for(const uid of members){const d=pdoc(uid);
-    if(d.bids&&typeof d.bids==='object')for(const[k,b]of Object.entries(d.bids)){if(!jobByKey[k]||!b||k.startsWith(uid+'~'))continue;(bidsByJob[k]=bidsByJob[k]||[]).push({by:uid,amt:num(b.amt),say:str(b.say,90),at:num(b.at)})}
+    if(d.bids&&typeof d.bids==='object')for(const[k,b]of Object.entries(d.bids)){if(!jobByKey[k]||!b||k.startsWith(uid+'~'))continue;(bidsByJob[k]=bidsByJob[k]||[]).push({by:uid,amt:num(b.amt),say:pitchFor(k,uid),at:num(b.at)})}
   }
   const D={members,jobs,jobByKey,bidsByJob,blocked};
   D.threads=threadsOf(D);D.unread=D.threads.filter(t=>t.unread).length;
   D.toConfirm=jobs.filter(j=>j.accepted===me&&j.status==='done'&&!payOf(j)?.ok).length;
   return D;
 }
+function pitchFor(jobKey,bidder){const k=jobKey+'~'+bidder,p=S.pitchMine[k]||S.pitchIn[k];return p?str(p.say,90):''}
+function threadOpen(k){return !!S.threadDocs[k]}
+function canMessage(t,D){const me=S.me.id;
+  if(t.jobKey){const j=D.jobByKey[t.jobKey];if(!j)return threadOpen(t.key);return j.owner===me||j.accepted===me||threadOpen(t.key)}
+  return threadOpen(t.key)||num(pdoc(t.other).freeUntil)>Date.now()}
 function bidsFor(D,key){return (D.bidsByJob[key]||[]).filter(b=>!D.blocked.has(b.by))}
 function boardJobs(D){
   const now=Date.now();
@@ -162,6 +167,9 @@ function prune(d){
   d.jobs=Object.fromEntries([...live,...rest]);d.bids=keep(d.bids,150,b=>num(b.at));d.paid=keep(d.paid,150,x=>num(x.at));
   return d;
 }
+function savePitch(jobKey,say){const {doc,setDoc,deleteDoc}=S.fb,me=S.me.id,id=jobKey+'~'+me,owner=jobKey.split('~')[0];
+  if(say){const p={owner,by:me,job:jobKey,say:say.slice(0,90),at:Date.now()};S.pitchMine={...S.pitchMine,[id]:p};return setDoc(doc(S.db,'pitches',id),p).catch(writeErr)}
+  const m={...S.pitchMine};delete m[id];S.pitchMine=m;return deleteDoc(doc(S.db,'pitches',id)).catch(()=>{})}
 function saveMine(mut){
   const {doc,setDoc}=S.fb;
   S.myDoc=prune(mut(clone(S.myDoc)));S.pendingMine++;render();
@@ -225,6 +233,8 @@ function startSubs(){
     S.peopleDocs=d;if(!S.pendingMine)S.myDoc=d[me]?clone(d[me]):null;S.ready.people=true;afterData();
   },fail));
   S.subs.push(onSnapshot(doc(db,'private',me),s=>{S.priv=s.exists()?s.data():{};S.ready.priv=true;afterData()},fail));
+  S.subs.push(onSnapshot(query(collection(db,'pitches'),where('owner','==',me)),snap=>{const p={};snap.forEach(x=>{p[x.id]=x.data()});S.pitchIn=p;if(S.phase==='app')render()},e=>console.warn(e)));
+  S.subs.push(onSnapshot(query(collection(db,'pitches'),where('by','==',me)),snap=>{const p={};snap.forEach(x=>{p[x.id]=x.data()});S.pitchMine=p;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'threads'),where('members','array-contains',me)),snap=>{
     const t={};snap.forEach(x=>{t[x.id]=x.data()});S.threadDocs=t;if(S.phase==='app')render();
   },fail));
@@ -242,6 +252,8 @@ function afterData(){
     if(S.me.isOwner&&ownerId()!==me)setDoc(doc(S.db,'config','app'),{...S.config,adminUid:me,campus:str(S.config.campus,40)||DEFAULT_CAMPUS}).catch(writeErr);
     if(!S.me.isOwner&&S.myInvite&&S.myInvite.uid!==me)updateDoc(doc(S.db,'invites',S.me.email),{uid:me,joinedAt:Date.now()}).catch(()=>{});
     if(S.myDoc&&S.myDoc.removed)saveMine(d=>{delete d.removed;return d});
+    const old=Object.entries(S.myDoc?.bids||{}).filter(([,b])=>b&&b.say);
+    if(old.length){for(const[k,b]of old)savePitch(k,str(b.say,90));saveMine(d=>{for(const[k]of old)if(d.bids?.[k])delete d.bids[k].say;return d})}
   }
   computePhase();render();
 }
@@ -325,10 +337,11 @@ function markSeen(){
 }
 function sendMsg(){
   const c=S.chat,t=S.chatDraft.text.trim();if(!c.key||!t)return;
+  if(!canMessage(c,derive())){toast('You can\u2019t message them yet.');return}
   const {collection,addDoc,doc,setDoc}=S.fb,me=S.me.id,at=Date.now();
   S.chatDraft.text='';
   addDoc(collection(S.db,'threads',c.key,'msgs'),{by:me,t:t.slice(0,1000),at}).catch(writeErr);
-  setDoc(doc(S.db,'threads',c.key),{members:[me,c.other],job:c.jobKey||null,lastText:t.slice(0,80),lastAt:at,lastBy:me},{merge:true}).catch(writeErr);
+  setDoc(doc(S.db,'threads',c.key),{members:[me,c.other],job:c.jobKey||null,open:true,lastText:t.slice(0,80),lastAt:at,lastBy:me},{merge:true}).catch(writeErr);
   savePriv({seen:{[c.key]:at}});
   requestAnimationFrame(()=>{$('msg')?.focus()});
 }
@@ -462,7 +475,7 @@ function viewJob(D){
   if(!j)return`<div class="pad">${back('board','Back to the board')}<div class="empty" style="margin:18px 0"><b>This job is gone</b><p>The poster closed it or it was taken off the board.</p></div></div>`;
   const me=S.me.id,mine=j.owner===me,st=jobState(j),bids=bidsFor(D,j.key).sort((a,b)=>a.amt-b.amt||a.at-b.at);
   const myBid=(S.myDoc?.bids||{})[j.key];
-  if(S.bid.key!==j.key)S.bid={key:j.key,amt:String(myBid?num(myBid.amt):j.price),say:myBid?str(myBid.say,90):''};
+  if(S.bid.key!==j.key)S.bid={key:j.key,amt:String(myBid?num(myBid.amt):j.price),say:myBid?pitchFor(j.key,me):''};
   const stTag={expired:'<span class="tag warn">Closed · time ran out</span>',closed:'<span class="tag">Closed</span>',removed:'<span class="tag warn">Removed</span>',
     assigned:`<span class="tag ok">Picked ${esc(shortName(j.accepted))}</span>`,done:payOf(j)?.ok?'<span class="tag ok">Done · Paid ✓</span>':'<span class="tag ok">Done</span>'}[st]||'';
   let foot='';
@@ -481,12 +494,12 @@ function viewJob(D){
       <div style="display:flex;gap:9px"><label class="field" for="bidAmt"><span class="fl">Your bid ₹</span>
         <input id="bidAmt" type="text" inputmode="numeric" maxlength="6" value="${esc(S.bid.amt)}" data-bind="bid.amt" aria-label="Your bid in rupees"
          style="font-family:var(--display);font-size:var(--t-19);font-weight:800;letter-spacing:-.035em;font-variant-numeric:tabular-nums"></label>
-        <button class="iconbtn" style="width:52px;height:auto;border-radius:999px;background:var(--surface)" data-thread-job aria-label="Message ${esc(firstName(j.owner))}">${ic('chat',20)}</button></div>
-      <label class="field" for="bidSay"><input id="bidSay" maxlength="90" placeholder="One line on why you (optional)" value="${esc(S.bid.say)}" data-bind="bid.say"></label>
+        ${threadOpen(jobThreadKey(j.key,me))?`<button class="iconbtn" style="width:52px;height:auto;border-radius:999px;background:var(--surface)" data-thread-job aria-label="Message ${esc(firstName(j.owner))}">${ic('chat',20)}</button>`:''}</div>
+      <label class="field" for="bidSay"><input id="bidSay" maxlength="90" placeholder="Pitch yourself in one line (only ${esc(firstName(j.owner))} sees it)" value="${esc(S.bid.say)}" data-bind="bid.say"></label>
       ${S.err.bid?`<p class="err">${esc(S.err.bid)}</p>`:''}
       <button class="cta" data-act="bid">${myBid?'Update my bid':'Place bid'}</button>
       ${myBid?'<button class="linkbtn" data-act="withdraw">Withdraw my bid</button>':''}
-      <p class="note">You pay each other on UPI. tack never holds your money.</p></div>`;
+      <p class="note">${threadOpen(jobThreadKey(j.key,me))?`${esc(firstName(j.owner))} messaged you about this job.`:`You can message ${esc(firstName(j.owner))} once they pick you.`} You pay each other on UPI.</p></div>`;
     else if(j.accepted===me&&st==='done'){const pay=payOf(j),pn=esc(firstName(j.owner)),late=pay&&!pay.ok&&Date.now()-(j.doneAt||pay.at)>PAY_GRACE;
       foot=pay?.ok?`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} Paid · you confirmed ₹${fmt(j.agreed)} ${since(pay.at)}</div>
           <button class="linkbtn" data-act="paid" data-val="no">I marked this by mistake</button></div>`
@@ -578,6 +591,7 @@ function viewChat(D){
   const c=S.chat;if(!c.key)return viewChats(D);
   const j=c.jobKey?D.jobByKey[c.jobKey]:null,me=S.me.id;
   const accepted=j&&j.accepted&&[j.owner,j.accepted].includes(me)&&[j.owner,j.accepted].includes(c.other);
+  const can=canMessage(c,D);
   return`<div class="pad" style="padding-bottom:10px"><div style="display:flex;align-items:center;gap:10px">
      <button class="back" data-go="chats" aria-label="Back to chats" style="padding:0">${ic('back',20)}</button>
      <button class="rowmain" data-person="${esc(c.other)}">${ring(c.other,42)}<span class="rowtext"><span style="font-size:var(--t-16);font-weight:700;letter-spacing:-.015em">${esc(shortName(c.other))}</span>
@@ -590,10 +604,11 @@ function viewChat(D){
    ${c.msgs.map(m=>`<div class="${m.by===me?'out':'in'}">${esc(m.t)}<span class="time">${stamp(m.at)}</span></div>`).join('')}
    <p class="note" style="margin-top:4px">Keep it here. If you report someone, we can see this chat.</p>
   </div>
+  ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`You can message ${esc(firstName(c.other))} when they're marked Free right now, or after they message you.`}</p></div>`:`
   <div class="foot" style="position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%)"><div style="display:flex;gap:9px">
     <label class="field" for="msg"><input id="msg" type="text" maxlength="1000" placeholder="Message…" value="${esc(S.chatDraft.text)}" data-bind="chatDraft.text" aria-label="Message ${esc(firstName(c.other))}" autocomplete="off"></label>
     <button data-act="send" aria-label="Send" style="width:50px;height:50px;flex-shrink:0;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(198,242,78,.35)">${ic('send',19,2,'var(--bg)')}</button>
-  </div></div>`;
+  </div></div>`}`;
 }
 function viewPerson(uid,D){
   const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,free=num(d.freeUntil)>Date.now();
@@ -619,7 +634,7 @@ function viewPerson(uid,D){
        <button data-act="logout">${ic('out',18)} Log out</button>
        <button data-sheet="erase" class="danger">${ic('trash',18)} Delete my account</button></div>
        <p class="note">Logged in as ${esc(S.me.email)}</p>`
-     :`<button class="cta" data-dm="${esc(uid)}">Message ${esc(firstName(uid))}</button>
+     :`${canMessage({key:dmKey(S.me.id,uid),other:uid,jobKey:null},D)?`<button class="cta" data-dm="${esc(uid)}">Message ${esc(firstName(uid))}</button>`:`<p class="note">You can message ${esc(firstName(uid))} when they're marked Free right now.</p>`}
        <button class="linkbtn" data-sheet="report" data-about="${esc(uid)}">Report or block</button>`}
   </div></div><div style="height:24px"></div>`;
 }
@@ -809,8 +824,8 @@ const ACT={
     saveMine(x=>{if(x.jobs?.[j.id])x.jobs[j.id].status='closed';return x});go('post')},
   bid(){const j=derive().jobByKey[S.openJob];if(!j)return;const amt=digits(S.bid.amt);
     if(!need(amt>=1&&amt<=50000,'bid','Enter a bid in rupees.'))return;const had=!!(S.myDoc?.bids||{})[j.key];
-    saveMine(x=>{x.bids={...(x.bids||{}),[j.key]:{amt,say:S.bid.say.trim().slice(0,90),at:Date.now()}};return x});S.err={};toast(had?'Bid updated':'Bid placed')},
-  withdraw(){const k=S.openJob;saveMine(x=>{if(x.bids)delete x.bids[k];return x});S.bid={key:null};toast('Bid withdrawn')},
+    saveMine(x=>{x.bids={...(x.bids||{}),[j.key]:{amt,at:Date.now()}};return x});savePitch(j.key,S.bid.say.trim());S.err={};toast(had?'Bid updated':'Bid placed')},
+  withdraw(){const k=S.openJob;saveMine(x=>{if(x.bids)delete x.bids[k];return x});savePitch(k,'');S.bid={key:null};toast('Bid withdrawn')},
   confirmPick(){const j=derive().jobByKey[S.openJob],s=S.sheet;if(!j||!s)return;
     saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.status='assigned';o.accepted=s.uid;o.agreed=s.amt;o.assignedAt=Date.now()}return x});
     S.sheet=null;toast('Picked '+firstName(s.uid)+'. Sort out the details in chat.');openThread({key:jobThreadKey(j.key,s.uid),other:s.uid,jobKey:j.key})},
@@ -834,6 +849,7 @@ const ACT={
     try{
       for(const[k,t]of Object.entries(S.threadDocs)){const q=await getDocs(query(collection(S.db,'threads',k,'msgs'),where('by','==',me)));for(const m of q.docs)await deleteDoc(m.ref);
         if(t&&t.lastBy===me)await S.fb.setDoc(doc(S.db,'threads',k),{lastText:'Message deleted'},{merge:true})}
+      for(const id of Object.keys(S.pitchMine))await deleteDoc(doc(S.db,'pitches',id));
       await deleteDoc(doc(S.db,'people',me));await deleteDoc(doc(S.db,'private',me));
       S.erased=true;stopSubs();await deleteUser(user);
       S.busy=false;S.sheet=null;S.erase={pw:''};S.phase='erased';render();
@@ -879,9 +895,9 @@ document.addEventListener('click',e=>{
   if(ds.why!==undefined){S.rep.why=ds.why;render();return}
   const D=derive(),me=S.me.id;
   if(ds.thread!==undefined){const t=D.threads.find(x=>x.key===ds.thread);if(t)openThread(t);return}
-  if(ds.threadJob!==undefined){const j=D.jobByKey[S.openJob];if(j)openThread({key:jobThreadKey(j.key,me),other:j.owner,jobKey:j.key});return}
+  if(ds.threadJob!==undefined){const j=D.jobByKey[S.openJob];if(j&&canMessage({key:jobThreadKey(j.key,me),other:j.owner,jobKey:j.key},D))openThread({key:jobThreadKey(j.key,me),other:j.owner,jobKey:j.key});return}
   if(ds.threadWith!==undefined){const j=D.jobByKey[S.openJob];if(j)openThread({key:jobThreadKey(j.key,ds.threadWith),other:ds.threadWith,jobKey:j.key});return}
-  if(ds.dm!==undefined){if(ds.dm!==me)openThread({key:dmKey(me,ds.dm),other:ds.dm,jobKey:null});return}
+  if(ds.dm!==undefined){if(ds.dm!==me&&canMessage({key:dmKey(me,ds.dm),other:ds.dm,jobKey:null},D))openThread({key:dmKey(me,ds.dm),other:ds.dm,jobKey:null});return}
 });
 document.addEventListener('submit',e=>{
   const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();
