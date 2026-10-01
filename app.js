@@ -36,7 +36,7 @@ const I={
  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/>',
  camera:'<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.5" r="3.5"/>'
 };
-const ic=(n,s=20,w=2.1,c='currentColor',fill='none')=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="${fill}" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
+const ic=(n,s=20,w=2,c='currentColor',fill='none')=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="${fill}" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
 
 const blankDraft=()=>({text:'',price:'',kind:'Errand',when:'Today',where:'Gate 1',whereText:'',more:''});
 const inviteParam=(new URLSearchParams(location.search).get('invite')||'').trim().toLowerCase();
@@ -421,7 +421,7 @@ function onboardHTML(edit){
   </div>`;
 }
 
-function back(to,label){return`<button class="back" data-go="${to}">${ic('back',16,2.3)} ${label}</button>`}
+function back(to,label){return`<button class="back" data-go="${to}">${ic('back',16)} ${label}</button>`}
 function tile(j,D,i=0){
   const r=ringOf(j.owner),n=bidsFor(D,j.key).length,left=j.deadline-Date.now();
   return`<button class="tile r${i%3}" data-job="${esc(j.key)}" style="--glow:${GLOW[r]}">
@@ -445,12 +445,12 @@ function viewBoard(D){
   </header>
   <section class="stripwrap" aria-label="Free right now"><p class="label">Free right now</p>
     <div class="strip">
-      <button class="person" data-sheet="free" aria-label="${meFree?'Change when you’re free':'Mark yourself free'}">${meFree?ring(S.me.id,50):`<span class="add">${ic('plus',18,2.6)}</span>`}<span>You</span></button>
+      <button class="person" data-sheet="free" aria-label="${meFree?'Change when you’re free':'Mark yourself free'}">${meFree?ring(S.me.id,50):`<span class="add">${ic('plus',18)}</span>`}<span>You</span></button>
       ${free.map(u=>`<button class="person" data-person="${esc(u)}">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}
       ${free.length?'':`<span class="stripnote">Nobody else is marked free. Tap + to say you're around.</span>`}
     </div></section>
   <div class="dhead"><h1 class="h1">The board</h1><span class="muted">${list.length} pinned at ${esc(campus())}</span></div>
-  <div class="pills" role="group" aria-label="Sort jobs">${[['high','₹ high'],['newest','newest'],['closing','closing']].map(([k,l])=>`<button class="pill ${S.sort===k?'on':''}" data-sort="${k}" aria-pressed="${S.sort===k}">${l}</button>`).join('')}</div>
+  <div class="pills" role="group" aria-label="Sort jobs">${[['high','Top pay'],['newest','Newest'],['closing','Closing soon']].map(([k,l])=>`<button class="pill ${S.sort===k?'on':''}" data-sort="${k}" aria-pressed="${S.sort===k}">${l}</button>`).join('')}</div>
   ${list.length?wallHTML(list,D):`<div class="empty"><b>Nothing pinned yet</b><p>Pin the first job: a xerox run, a lift down four floors, an hour of help before a submission.</p><button class="cta" data-go="post">Pin a job</button></div>`}`;
 }
 function viewJob(D){
@@ -472,7 +472,7 @@ function viewJob(D){
     if(st==='open')foot=`<div class="foot">
       <div style="display:flex;gap:9px"><label class="field" for="bidAmt"><span class="fl">Your bid ₹</span>
         <input id="bidAmt" type="text" inputmode="numeric" maxlength="6" value="${esc(S.bid.amt)}" data-bind="bid.amt" aria-label="Your bid in rupees"
-         style="font-family:var(--display);font-size:20px;font-weight:800;letter-spacing:-.035em;font-variant-numeric:tabular-nums"></label>
+         style="font-family:var(--display);font-size:var(--t-19);font-weight:800;letter-spacing:-.035em;font-variant-numeric:tabular-nums"></label>
         <button class="iconbtn" style="width:52px;height:auto;border-radius:999px;background:var(--surface)" data-thread-job aria-label="Message ${esc(firstName(j.owner))}">${ic('chat',20)}</button></div>
       <label class="field" for="bidSay"><input id="bidSay" maxlength="90" placeholder="One line on why you (optional)" value="${esc(S.bid.say)}" data-bind="bid.say"></label>
       ${S.err.bid?`<p class="err">${esc(S.err.bid)}</p>`:''}
@@ -490,14 +490,14 @@ function viewJob(D){
     <span class="big" style="view-transition-name:jp">₹${fmt(j.price)}</span>
     <h1 class="h1">${esc(j.text)}</h1>
     <div class="chips">${[j.when,j.where,j.kind].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${stTag}</div>
-    ${j.more?`<p style="margin:0;font-size:14px;line-height:1.55;color:var(--fg2);max-width:52ch;overflow-wrap:anywhere;white-space:pre-wrap">${esc(j.more)}</p>`:''}
+    ${j.more?`<p style="margin:0;font-size:var(--t-14);line-height:1.55;color:var(--fg2);max-width:52ch;overflow-wrap:anywhere;white-space:pre-wrap">${esc(j.more)}</p>`:''}
     <button class="card" data-person="${esc(j.owner)}">${ring(j.owner,50)}
-      <span class="rowtext" style="gap:3px"><span style="font-size:15px;font-weight:700;letter-spacing:-.015em">${esc(shortName(j.owner))}${mine?' <span class="muted">(you)</span>':''}</span>
-      <span style="font-size:11.5px;font-weight:500;color:var(--muted)">${esc(metaOf(j.owner)||campus())}${esc(rateLine(j.owner,D))} · posted ${since(j.at)}</span></span></button>
+      <span class="rowtext" style="gap:3px"><span style="font-size:var(--t-16);font-weight:700;letter-spacing:-.015em">${esc(shortName(j.owner))}${mine?' <span class="muted">(you)</span>':''}</span>
+      <span style="font-size:var(--t-12);font-weight:500;color:var(--muted)">${esc(metaOf(j.owner)||campus())}${esc(rateLine(j.owner,D))} · posted ${since(j.at)}</span></span></button>
     ${!mine?`<div style="display:flex;gap:16px"><button class="linkbtn" data-sheet="report" data-about="${esc(j.owner)}">Report</button>${mod}</div>`:''}
    </div>
    <div class="stack">
-    <div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">${bids.length} ${bids.length===1?'bid':'bids'}</h2><span style="font-size:11.5px;font-weight:600;color:var(--muted)">lowest first</span></div>
+    <div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">${bids.length} ${bids.length===1?'bid':'bids'}</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--muted)">lowest first</span></div>
     ${bids.length?bids.map(b=>`<div class="row">
       <button class="rowmain" data-person="${esc(b.by)}">${ring(b.by,42)}<span class="rowtext">
         <span class="t1">${esc(shortName(b.by))}${b.by===me?' (you)':''} <span class="muted">· ${esc(metaOf(b.by))}${esc(rateLine(b.by,D))}</span></span>
@@ -526,7 +526,7 @@ function viewPost(){
    <input id="jw" class="inp" maxlength="40" placeholder="Or type a place: Seminar hall, B-wing 4th floor…" value="${esc(d.whereText)}" data-bind="draft.whereText" aria-label="Other place">
    <div class="stack gap8"><label for="jm" class="formlabel">Anything else <span class="muted">(optional)</span></label>
      <textarea id="jm" class="inp" rows="2" maxlength="600" style="resize:vertical" placeholder="Details the person doing it should know." data-bind="draft.more">${esc(d.more)}</textarea></div>
-   <div class="card">${ring(S.me.id,38)}<span style="font-size:12px;font-weight:500;color:var(--fg2)">Posting as <b style="color:var(--fg)">${esc(shortName(S.me.id))}${metaOf(S.me.id)?' · '+esc(metaOf(S.me.id)):''}</b>. Your photo and name show on the board.</span></div>
+   <div class="card">${ring(S.me.id,38)}<span style="font-size:var(--t-12);font-weight:500;color:var(--fg2)">Posting as <b style="color:var(--fg)">${esc(shortName(S.me.id))}${metaOf(S.me.id)?' · '+esc(metaOf(S.me.id)):''}</b>. Your photo and name show on the board.</span></div>
   </div></div>
   <div class="foot">${S.err.post?`<p class="err">${esc(S.err.post)}</p>`:''}<button class="cta" data-act="post">Put it on the board</button>
    <p class="note">No assignment or exam work. Nothing illegal, nothing that puts someone at risk.</p></div>`;
@@ -538,8 +538,8 @@ function viewBids(D){
   const jobLine=j=>{const st=jobState(j),n=bidsFor(D,j.key).length;
     return st==='open'?[`${n} ${n===1?'bid':'bids'} in`,'']:st==='assigned'?[`Picked ${shortName(j.accepted)} · ₹${fmt(j.agreed)}`,'ok']:st==='done'?[`Done${j.rating?' · you gave ★'+j.rating.stars:''}`,'ok']:st==='expired'?['Time ran out','warn']:['Closed','']};
   const bidLine=({j})=>{const st=jobState(j);return j.accepted===me?[`Accepted · ₹${fmt(j.agreed)}`,'ok']:j.accepted?['Went to someone else','']:st==='open'?[`Waiting · ${bidsFor(D,j.key).length} bids in`,'']:['Closed','']};
-  const row=(j,[line,cls],amt)=>`<button class="item" data-job="${esc(j.key)}"><span class="itext"><span class="t1" style="font-weight:600;color:#EDEAF6">${esc(j.text)}</span>
-    <span style="font-size:11px;font-weight:700;color:${cls==='ok'?'var(--accent)':cls==='warn'?'#FF8C9B':'var(--muted)'}">${esc(line)}</span></span><span class="amt" style="font-size:16px;color:var(--fg2)">₹${fmt(amt)}</span></button>`;
+  const row=(j,[line,cls],amt)=>`<button class="item" data-job="${esc(j.key)}"><span class="itext"><span class="t1" style="font-weight:600;color:var(--fg)">${esc(j.text)}</span>
+    <span style="font-size:var(--t-11);font-weight:700;color:${cls==='ok'?'var(--accent)':cls==='warn'?'var(--coral-ink)':'var(--muted)'}">${esc(line)}</span></span><span class="amt" style="font-size:var(--t-16);color:var(--fg2)">₹${fmt(amt)}</span></button>`;
   return`<div class="pad narrow"><h1 class="pageh">Bids</h1>
    <div class="stack">
     <div class="sect"><h2 class="h2">On your jobs</h2><button class="linkbtn" data-go="post" style="padding:0">Pin a job</button></div>
@@ -561,9 +561,9 @@ function viewChat(D){
   const j=c.jobKey?D.jobByKey[c.jobKey]:null,me=S.me.id;
   const accepted=j&&j.accepted&&[j.owner,j.accepted].includes(me)&&[j.owner,j.accepted].includes(c.other);
   return`<div class="pad" style="padding-bottom:10px"><div style="display:flex;align-items:center;gap:10px">
-     <button class="back" data-go="chats" aria-label="Back to chats" style="padding:0">${ic('back',20,2.3)}</button>
-     <button class="rowmain" data-person="${esc(c.other)}">${ring(c.other,42)}<span class="rowtext"><span style="font-size:15px;font-weight:700;letter-spacing:-.015em">${esc(shortName(c.other))}</span>
-       <span style="font-size:11.5px;font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${j?`₹${fmt(j.agreed||j.price)} · ${esc(j.text)}`:esc(metaOf(c.other)||campus())}</span></span></button>
+     <button class="back" data-go="chats" aria-label="Back to chats" style="padding:0">${ic('back',20)}</button>
+     <button class="rowmain" data-person="${esc(c.other)}">${ring(c.other,42)}<span class="rowtext"><span style="font-size:var(--t-16);font-weight:700;letter-spacing:-.015em">${esc(shortName(c.other))}</span>
+       <span style="font-size:var(--t-12);font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${j?`₹${fmt(j.agreed||j.price)} · ${esc(j.text)}`:esc(metaOf(c.other)||campus())}</span></span></button>
      <button class="iconbtn" data-sheet="report" data-about="${esc(c.other)}" aria-label="Report or block">${ic('flag',17)}</button></div></div>
   <div class="msgs">
    ${accepted?`<div class="banner">${ic('tick',13,3.4,'var(--accent)')} Bid accepted · ₹${fmt(j.agreed)} · pay on UPI after</div>`:''}
@@ -574,13 +574,13 @@ function viewChat(D){
   </div>
   <div class="foot" style="position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%)"><div style="display:flex;gap:9px">
     <label class="field" for="msg"><input id="msg" type="text" maxlength="1000" placeholder="Message…" value="${esc(S.chatDraft.text)}" data-bind="chatDraft.text" aria-label="Message ${esc(firstName(c.other))}" autocomplete="off"></label>
-    <button data-act="send" aria-label="Send" style="width:50px;height:50px;flex-shrink:0;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(198,242,78,.35)">${ic('send',19,2.5,'var(--bg)')}</button>
+    <button data-act="send" aria-label="Send" style="width:50px;height:50px;flex-shrink:0;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(198,242,78,.35)">${ic('send',19,2,'var(--bg)')}</button>
   </div></div>`;
 }
 function viewPerson(uid,D){
   const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,free=num(d.freeUntil)>Date.now();
   const does=str(d.does,60).split(',').map(s=>s.trim()).filter(Boolean).slice(0,6);
-  const tints=[['rgba(79,227,224,.16)','#7FEFEC'],['rgba(255,122,209,.16)','#FF9FDD'],['rgba(255,197,61,.16)','#FFD26B'],['rgba(161,140,255,.18)','#BCAAFF']];
+  const tints=[['rgba(79,227,224,.16)','var(--cyan-ink)'],['rgba(255,122,209,.16)','var(--pink-ink)'],['rgba(255,197,61,.16)','var(--amber-ink)'],['rgba(161,140,255,.18)','var(--violet-ink)']];
   return`<div class="pad">${isMe?'':back('board','Back to the board')}
   <div class="stack narrow" style="margin:6px auto 0;gap:18px">
    <div class="prof">
@@ -593,7 +593,7 @@ function viewPerson(uid,D){
    ${isMe?`<button class="card" data-sheet="free">${ic('clock',20)}<span class="rowtext"><span class="t1">${free?'You’re free until '+clock(num(d.freeUntil)):'Free right now?'}</span><span class="t2">${free?'Tap to change or turn it off':'Show classmates you’re around for a job'}</span></span><span class="chev">${ic('chev',18)}</span></button>`:''}
    ${does.length?`<div class="chips">${does.map((x,i)=>`<span class="chip" style="background:${tints[i%4][0]};color:${tints[i%4][1]};font-weight:700">${esc(x)}</span>`).join('')}</div>`:''}
    ${st.reviews.length?`<h2 class="h2">What people said</h2>${st.reviews.map(r=>`<div class="row" style="align-items:flex-start">${face(r.from,36)}<span class="rowtext" style="gap:3px">
-       <span class="t1" style="font-size:12.5px">${esc(shortName(r.from))} <span class="muted">· ${'★'.repeat(r.stars)}</span></span><span style="font-size:13px;line-height:1.45;color:var(--fg2);overflow-wrap:anywhere">${esc(r.text)}</span></span></div>`).join('')}`:''}
+       <span class="t1" style="font-size:var(--t-12)">${esc(shortName(r.from))} <span class="muted">· ${'★'.repeat(r.stars)}</span></span><span style="font-size:var(--t-14);line-height:1.45;color:var(--fg2);overflow-wrap:anywhere">${esc(r.text)}</span></span></div>`).join('')}`:''}
    ${isMe?`<div class="menu">
        <button data-go="edit">${ic('edit',18)} Edit profile<span class="chev">${ic('chev',16)}</span></button>
        ${S.me.isOwner?`<button data-go="invites">${ic('users',18)} Invites and members<span class="chev">${ic('chev',16)}</span></button>`:''}
@@ -637,13 +637,13 @@ function viewInvites(D){
   const li=S.lastInvite;
   return`<div class="pad">${back('me','Back')}<div class="stack narrow" style="margin-top:6px;gap:20px">
    <div><h1 class="pageh" style="margin-bottom:6px">Invites and members</h1>
-   <p style="margin:0;font-size:14px;line-height:1.55;color:var(--fg2)">Only emails on this list can sign up. Add someone, then send them the invite. They create an account with that email and confirm it.</p></div>
+   <p style="margin:0;font-size:var(--t-14);line-height:1.55;color:var(--fg2)">Only emails on this list can sign up. Add someone, then send them the invite. They create an account with that email and confirm it.</p></div>
    <div class="stack gap8"><label class="formlabel" for="invE">Invite by email</label>
      <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="invE" class="inp" style="flex:1;min-width:200px" type="email" inputmode="email" autocapitalize="off" spellcheck="false" autocomplete="off" placeholder="name@college.edu.in" value="${esc(S.inv.email)}" data-bind="inv.email">
-     <button class="pick" style="padding:12px 18px;font-size:13px" data-act="invite">Add invite</button></div>
+     <button class="pick" style="padding:12px 18px;font-size:var(--t-14)" data-act="invite">Add invite</button></div>
      ${S.err.inv?`<p class="err">${esc(S.err.inv)}</p>`:''}</div>
    ${li?`<div class="box stack" style="gap:10px;border:1px solid rgba(198,242,78,.35)">
-     <span class="t1" style="font-size:14px">${esc(li)} can sign up now. Send them the invite:</span>${shareButtons(li)}
+     <span class="t1" style="font-size:var(--t-14)">${esc(li)} can sign up now. Send them the invite:</span>${shareButtons(li)}
      <p class="note" style="text-align:left">The invite has a link to the sign-up page with their email filled in.</p></div>`:''}
    <div class="stack gap8"><div class="sect"><h2 class="h2">Invited</h2><span class="time">${list.length}</span></div>
     ${list.length?list.map(x=>{const joined=x.uid&&S.peopleDocs[x.uid]?.adult;return`<div class="row">${joined?ring(x.uid,40):`<span class="add" style="width:40px;height:40px">${ic('clock',16)}</span>`}
@@ -654,7 +654,7 @@ function viewInvites(D){
    <div class="stack gap8"><div class="sect"><h2 class="h2">Reports</h2><span class="time">${S.reports.length}</span></div>
     ${S.reports.length?S.reports.map(r=>`<div class="row" style="align-items:flex-start"><span class="rowtext" style="gap:3px"><span class="t1">${esc(shortName(str(r.by,128)))} reported ${esc(shortName(str(r.about,128)))}</span>
       <span class="t2">${esc(str(r.why,40))}${r.note?' · '+esc(str(r.note,200)):''}</span><span class="time">${stamp(num(r.at))}</span></span>
-      <button class="btn2" style="width:auto;padding:8px 12px;font-size:12px" data-person="${esc(str(r.about,128))}">View</button></div>`).join(''):'<p class="note" style="text-align:left">No reports.</p>'}</div>
+      <button class="btn2" style="width:auto;padding:8px 12px;font-size:var(--t-12)" data-person="${esc(str(r.about,128))}">View</button></div>`).join(''):'<p class="note" style="text-align:left">No reports.</p>'}</div>
    <div class="stack gap8"><label class="formlabel" for="invC">Campus name</label>
      <div style="display:flex;gap:8px"><input id="invC" class="inp" maxlength="40" value="${esc(S.inv.campus||campus())}" data-bind="inv.campus"><button class="btn2" style="width:auto;padding:12px 18px" data-act="saveCampus">Save</button></div></div>
    <p class="note" style="text-align:left">Removing an invite locks that person out straight away and takes their jobs off the board.</p>
@@ -663,18 +663,18 @@ function viewInvites(D){
 function railHTML(D){
   const free=freePeople(D).filter(u=>u!==S.me.id),me=S.me.id;
   const myBids=Object.entries(S.myDoc?.bids||{}).map(([k,b])=>({b,j:D.jobByKey[k]})).filter(x=>x.j&&x.j.owner!==me).sort((a,b)=>num(b.b.at)-num(a.b.at)).slice(0,4);
-  return`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">Free right now</h2><span style="font-size:11.5px;font-weight:600;color:var(--dim)">${D.members.length} on the board</span></div>
+  return`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">Free right now</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--dim)">${D.members.length} on the board</span></div>
   <div class="stack gap8">${free.length?free.map(u=>`<div style="display:flex;align-items:center;gap:10px"><button class="rowmain" data-person="${esc(u)}">${ring(u,40)}
-     <span class="rowtext"><span style="font-size:13px;font-weight:700">${esc(shortName(u))}</span><span style="font-size:11px;font-weight:500;color:var(--muted)">${esc([metaOf(u),str(pdoc(u).does,40)].filter(Boolean).join(' · '))}</span></span></button>
-     <button data-dm="${esc(u)}" style="background:var(--surface2);border-radius:999px;padding:7px 13px;font-size:11.5px;font-weight:700">Ask</button></div>`).join('')
+     <span class="rowtext"><span style="font-size:var(--t-14);font-weight:700">${esc(shortName(u))}</span><span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc([metaOf(u),str(pdoc(u).does,40)].filter(Boolean).join(' · '))}</span></span></button>
+     <button data-dm="${esc(u)}" style="background:var(--surface2);border-radius:999px;padding:7px 13px;font-size:var(--t-12);font-weight:700">Ask</button></div>`).join('')
    :`<p class="note" style="text-align:left">Nobody else is marked free right now.</p>`}
-   <button class="btn2" style="padding:10px;font-size:12.5px" data-sheet="free">${num(S.myDoc?.freeUntil)>Date.now()?'You’re free until '+clock(num(S.myDoc.freeUntil)):'I’m free right now'}</button></div>
+   <button class="btn2" style="padding:10px;font-size:var(--t-12)" data-sheet="free">${num(S.myDoc?.freeUntil)>Date.now()?'You’re free until '+clock(num(S.myDoc.freeUntil)):'I’m free right now'}</button></div>
   <div style="height:1px;background:var(--line)"></div>
   <h2 class="h2">Your bids</h2>
-  <div class="stack gap8">${myBids.length?myBids.map(({b,j})=>{const ok=j.accepted===me;return`<button data-job="${esc(j.key)}" style="display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:14px;padding:11px 13px;width:100%;text-align:left">
-     <span class="rowtext"><span style="font-size:12.5px;font-weight:600;color:#EDEAF6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(j.text)}</span>
-     <span style="font-size:10.5px;font-weight:600;color:${ok?'var(--accent)':'var(--muted)'}">${ok?'Accepted · ₹'+fmt(j.agreed):j.accepted?'Went to someone else':jobState(j)==='open'?'Waiting · '+bidsFor(D,j.key).length+' bids in':'Closed'}</span></span>
-     <span style="font-family:var(--display);font-size:15px;font-weight:800;color:var(--fg2);font-variant-numeric:tabular-nums">₹${fmt(b.amt)}</span></button>`}).join('')
+  <div class="stack gap8">${myBids.length?myBids.map(({b,j})=>{const ok=j.accepted===me;return`<button data-job="${esc(j.key)}" style="display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:var(--r-sm);padding:11px 13px;width:100%;text-align:left">
+     <span class="rowtext"><span style="font-size:var(--t-12);font-weight:600;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(j.text)}</span>
+     <span style="font-size:var(--t-11);font-weight:600;color:${ok?'var(--accent)':'var(--muted)'}">${ok?'Accepted · ₹'+fmt(j.agreed):j.accepted?'Went to someone else':jobState(j)==='open'?'Waiting · '+bidsFor(D,j.key).length+' bids in':'Closed'}</span></span>
+     <span style="font-family:var(--display);font-size:var(--t-16);font-weight:800;color:var(--fg2);font-variant-numeric:tabular-nums">₹${fmt(b.amt)}</span></button>`}).join('')
    :'<p class="note" style="text-align:left">Bids you place show up here.</p>'}</div>`;
 }
 
@@ -731,11 +731,11 @@ function render(){
     $('rail').innerHTML=railHTML(D);
     const navOn=v=>S.view===v||(v==='board'&&['job','person'].includes(S.view))||(v==='chats'&&S.view==='chat')||(v==='me'&&['privacy','edit'].includes(S.view))||(v==='invites'&&S.view==='invites');
     $('sidebar').innerHTML=`<div style="padding:0 6px"><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${esc(campus())} · ${boardJobs(D).length} pinned</span></div></div>
-      <button class="cta" data-go="post" style="padding:13px 10px;font-size:15px">+ Pin a job</button>
+      <button class="cta" data-go="post" style="padding:13px 10px;font-size:var(--t-16)">+ Pin a job</button>
       <nav style="display:flex;flex-direction:column;gap:3px" aria-label="Sections">${[['board','Board','board'],['bids','Bids','bids'],['chats','Chats','chat'],['me','Profile','me']].concat(S.me.isOwner?[['invites','Invites','users']]:[])
         .map(([v,l,i])=>`<button class="navitem ${navOn(v)?'on':''}" data-go="${v}" ${navOn(v)?'aria-current="page"':''}>${ic(i,18)} ${l}${v==='chats'&&D.unread?'<span class="udot" aria-label="Unread"></span>':''}</button>`).join('')}</nav>
-      <button class="card" style="margin-top:auto;padding:10px 12px;border-radius:14px" data-go="me">${ring(S.me.id,38)}<span class="rowtext"><span style="font-size:12.5px;font-weight:700">${esc(shortName(S.me.id))}</span>
-        <span style="font-size:10.5px;font-weight:500;color:var(--muted)">${esc(metaOf(S.me.id)||campus())}</span></span></button>`;
+      <button class="card" style="margin-top:auto;padding:10px 12px;border-radius:var(--r-sm)" data-go="me">${ring(S.me.id,38)}<span class="rowtext"><span style="font-size:var(--t-12);font-weight:700">${esc(shortName(S.me.id))}</span>
+        <span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc(metaOf(S.me.id)||campus())}</span></span></button>`;
     $('tabbar').innerHTML=[['board','Board','board'],['bids','Bids','bids'],['post','','plus'],['chats','Chats','chat'],['me','Me','me']].map(([v,l,i])=>v==='post'
       ?`<button class="tab" data-go="post" aria-label="Pin a job"><span class="fab">${ic('plus',24,3,'var(--bg)')}</span></button>`
       :`<button class="tab ${navOn(v)||(v==='me'&&S.view==='invites')?'on':''}" data-go="${v}">${ic(i,20)}<span>${l}</span>${v==='chats'&&D.unread?'<span class="udot"></span>':''}</button>`).join('');
