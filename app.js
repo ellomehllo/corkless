@@ -422,9 +422,9 @@ function onboardHTML(edit){
 }
 
 function back(to,label){return`<button class="back" data-go="${to}">${ic('back',16,2.3)} ${label}</button>`}
-function tile(j,D){
+function tile(j,D,i=0){
   const r=ringOf(j.owner),n=bidsFor(D,j.key).length,left=j.deadline-Date.now();
-  return`<button class="tile" data-job="${esc(j.key)}" style="--glow:${GLOW[r]}">
+  return`<button class="tile r${i%3}" data-job="${esc(j.key)}" style="--glow:${GLOW[r]}">
     <span class="pin" style="background:${r};box-shadow:0 0 10px ${r}"></span>
     <span class="price">₹${fmt(j.price)}</span>
     ${left<36e5?`<span class="flag">${Math.max(1,Math.round(left/6e4))} min left</span>`:''}
@@ -432,6 +432,11 @@ function tile(j,D){
     <span class="by">${face(j.owner,22)}<span class="nm">${esc(firstName(j.owner))}</span><span class="n">${n} ${n===1?'bid':'bids'}</span></span>
   </button>`;
 }
+const wideMQ=matchMedia('(min-width:900px)');
+function wallHTML(list,D){const n=wideMQ.matches?3:2,cols=Array.from({length:n},()=>[]);
+  list.forEach((j,i)=>cols[i%n].push(tile(j,D,i)));
+  return`<div class="wall">${cols.map(c=>`<div class="wcol">${c.join('')}</div>`).join('')}</div>`}
+wideMQ.addEventListener?.('change',()=>{if(S.phase==='app')render()});
 function viewBoard(D){
   const list=boardJobs(D),free=freePeople(D).filter(u=>u!==S.me.id),meFree=num(S.myDoc?.freeUntil)>Date.now();
   return`<header class="top">
@@ -446,7 +451,7 @@ function viewBoard(D){
     </div></section>
   <div class="dhead"><h1 class="h1">The board</h1><span class="muted">${list.length} pinned at ${esc(campus())}</span></div>
   <div class="pills" role="group" aria-label="Sort jobs">${[['high','₹ high'],['newest','newest'],['closing','closing']].map(([k,l])=>`<button class="pill ${S.sort===k?'on':''}" data-sort="${k}" aria-pressed="${S.sort===k}">${l}</button>`).join('')}</div>
-  ${list.length?`<div class="wall">${list.map(j=>tile(j,D)).join('')}</div>`:`<div class="empty"><b>Nothing pinned yet</b><p>Pin the first job: a xerox run, a lift down four floors, an hour of help before a submission.</p><button class="cta" data-go="post">Pin a job</button></div>`}`;
+  ${list.length?wallHTML(list,D):`<div class="empty"><b>Nothing pinned yet</b><p>Pin the first job: a xerox run, a lift down four floors, an hour of help before a submission.</p><button class="cta" data-go="post">Pin a job</button></div>`}`;
 }
 function viewJob(D){
   const j=D.jobByKey[S.openJob];
