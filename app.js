@@ -108,14 +108,18 @@ function derive(){
     if(d.jobs&&typeof d.jobs==='object')for(const[id,j]of Object.entries(d.jobs)){if(!JOB_RE.test(id)||!j||typeof j!=='object')continue;const n=normJob(id,j,uid);jobs.push(n);jobByKey[n.key]=n}
   }
   for(const uid of members){const d=pdoc(uid);
-    if(d.bids&&typeof d.bids==='object')for(const[k,b]of Object.entries(d.bids)){if(!jobByKey[k]||!b||k.startsWith(uid+'~'))continue;(bidsByJob[k]=bidsByJob[k]||[]).push({by:uid,amt:num(b.amt),say:pitchFor(k,uid),at:num(b.at)})}
+    void d;
   }
+  for(const p of [...Object.values(S.pitchIn),...Object.values(S.pitchMine)]){
+    if(!p||typeof p.job!=='string'||typeof p.by!=='string'||!jobByKey[p.job]||!members.includes(p.by)||!(num(p.amt)>0))continue;
+    const l=(bidsByJob[p.job]=bidsByJob[p.job]||[]);if(!l.some(b=>b.by===p.by))l.push({by:p.by,amt:num(p.amt),say:str(p.say,90),at:num(p.at)})}
   const D={members,jobs,jobByKey,bidsByJob,blocked};
   D.threads=threadsOf(D);D.unread=D.threads.filter(t=>t.unread).length;
   D.toConfirm=jobs.filter(j=>j.accepted===me&&j.status==='done'&&!payOf(j)?.ok).length;
   D.offersWaiting=offerList(S.offersIn).filter(o=>o.status==='pending'&&D.members.includes(o.owner)&&!D.blocked.has(o.owner)).length;
   return D;
 }
+function myBidOn(jobKey){const p=S.pitchMine[jobKey+'~'+S.me.id];return p&&num(p.amt)>0?{amt:num(p.amt),say:str(p.say,90),at:num(p.at)}:null}
 function pitchFor(jobKey,bidder){const k=jobKey+'~'+bidder,p=S.pitchMine[k]||S.pitchIn[k];return p?str(p.say,90):''}
 function threadOpen(k){return !!S.threadDocs[k]}
 function canMessage(t,D){const me=S.me.id;
@@ -171,7 +175,7 @@ function prune(d){
   const keep=(o,n,by)=>{if(!o||typeof o!=='object')return{};const e=Object.entries(o);if(e.length<=n)return o;e.sort((a,b)=>by(b[1])-by(a[1]));return Object.fromEntries(e.slice(0,n))};
   const jobs=Object.entries(d.jobs||{});const live=jobs.filter(([,j])=>j.status==='open'||j.status==='assigned');
   const rest=jobs.filter(([,j])=>!(j.status==='open'||j.status==='assigned')).sort((a,b)=>num(b[1].at)-num(a[1].at)).slice(0,80);
-  d.jobs=Object.fromEntries([...live,...rest]);d.bids=keep(d.bids,150,b=>num(b.at));d.paid=keep(d.paid,150,x=>num(x.at));
+  d.jobs=Object.fromEntries([...live,...rest]);d.paid=keep(d.paid,150,x=>num(x.at));
   return d;
 }
 const converting=new Set();
@@ -184,8 +188,8 @@ function convertOffers(){
     enqueue('me',()=>S.fb.deleteDoc(S.fb.doc(S.db,'offers',o.key))).catch(()=>{});
   }
 }
-function savePitch(jobKey,say){const {doc,setDoc,deleteDoc}=S.fb,me=S.me.id,id=jobKey+'~'+me,owner=jobKey.split('~')[0];
-  if(say){const p={owner,by:me,job:jobKey,say:say.slice(0,90),at:Date.now()};S.pitchMine={...S.pitchMine,[id]:p};return setDoc(doc(S.db,'pitches',id),p).catch(writeErr)}
+function savePitch(jobKey,say,amt){const {doc,setDoc,deleteDoc}=S.fb,me=S.me.id,id=jobKey+'~'+me,owner=jobKey.split('~')[0];
+  if(amt){const p={owner,by:me,job:jobKey,amt,say:(say||'').slice(0,90),at:Date.now()};S.pitchMine={...S.pitchMine,[id]:p};return setDoc(doc(S.db,'pitches',id),p).catch(writeErr)}
   const m={...S.pitchMine};delete m[id];S.pitchMine=m;return deleteDoc(doc(S.db,'pitches',id)).catch(()=>{})}
 function saveMine(mut){
   const {doc,setDoc}=S.fb;
@@ -272,8 +276,10 @@ function afterData(){
     if(S.me.isOwner&&ownerId()!==me)setDoc(doc(S.db,'config','app'),{...S.config,adminUid:me,campus:str(S.config.campus,40)||DEFAULT_CAMPUS}).catch(writeErr);
     if(!S.me.isOwner&&S.myInvite&&S.myInvite.uid!==me)updateDoc(doc(S.db,'invites',S.me.email),{uid:me,joinedAt:Date.now()}).catch(()=>{});
     if(S.myDoc&&S.myDoc.removed)saveMine(d=>{delete d.removed;return d});
-    const old=Object.entries(S.myDoc?.bids||{}).filter(([,b])=>b&&b.say);
-    if(old.length){for(const[k,b]of old)savePitch(k,str(b.say,90));saveMine(d=>{for(const[k]of old)if(d.bids?.[k])delete d.bids[k].say;return d})}
+    const old=Object.entries(S.myDoc?.bids||{}).filter(([,b])=>b&&num(b.amt)>0);
+    if(old.length){for(const[k,b]of old)S.fb.setDoc(doc(S.db,'pitches',k+'~'+me),{owner:k.split('~')[0],by:me,job:k,amt:num(b.amt),at:num(b.at)||Date.now(),...(typeof b.say==='string'&&b.say?{say:b.say.slice(0,90)}:{})},{merge:true}).catch(()=>{});
+      saveMine(d=>{delete d.bids;return d})}
+    else if(S.myDoc&&S.myDoc.bids)saveMine(d=>{delete d.bids;return d});
   }
   computePhase();render();
 }
@@ -477,7 +483,7 @@ function tile(j,D,i=0){
     ${left<36e5?`<span class="flag">${Math.max(1,Math.round(left/6e4))} min left</span>`:''}
     <p>${esc(j.text)}</p>
     ${j.where||j.when?`<span class="where">${ic('place',12,2.2)}<span>${esc([j.where,left<36e5?'':j.when].filter(Boolean).join(' · '))}</span></span>`:''}
-    <span class="by">${face(j.owner,22)}<span class="nm">${esc(firstName(j.owner))}</span><span class="n">${n} ${n===1?'bid':'bids'}</span></span>
+    <span class="by">${face(j.owner,22)}<span class="nm">${esc(firstName(j.owner))}</span><span class="n">${j.owner===S.me.id?`${n} ${n===1?'bid':'bids'}`:since(j.at)}</span></span>
   </button>`;
 }
 const wideMQ=matchMedia('(min-width:900px)');
@@ -506,10 +512,10 @@ function viewJob(D){
   const j=D.jobByKey[S.openJob];
   if(!j)return`<div class="pad">${back('board','Back to the board')}<div class="empty" style="margin:18px 0"><b>This job is gone</b><p>The poster closed it or it was taken off the board.</p></div></div>`;
   const me=S.me.id,mine=j.owner===me,st=jobState(j),bids=bidsFor(D,j.key).sort((a,b)=>a.amt-b.amt||a.at-b.at);
-  const myBid=(S.myDoc?.bids||{})[j.key];
+  const myBid=myBidOn(j.key);
   if(S.bid.key!==j.key)S.bid={key:j.key,amt:String(myBid?num(myBid.amt):j.price),say:myBid?pitchFor(j.key,me):''};
   const stTag={expired:'<span class="tag warn">Closed · time ran out</span>',closed:'<span class="tag">Closed</span>',removed:'<span class="tag warn">Removed</span>',
-    assigned:`<span class="tag ok">Picked ${esc(shortName(j.accepted))}</span>`,done:payOf(j)?.ok?'<span class="tag ok">Done · Paid ✓</span>':'<span class="tag ok">Done</span>'}[st]||'';
+    assigned:mine||j.accepted===me?`<span class="tag ok">Picked ${esc(shortName(j.accepted))}</span>`:'<span class="tag">Taken</span>',done:payOf(j)?.ok?'<span class="tag ok">Done · Paid ✓</span>':'<span class="tag ok">Done</span>'}[st]||'';
   let foot='';
   if(mine){
     if(st==='open')foot=`<div class="foot"><button class="btn2" data-sheet="close">Close this job</button><p class="note">Pick someone from the bids to take it off the board.</p></div>`;
@@ -559,7 +565,8 @@ function viewJob(D){
       <span style="font-size:var(--t-12);font-weight:500;color:var(--muted)">${esc(metaOf(j.owner)||campus())}${esc(rateLine(j.owner,D))} · posted ${since(j.at)}</span></span></button>
    </div>
    <div class="stack">
-    <div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">${bids.length} ${bids.length===1?'bid':'bids'}</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--muted)">lowest first</span></div>
+    ${mine?`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">${bids.length} ${bids.length===1?'bid':'bids'}</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--muted)">only you see these</span></div>`
+      :`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">${myBid?'Your bid':'Bids'}</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--muted)">only ${esc(firstName(j.owner))} sees who bids</span></div>`}
     ${bids.length?bids.map(b=>`<div class="row">
       <button class="rowmain" data-person="${esc(b.by)}">${ring(b.by,42)}<span class="rowtext">
         <span class="t1">${esc(shortName(b.by))}${b.by===me?' (you)':''} <span class="muted">· ${esc(metaOf(b.by))}${esc(rateLine(b.by,D))}</span></span>
@@ -568,7 +575,7 @@ function viewJob(D){
       ${mine&&st==='open'?`<button class="pick" data-pick="${esc(b.by)}" aria-label="Pick ${esc(firstName(b.by))} for ₹${fmt(b.amt)}">Pick</button>`:''}
       ${mine&&st==='open'?`<button class="iconbtn" data-thread-with="${esc(b.by)}" aria-label="Message ${esc(firstName(b.by))}">${ic('chat',17)}</button>`:''}
       ${j.accepted===b.by?'<span class="tag ok">Picked</span>':''}
-    </div>`).join(''):`<p class="note" style="text-align:left">${mine?'No bids yet. Classmates see this on the board now.':'No bids yet. Be the first.'}</p>`}
+    </div>`).join(''):`<p class="note" style="text-align:left">${mine?'No bids yet. Classmates see this on the board now.':'Bids are private. Place yours below.'}</p>`}
    </div>
   </div></div>${foot}
   ${!mine?`<div class="reportrow"><button class="linkbtn" data-sheet="report" data-about="${esc(j.owner)}">Report this job</button>${mod}</div>`:''}`;
@@ -597,15 +604,15 @@ function viewPost(){
 function viewBids(D){
   const me=S.me.id;
   const myJobs=D.jobs.filter(j=>j.owner===me&&j.status!=='removed').sort((a,b)=>{const o=x=>({open:0,assigned:1}[jobState(x)]??2);return o(a)-o(b)||b.at-a.at});
-  const myBids=Object.entries(S.myDoc?.bids||{}).map(([k,b])=>({k,b,j:D.jobByKey[k]})).filter(x=>x.j&&x.j.owner!==me).sort((a,b)=>num(b.b.at)-num(a.b.at));
+  const myBids=Object.values(S.pitchMine).filter(p=>p&&num(p.amt)>0).map(p=>({k:p.job,b:{amt:num(p.amt),at:num(p.at)},j:D.jobByKey[p.job]})).filter(x=>x.j&&x.j.owner!==me).sort((a,b)=>num(b.b.at)-num(a.b.at));
   const jobLine=j=>{const st=jobState(j),n=bidsFor(D,j.key).length;
     return st==='open'?[`${n} ${n===1?'bid':'bids'} in`,'']:st==='assigned'?[`Picked ${shortName(j.accepted)} · ₹${fmt(j.agreed)}`,'ok']:st==='done'?(payOf(j)?.ok?['Done · Paid ✓','ok']:[`Done · ${payOf(j)?'they haven\u2019t got your payment':'waiting for them to confirm payment'}`,payOf(j)?'warn':'']):st==='expired'?['Time ran out','warn']:['Closed','']};
-  const bidLine=({j})=>{const st=jobState(j);return j.accepted===me?(st==='done'?(payOf(j)?.ok?['Done · Paid ✓','ok']:['Done · confirm you got paid','warn']):[`Accepted · ₹${fmt(j.agreed)}`,'ok']):j.accepted?['Went to someone else','']:st==='open'?[`Waiting · ${bidsFor(D,j.key).length} bids in`,'']:['Closed','']};
+  const bidLine=({j})=>{const st=jobState(j);return j.accepted===me?(st==='done'?(payOf(j)?.ok?['Done · Paid ✓','ok']:['Done · confirm you got paid','warn']):[`Accepted · ₹${fmt(j.agreed)}`,'ok']):j.accepted?['Went to someone else','']:st==='open'?[`Waiting for ${firstName(j.owner)} to pick`,'']:['Closed','']};
   const row=(j,[line,cls],amt)=>`<button class="item" data-job="${esc(j.key)}"><span class="itext"><span class="t1" style="font-weight:600;color:var(--fg)">${esc(j.text)}</span>
     <span style="font-size:var(--t-11);font-weight:700;color:${cls==='ok'?'var(--accent)':cls==='warn'?'var(--coral-ink)':'var(--muted)'}">${esc(line)}</span></span><span class="amt" style="font-size:var(--t-16);color:var(--fg2)">₹${fmt(amt)}</span></button>`;
   const oin=offerList(S.offersIn).filter(o=>D.members.includes(o.owner)&&!D.blocked.has(o.owner)&&o.status!=='declined').sort((a,b)=>num(b.at)-num(a.at));
   const oout=offerList(S.offersOut).filter(o=>o.status!=='accepted').sort((a,b)=>num(b.at)-num(a.at));
-  const doing=D.jobs.filter(j=>j.accepted===me&&!(S.myDoc?.bids||{})[j.key]&&j.status!=='removed').sort((a,b)=>b.at-a.at);
+  const doing=D.jobs.filter(j=>j.accepted===me&&!myBidOn(j.key)&&j.status!=='removed').sort((a,b)=>b.at-a.at);
   const offerCard=o=>`<div class="box stack" style="gap:10px;border:1px solid rgba(198,242,78,.3)">
     <div style="display:flex;align-items:center;gap:10px">${ring(o.owner,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.owner))} asked you</span><span class="t2">${esc([o.where,o.when].filter(Boolean).join(' · '))}</span></span><span class="amt" style="color:var(--accent)">₹${fmt(o.price)}</span></div>
     <span style="font-size:var(--t-14);line-height:1.4;color:var(--fg);overflow-wrap:anywhere">${esc(o.text)}</span>
@@ -706,7 +713,7 @@ function viewPrivacy(){
    <h2>What tack keeps</h2>
    <p>Your email address and a password to log in. Your name, photo, year, branch, what you're good at and your ring colour. The jobs you pin, the bids you place, the ratings you give and your messages. When you mark yourself free, the time it ends.</p>
    <h2>What other members see</h2>
-   <p>Your name, photo, year and branch, your jobs, bids, ratings and reviews. They never see your email address.</p>
+   <p>Your name, photo, year and branch, the jobs you post, your ratings and reviews. They never see your email address. Your bids are private: only the poster of that job sees your bid and pitch. Other members can't see who bid on a job or who took it.</p>
    <h2>Invite links</h2>
    <p>Invite links are personal: whoever joins with yours is recorded as invited by you.</p>
    <h2>Chats</h2>
@@ -760,7 +767,7 @@ function viewInvites(D){
 }
 function railHTML(D){
   const free=freePeople(D).filter(u=>u!==S.me.id),me=S.me.id;
-  const myBids=Object.entries(S.myDoc?.bids||{}).map(([k,b])=>({b,j:D.jobByKey[k]})).filter(x=>x.j&&x.j.owner!==me).sort((a,b)=>num(b.b.at)-num(a.b.at)).slice(0,4);
+  const myBids=Object.values(S.pitchMine).filter(p=>p&&num(p.amt)>0).map(p=>({b:{amt:num(p.amt),at:num(p.at)},j:D.jobByKey[p.job]})).filter(x=>x.j&&x.j.owner!==me).sort((a,b)=>num(b.b.at)-num(a.b.at)).slice(0,4);
   return`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">Free right now</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--dim)">${D.members.length} on the board</span></div>
   <div class="stack gap8">${free.length?free.map(u=>`<div style="display:flex;align-items:center;gap:10px"><button class="rowmain" data-person="${esc(u)}">${ring(u,40)}
      <span class="rowtext"><span style="font-size:var(--t-14);font-weight:700">${esc(shortName(u))}</span><span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc([metaOf(u),str(pdoc(u).does,40)].filter(Boolean).join(' · '))}</span></span></button>
@@ -771,7 +778,7 @@ function railHTML(D){
   <h2 class="h2">Your bids</h2>
   <div class="stack gap8">${myBids.length?myBids.map(({b,j})=>{const ok=j.accepted===me;return`<button data-job="${esc(j.key)}" style="display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:var(--r-sm);padding:11px 13px;width:100%;text-align:left">
      <span class="rowtext"><span style="font-size:var(--t-12);font-weight:600;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(j.text)}</span>
-     <span style="font-size:var(--t-11);font-weight:600;color:${ok?'var(--accent)':'var(--muted)'}">${ok?'Accepted · ₹'+fmt(j.agreed):j.accepted?'Went to someone else':jobState(j)==='open'?'Waiting · '+bidsFor(D,j.key).length+' bids in':'Closed'}</span></span>
+     <span style="font-size:var(--t-11);font-weight:600;color:${ok?'var(--accent)':'var(--muted)'}">${ok?'Accepted · ₹'+fmt(j.agreed):j.accepted?'Went to someone else':jobState(j)==='open'?'Waiting for '+firstName(j.owner)+' to pick':'Closed'}</span></span>
      <span style="font-family:var(--display);font-size:var(--t-16);font-weight:800;color:var(--fg2);font-variant-numeric:tabular-nums">₹${fmt(b.amt)}</span></button>`}).join('')
    :'<p class="note" style="text-align:left">Bids you place show up here.</p>'}</div>`;
 }
@@ -902,9 +909,9 @@ const ACT={
   repost(){const j=derive().jobByKey[S.openJob];if(!j)return;S.draft={...blankDraft(),text:j.text,price:String(j.price),kind:KINDS.includes(j.kind)?j.kind:'Other',where:WHERES.includes(j.where)?j.where:'Gate 1',whereText:WHERES.includes(j.where)?'':j.where,more:j.more};
     saveMine(x=>{if(x.jobs?.[j.id])x.jobs[j.id].status='closed';return x});go('post')},
   bid(){const j=derive().jobByKey[S.openJob];if(!j)return;const amt=digits(S.bid.amt);
-    if(!need(amt>=1&&amt<=50000,'bid','Enter a bid in rupees.'))return;const had=!!(S.myDoc?.bids||{})[j.key];
-    saveMine(x=>{x.bids={...(x.bids||{}),[j.key]:{amt,at:Date.now()}};return x});savePitch(j.key,S.bid.say.trim());S.err={};toast(had?'Bid updated':'Bid placed')},
-  withdraw(){const k=S.openJob;saveMine(x=>{if(x.bids)delete x.bids[k];return x});savePitch(k,'');S.bid={key:null};toast('Bid withdrawn')},
+    if(!need(amt>=1&&amt<=50000,'bid','Enter a bid in rupees.'))return;const had=!!myBidOn(j.key);
+    savePitch(j.key,S.bid.say.trim(),amt);render();S.err={};toast(had?'Bid updated':'Bid placed')},
+  withdraw(){const k=S.openJob;savePitch(k,'',0);render();S.bid={key:null};toast('Bid withdrawn')},
   confirmPick(){const j=derive().jobByKey[S.openJob],s=S.sheet;if(!j||!s)return;
     saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.status='assigned';o.accepted=s.uid;o.agreed=s.amt;o.assignedAt=Date.now()}return x});
     S.sheet=null;toast('Picked '+firstName(s.uid)+'. Sort out the details in chat.');openThread({key:jobThreadKey(j.key,s.uid),other:s.uid,jobKey:j.key})},
