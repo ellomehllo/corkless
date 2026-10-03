@@ -15,6 +15,7 @@ const DEFAULT_CAMPUS='MIT-WPU';
 const CRIT={d:[['timing','Timing','Showed up and finished when agreed'],['quality','Quality','Did the job well'],['comm','Communication','Replied and kept you updated'],['care','Care','Careful with your things, followed instructions']],
   p:[['payment','Payment','Paid what was agreed, on time'],['clarity','Clarity','The job was as described'],['comm','Communication','Easy to reach, replied on time'],['respect','Respect','Treated you well']]};
 const ID_RE=/^[A-Za-z0-9_-]{6,128}$/, JOB_RE=/^[a-z0-9]{4,24}$/;
+const PIC_RE=/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/,PIC_MAX=200000,MAX_PICS=3;
 const PHOTO_RE=/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 
 const I={
@@ -37,11 +38,12 @@ const I={
  clock:'<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
  out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/>',
+ x:'<path d="M6 6l12 12M18 6 6 18"/>',
  camera:'<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.5" r="3.5"/>'
 };
 const ic=(n,s=20,w=2,c='currentColor',fill='none')=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="${fill}" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
 
-const blankDraft=()=>({text:'',price:'',kind:'Errand',when:'Today',where:'Gate 1',whereText:'',more:''});
+const blankDraft=()=>({text:'',price:'',kind:'Errand',when:'Today',where:'Gate 1',whereText:'',more:'',pics:[]});
 const inviteParam=(new URLSearchParams(location.search).get('invite')||'').trim().toLowerCase();
 const codeParam=((new URLSearchParams(location.search).get('code')||'').trim().toLowerCase().match(/^[a-z0-9]{8,24}$/)||[''])[0];
 const S={
@@ -53,7 +55,7 @@ const S={
   offer:{to:null,prevJob:null,text:'',price:'',when:'Next hour',where:''}, invites:{}, reports:[], myInvite:null,
   myDoc:null, pendingMine:0,
   view:'board', openJob:null, personOf:null, sort:'high',
-  draft:blankDraft(), bid:{key:null,amt:'',say:''}, chatDraft:{text:''},
+  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, chatDraft:{text:''},
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',adult:false,rules:false},
   inv:{email:'',campus:''}, lastInvite:null,
   picks:{}, repDocs:{},
@@ -97,7 +99,7 @@ const isMember=uid=>{const d=pdoc(uid);return !!d.adult&&!d.removed};
 function normJob(id,j,uid){
   return{id,owner:uid,key:uid+'~'+id,text:str(j.text,200),more:str(j.more,600),price:num(j.price),kind:str(j.kind,20),
     when:str(j.when,20),where:str(j.where,40),at:num(j.at),deadline:num(j.deadline),
-    status:STATUSES.includes(j.status)?j.status:'open',doneAt:num(j.doneAt),accepted:null,agreed:0,pick:null};
+    status:STATUSES.includes(j.status)?j.status:'open',doneAt:num(j.doneAt),pics:Math.min(MAX_PICS,Math.max(0,Math.floor(num(j.pics)))),accepted:null,agreed:0,pick:null};
 }
 function jobState(j){return j.status==='open'&&j.deadline<Date.now()?'expired':j.status}
 function derive(){
@@ -110,7 +112,7 @@ function derive(){
   }
   for(const p of [...Object.values(S.pitchIn),...Object.values(S.pitchMine)]){
     if(!p||typeof p.job!=='string'||typeof p.by!=='string'||!jobByKey[p.job]||!members.includes(p.by)||!(num(p.amt)>0))continue;
-    const l=(bidsByJob[p.job]=bidsByJob[p.job]||[]);if(!l.some(b=>b.by===p.by))l.push({by:p.by,amt:num(p.amt),say:str(p.say,90),at:num(p.at)})}
+    const l=(bidsByJob[p.job]=bidsByJob[p.job]||[]);if(!l.some(b=>b.by===p.by))l.push({by:p.by,amt:num(p.amt),say:str(p.say,90),at:num(p.at),pics:Math.min(MAX_PICS,num(p.pics))})}
   for(const[k,pk]of Object.entries(S.picks)){const j=jobByKey[k];if(!j||!pk||typeof pk.doer!=='string')continue;
     j.accepted=pk.doer;j.agreed=num(pk.agreed);j.pick=pk;if(pk.doneAt)j.doneAt=num(pk.doneAt)}
   const D={members,jobs,jobByKey,bidsByJob,blocked};
@@ -119,7 +121,7 @@ function derive(){
   D.offersWaiting=offerList(S.offersIn).filter(o=>o.status==='pending'&&D.members.includes(o.owner)&&!D.blocked.has(o.owner)).length;
   return D;
 }
-function myBidOn(jobKey){const p=S.pitchMine[jobKey+'~'+S.me.id];return p&&num(p.amt)>0?{amt:num(p.amt),say:str(p.say,90),at:num(p.at)}:null}
+function myBidOn(jobKey){const p=S.pitchMine[jobKey+'~'+S.me.id];return p&&num(p.amt)>0?{amt:num(p.amt),say:str(p.say,90),at:num(p.at),pics:Math.min(MAX_PICS,num(p.pics))}:null}
 function threadOpen(k){return !!S.threadDocs[k]}
 function canMessage(t,D){const me=S.me.id;
   if(!t.jobKey)return false;
@@ -199,8 +201,8 @@ function convertOffers(){
       .then(()=>S.fb.deleteDoc(S.fb.doc(S.db,'offers',o.key))).catch(e=>console.warn(e));
   }
 }
-function savePitch(jobKey,say,amt){const {doc,setDoc,deleteDoc}=S.fb,me=S.me.id,id=jobKey+'~'+me,owner=jobKey.split('~')[0];
-  if(amt){const p={owner,by:me,job:jobKey,amt,say:(say||'').slice(0,90),at:Date.now()};S.pitchMine={...S.pitchMine,[id]:p};return setDoc(doc(S.db,'pitches',id),p).catch(writeErr)}
+function savePitch(jobKey,say,amt,pics){const {doc,setDoc,deleteDoc}=S.fb,me=S.me.id,id=jobKey+'~'+me,owner=jobKey.split('~')[0];
+  if(amt){const p={owner,by:me,job:jobKey,amt,say:(say||'').slice(0,90),at:Date.now(),...(pics?{pics}:{})};S.pitchMine={...S.pitchMine,[id]:p};return setDoc(doc(S.db,'pitches',id),p).catch(writeErr)}
   const m={...S.pitchMine};delete m[id];S.pitchMine=m;return deleteDoc(doc(S.db,'pitches',id)).catch(()=>{})}
 function saveMine(mut){
   const {doc,setDoc}=S.fb;
@@ -404,6 +406,28 @@ function readPhoto(file){
     img.src=url;
   });
 }
+function readPic(file){
+  return new Promise((res,rej)=>{
+    if(!file||!/^image\//.test(file.type))return rej(new Error('type'));
+    const url=URL.createObjectURL(file),img=new Image();
+    img.onload=()=>{const w=img.naturalWidth,h=img.naturalHeight,c=document.createElement('canvas'),x=c.getContext('2d');let n=1024,q=.72,out='';
+      for(let i=0;i<6;i++){const k=Math.min(1,n/Math.max(w,h));c.width=Math.max(1,Math.round(w*k));c.height=Math.max(1,Math.round(h*k));
+        x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);out=c.toDataURL('image/jpeg',q);if(out.length<=PIC_MAX)break;n=Math.round(n*.8);q=Math.max(.5,q-.06)}
+      URL.revokeObjectURL(url);out.length<=PIC_MAX&&PIC_RE.test(out)?res(out):rej(new Error('size'))};
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('decode'))};
+    img.src=url;
+  });
+}
+const cleanPics=l=>Array.isArray(l)?l.filter(x=>typeof x==='string'&&x.length<=PIC_MAX&&PIC_RE.test(x)).slice(0,MAX_PICS):[];
+function picsOf(k){const v=S.pics[k];if(v!==undefined)return v;S.pics[k]=null;
+  const [col,id]=k.split(':');S.fb.getDoc(S.fb.doc(S.db,col==='j'?'jobpics':'bidpics',id)).then(d=>{S.pics[k]=d.exists()?cleanPics(d.data().pics):[]}).catch(()=>{S.pics[k]=[]}).finally(()=>{if(S.phase==='app')render()});
+  return null}
+function picStrip(k,n,cls=''){if(!n)return'';const l=picsOf(k);
+  return`<div class="pics ${cls}">${l?l.map((src,i)=>`<button class="pic" data-pic="${esc(k)}" data-i="${i}" aria-label="Open photo ${i+1} of ${l.length}"><img src="${src}" alt=""></button>`).join('')
+    :Array.from({length:n},()=>'<span class="pic wait" aria-hidden="true"></span>').join('')}</div>`}
+function picEdit(t,l){l=l||[];
+  return`<div class="pics">${l.map((src,i)=>`<span class="pic"><img src="${src}" alt="Photo ${i+1}"><button class="picx" data-unpic="${t}" data-i="${i}" aria-label="Remove photo ${i+1}">${ic('x',14,2.6)}</button></span>`).join('')}
+    ${l.length<MAX_PICS?`<label class="pic add" for="pk-${t}">${ic('camera',20)}<span>${l.length?'Add':'Add photos'}</span><input id="pk-${t}" type="file" accept="image/jpeg,image/png,image/webp" multiple data-pics="${t}"></label>`:''}</div>`}
 
 function authHTML(){
   const m=S.authMode,f=S.form;
@@ -494,7 +518,7 @@ function tile(j,D,i=0){
     ${left<36e5?`<span class="flag">${Math.max(1,Math.round(left/6e4))} min left</span>`:''}
     <p>${esc(j.text)}</p>
     ${j.where||j.when?`<span class="where">${ic('place',12,2.2)}<span>${esc([j.where,left<36e5?'':j.when].filter(Boolean).join(' · '))}</span></span>`:''}
-    <span class="by">${face(j.owner,22)}<span class="nm">${esc(firstName(j.owner))}</span><span class="n">${j.owner===S.me.id?`${n} ${n===1?'bid':'bids'}`:since(j.at)}</span></span>
+    <span class="by">${face(j.owner,22)}<span class="nm">${esc(firstName(j.owner))}</span><span class="n">${j.pics?ic('camera',12,2.2)+' ':''}${j.owner===S.me.id?`${n} ${n===1?'bid':'bids'}`:since(j.at)}</span></span>
   </button>`;
 }
 const wideMQ=matchMedia('(min-width:900px)');
@@ -524,7 +548,8 @@ function viewJob(D){
   if(!j)return`<div class="pad">${back('board','Back to the board')}<div class="empty" style="margin:18px 0"><b>This job is gone</b><p>The poster closed it or it was taken off the board.</p></div></div>`;
   const me=S.me.id,mine=j.owner===me,st=jobState(j),bids=bidsFor(D,j.key).sort((a,b)=>a.amt-b.amt||a.at-b.at);
   const myBid=myBidOn(j.key);
-  if(S.bid.key!==j.key)S.bid={key:j.key,amt:String(myBid?num(myBid.amt):j.price),say:myBid?myBid.say:''};
+  if(S.bid.key!==j.key)S.bid={key:j.key,amt:String(myBid?num(myBid.amt):j.price),say:myBid?myBid.say:'',pics:myBid&&num(myBid.pics)?null:[]};
+  if(S.bid.pics===null){const l=picsOf('b:'+j.key+'~'+me);if(l)S.bid.pics=[...l]}
   const stTag={expired:'<span class="tag warn">Closed · time ran out</span>',closed:'<span class="tag">Closed</span>',removed:'<span class="tag warn">Removed</span>',
     assigned:mine||j.accepted===me?`<span class="tag ok">Picked ${esc(shortName(j.accepted))}</span>`:'<span class="tag">Taken</span>',done:payOf(j)?.ok?'<span class="tag ok">Done · Paid ✓</span>':'<span class="tag ok">Done</span>'}[st]||'';
   let foot='';
@@ -546,6 +571,7 @@ function viewJob(D){
          style="font-family:var(--display);font-size:var(--t-19);font-weight:800;letter-spacing:-.035em;font-variant-numeric:tabular-nums"></label>
         ${threadOpen(jobThreadKey(j.key,me))?`<button class="iconbtn" style="width:52px;height:auto;border-radius:999px;background:var(--surface)" data-thread-job aria-label="Message ${esc(firstName(j.owner))}">${ic('chat',20)}</button>`:''}</div>
       <label class="field" for="bidSay"><input id="bidSay" maxlength="90" placeholder="Pitch yourself in one line (only ${esc(firstName(j.owner))} sees it)" value="${esc(S.bid.say)}" data-bind="bid.say"></label>
+      ${S.bid.pics?picEdit('bid',S.bid.pics):'<div class="pics"><span class="pic wait" aria-hidden="true"></span></div>'}
       ${S.err.bid?`<p class="err">${esc(S.err.bid)}</p>`:''}
       <button class="cta" data-act="bid">${myBid?'Update my bid':'Place bid'}</button>
       ${myBid?'<button class="linkbtn" data-act="withdraw">Withdraw my bid</button>':''}
@@ -574,6 +600,7 @@ function viewJob(D){
     <h1 class="h1">${esc(j.text)}</h1>
     <div class="chips">${[j.when,j.where].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${stTag}</div>
     ${j.more?`<p style="margin:0;font-size:var(--t-14);line-height:1.55;color:var(--fg2);max-width:52ch;overflow-wrap:anywhere;white-space:pre-wrap">${esc(j.more)}</p>`:''}
+    ${picStrip('j:'+j.key,j.pics)}
     <button class="card" data-person="${esc(j.owner)}">${ring(j.owner,50)}
       <span class="rowtext" style="gap:3px"><span style="font-size:var(--t-16);font-weight:700;letter-spacing:-.015em">${esc(shortName(j.owner))}${mine?' <span class="muted">(you)</span>':''}</span>
       <span style="font-size:var(--t-12);font-weight:500;color:var(--muted)">${esc(metaOf(j.owner)||campus())}${esc(posterLine(j.owner))} · posted ${since(j.at)}</span></span></button>
@@ -589,7 +616,7 @@ function viewJob(D){
       ${mine&&st==='open'?`<button class="pick" data-pick="${esc(b.by)}" aria-label="Pick ${esc(firstName(b.by))} for ₹${fmt(b.amt)}">Pick</button>`:''}
       ${mine&&st==='open'?`<button class="iconbtn" data-thread-with="${esc(b.by)}" aria-label="Message ${esc(firstName(b.by))}">${ic('chat',17)}</button>`:''}
       ${j.accepted===b.by?'<span class="tag ok">Picked</span>':''}
-    </div>`).join(''):`<p class="note" style="text-align:left">${mine?'No bids yet. Classmates see this on the board now.':'Bids are private. Place yours below.'}</p>`}
+    </div>${picStrip('b:'+j.key+'~'+b.by,b.pics,'sub')}`).join(''):`<p class="note" style="text-align:left">${mine?'No bids yet. Classmates see this on the board now.':'Bids are private. Place yours below.'}</p>`}
    </div>
   </div></div>${foot}
   ${!mine?`<div class="reportrow"><button class="linkbtn" data-sheet="report" data-about="${esc(j.owner)}">Report this job</button>${mod}</div>`:''}`;
@@ -609,7 +636,8 @@ function viewPost(){
    ${group('By when','when',WHENS)}${group('Where','where',WHERES)}
    <input id="jw" class="inp" maxlength="40" placeholder="Or type a place: Seminar hall, B-wing 4th floor…" value="${esc(d.whereText)}" data-bind="draft.whereText" aria-label="Other place">
    <div class="stack gap8"><label for="jm" class="formlabel">Anything else <span class="muted">(optional)</span></label>
-     <textarea id="jm" class="inp" rows="2" maxlength="600" style="resize:vertical" placeholder="Details the person doing it should know." data-bind="draft.more">${esc(d.more)}</textarea></div>
+     <textarea id="jm" class="inp" rows="2" maxlength="600" style="resize:vertical" placeholder="Details the person doing it should know." data-bind="draft.more">${esc(d.more)}</textarea>
+     ${picEdit('draft',d.pics)}</div>
    <div class="card">${ring(S.me.id,38)}<span style="font-size:var(--t-12);font-weight:500;color:var(--fg2)">Posting as <b style="color:var(--fg)">${esc(shortName(S.me.id))}${metaOf(S.me.id)?' · '+esc(metaOf(S.me.id)):''}</b>. Your photo and name show on the board.</span></div>
   </div></div>
   <div class="foot">${S.err.post?`<p class="err">${esc(S.err.post)}</p>`:''}<button class="cta" data-act="post">Put it on the board</button>
@@ -725,9 +753,9 @@ function viewPrivacy(){
    <h1 class="pageh" style="margin-bottom:6px">Privacy</h1>
    <p>tack is private to people ${esc(organiser())} invited. Nothing on the board is public.</p>
    <h2>What tack keeps</h2>
-   <p>Your email address and a password to log in. Your name, photo, year, branch, what you're good at and your ring colour. The jobs you pin, the bids you place, the ratings you give and your messages. When you mark yourself free, the time it ends.</p>
+   <p>Your email address and a password to log in. Your name, photo, year, branch, what you're good at and your ring colour. The jobs you pin, the bids you place, any photos you add to them, the ratings you give and your messages. Photos are shrunk on your phone first, which also strips their location data. When you mark yourself free, the time it ends.</p>
    <h2>What other members see</h2>
-   <p>Your name, photo, year and branch, the jobs you post, your ratings and reviews. They never see your email address. Your bids are private: only the poster of that job sees your bid and pitch. Other members can't see who bid on a job or who took it.</p>
+   <p>Your name, photo, year and branch, the jobs you post, your ratings and reviews. They never see your email address. Your bids are private: only the poster of that job sees your bid, pitch and bid photos. Other members can't see who bid on a job or who took it.</p>
    <h2>Ratings</h2>
    <p>After a job, the poster and the doer rate each other from 1 to 5 on four things. Profiles show only the averages and how many ratings there are, never who gave them or for which job. A note you write goes only to the person you rated.</p>
    <h2>Invite links</h2>
@@ -821,6 +849,9 @@ function sheetHTML(D){
     ${S.err.rate?`<p class="err">${esc(S.err.rate)}</p>`:''}<button class="cta" data-act="${side==='d'?'confirmDone':'confirmRatePoster'}" ${S.busy?'disabled':''}>${side==='d'?(j&&j.status==='done'?'Save rating':'Mark as done'):'Save rating'}</button>`;break}
   case'close':b=`<h2 id="sheetT">Close this job?</h2><p>It comes off the board. Bids on it are kept so people can see it closed.</p>
     <button class="cta" data-act="confirmClose">Close job</button><button class="linkbtn" data-act="closeSheet">Keep it open</button>`;break;
+  case'pic':{const l=S.pics[s.k]||[],src=l[s.i];
+    b=`<h2 id="sheetT" class="sr">Photo ${s.i+1} of ${l.length}</h2>${src?`<img class="bigpic" src="${src}" alt="Photo ${s.i+1} of ${l.length}">`:''}
+    ${l.length>1?`<button class="btn2" data-act="nextPic">Show photo ${(s.i+1)%l.length+1} of ${l.length}</button>`:''}<button class="linkbtn" data-act="closeSheet">Close</button>`;break}
   case'remove':b=`<h2 id="sheetT">Take this job off the board?</h2><p>Use this for jobs that break the rules. The poster sees it marked as removed.</p>
     <button class="cta destructive" data-act="confirmRemove">Remove job</button><button class="linkbtn" data-act="closeSheet">Cancel</button>`;break;
   case'uninvite':b=`<h2 id="sheetT">Remove ${esc(s.about)}?</h2><p>They can't sign up with this email, and if they already joined they're locked out straight away and their jobs leave the board.</p>
@@ -928,14 +959,23 @@ const ACT={
   post(){const d=S.draft,text=d.text.trim(),price=digits(d.price);
     if(!need(text.length>=8,'post','Say what you need in a few more words.')||!need(price>=10&&price<=20000,'post','Set a price between ₹10 and ₹20,000.'))return;
     const id=rid(),at=Date.now(),where=(d.whereText.trim()||d.where).slice(0,40);
-    saveMine(x=>{x.jobs={...(x.jobs||{}),[id]:{text:text.slice(0,200),more:d.more.trim().slice(0,600),price,kind:d.kind,when:d.when,where,at,deadline:deadlineFor(d.when,at),status:'open'}};return x});
+    const pics=cleanPics(d.pics);
+    saveMine(x=>{x.jobs={...(x.jobs||{}),[id]:{text:text.slice(0,200),more:d.more.trim().slice(0,600),price,kind:d.kind,when:d.when,where,at,deadline:deadlineFor(d.when,at),status:'open',...(pics.length?{pics:pics.length}:{})}};return x});
+    if(pics.length){S.pics['j:'+S.me.id+'~'+id]=pics;S.fb.setDoc(S.fb.doc(S.db,'jobpics',S.me.id+'~'+id),{owner:S.me.id,job:id,pics,at}).catch(e=>{console.warn(e);toast('Your job is up, but the photos didn\u2019t upload.')})}
     S.draft=blankDraft();S.sort='newest';go('board');toast('Pinned to the board')},
-  repost(){const j=derive().jobByKey[S.openJob];if(!j)return;S.draft={...blankDraft(),text:j.text,price:String(j.price),kind:KINDS.includes(j.kind)?j.kind:'Other',where:WHERES.includes(j.where)?j.where:'Gate 1',whereText:WHERES.includes(j.where)?'':j.where,more:j.more};
+  repost(){const j=derive().jobByKey[S.openJob];if(!j)return;S.draft={...blankDraft(),text:j.text,price:String(j.price),kind:KINDS.includes(j.kind)?j.kind:'Other',where:WHERES.includes(j.where)?j.where:'Gate 1',whereText:WHERES.includes(j.where)?'':j.where,more:j.more,pics:[...(S.pics['j:'+j.key]||[])]};
     saveMine(x=>{if(x.jobs?.[j.id])x.jobs[j.id].status='closed';return x});go('post')},
   bid(){const j=derive().jobByKey[S.openJob];if(!j)return;const amt=digits(S.bid.amt);
     if(!need(amt>=1&&amt<=50000,'bid','Enter a bid in rupees.'))return;const had=!!myBidOn(j.key);
-    savePitch(j.key,S.bid.say.trim(),amt);render();S.err={};toast(had?'Bid updated':'Bid placed')},
-  withdraw(){const k=S.openJob;savePitch(k,'',0);render();S.bid={key:null};toast('Bid withdrawn')},
+    const id=j.key+'~'+S.me.id,old=num(myBidOn(j.key)?.pics),pics=S.bid.pics?cleanPics(S.bid.pics):null,n=pics?pics.length:old;
+    savePitch(j.key,S.bid.say.trim(),amt,n);render();S.err={};toast(had?'Bid updated':'Bid placed');
+    if(pics){const {doc,setDoc,deleteDoc}=S.fb;S.pics['b:'+id]=pics;
+      if(pics.length)setDoc(doc(S.db,'bidpics',id),{owner:j.owner,by:S.me.id,job:j.key,pics,at:Date.now()}).catch(e=>{console.warn(e);toast('Your bid is in, but the photos didn\u2019t upload.')});
+      else if(old)deleteDoc(doc(S.db,'bidpics',id)).catch(()=>{})}},
+  withdraw(){const k=S.openJob,id=k+'~'+S.me.id,had=num(myBidOn(k)?.pics);savePitch(k,'',0);
+    if(had){delete S.pics['b:'+id];S.fb.deleteDoc(S.fb.doc(S.db,'bidpics',id)).catch(()=>{})}
+    render();S.bid={key:null};toast('Bid withdrawn')},
+  nextPic(){const s=S.sheet,l=S.pics[s?.k];if(!l||!l.length)return;S.sheet={...s,i:(s.i+1)%l.length};render()},
   confirmPick(){const j=derive().jobByKey[S.openJob],s=S.sheet;if(!j||!s)return;
     saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.status='assigned'}return x});
     S.picks={...S.picks,[j.key]:{owner:S.me.id,job:j.id,doer:s.uid,agreed:s.amt,at:Date.now(),status:'assigned'}};
@@ -960,7 +1000,8 @@ const ACT={
     S.busy=false;render()},
   confirmClose(){const j=derive().jobByKey[S.openJob];if(!j)return;saveMine(x=>{if(x.jobs?.[j.id])x.jobs[j.id].status='closed';return x});S.sheet=null;toast('Job closed')},
   confirmRemove(){const j=derive().jobByKey[S.openJob];if(!j||!S.me.isOwner)return;const {doc,updateDoc,FieldPath}=S.fb;
-    updateDoc(doc(S.db,'people',j.owner),new FieldPath('jobs',j.id,'status'),'removed').catch(writeErr);S.sheet=null;toast('Job removed from the board');go('board')},
+    updateDoc(doc(S.db,'people',j.owner),new FieldPath('jobs',j.id,'status'),'removed').catch(writeErr);
+    if(j.pics){delete S.pics['j:'+j.key];S.fb.deleteDoc(doc(S.db,'jobpics',j.key)).catch(()=>{})}S.sheet=null;toast('Job removed from the board');go('board')},
   confirmReport(){const s=S.sheet;if(!need(S.rep.why,'rep','Pick a reason.'))return;const {collection,addDoc}=S.fb;
     addDoc(collection(S.db,'reports'),{by:S.me.id,about:s.about,why:S.rep.why,note:S.rep.note.trim().slice(0,200),at:Date.now()}).catch(writeErr);
     if(S.rep.block)savePriv({blocked:[...new Set([...arr(S.priv.blocked),s.about])]});
@@ -975,7 +1016,8 @@ const ACT={
     try{
       for(const[k,t]of Object.entries(S.threadDocs)){const q=await getDocs(query(collection(S.db,'threads',k,'msgs'),where('by','==',me)));for(const m of q.docs)await deleteDoc(m.ref);
         if(t&&t.lastBy===me)await S.fb.setDoc(doc(S.db,'threads',k),{lastText:'Message deleted'},{merge:true}).catch(()=>{})}
-      for(const id of Object.keys(S.pitchMine))await deleteDoc(doc(S.db,'pitches',id));
+      for(const[id,p]of Object.entries(S.pitchMine)){if(num(p?.pics))await deleteDoc(doc(S.db,'bidpics',id)).catch(()=>{});await deleteDoc(doc(S.db,'pitches',id))}
+      for(const[id,j]of Object.entries(S.myDoc?.jobs||{}))if(num(j?.pics))await deleteDoc(doc(S.db,'jobpics',me+'~'+id)).catch(()=>{});
       for(const id of Object.keys(S.offersOut))await deleteDoc(doc(S.db,'offers',id)).catch(()=>{});
       for(const[id,c]of Object.entries(S.myCodes))if(!c.usedBy)await deleteDoc(doc(S.db,'invcodes',id)).catch(()=>{});
       await deleteDoc(doc(S.db,'people',me));await deleteDoc(doc(S.db,'private',me));
@@ -1021,14 +1063,14 @@ const ACT={
 };
 
 document.addEventListener('click',e=>{
-  const el=e.target.closest('[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
+  const el=e.target.closest('[data-pic],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
   if(!el)return;const ds=el.dataset;
   if(ds.ask!==undefined){if(ds.ask===S.me?.id)return;S.offer={to:ds.ask,prevJob:ds.prev||null,text:'',price:'',when:'Next hour',where:''};S.err={};S.sheet={type:'offer'};render();return}
   if(ds.ofwhen!==undefined){S.offer.when=ds.ofwhen;render();return}
   if(ds.auth!==undefined){S.authMode=ds.auth;S.authErr='';S.authMsg='';render();return}
   if(ds.act!==undefined){const f=ACT[ds.act];if(f){e.preventDefault();f(el)}return}
   if(ds.go!==undefined){go(ds.go);return}
-  if(ds.job!==undefined){const pr=el.classList.contains('tile')&&el.querySelector('.price');if(pr&&document.startViewTransition&&!reduceMotion.matches)pr.style.viewTransitionName='jp';S.openJob=ds.job;S.bid={key:null};go('job');return}
+  if(ds.job!==undefined){const pr=el.classList.contains('tile')&&el.querySelector('.price');if(pr&&document.startViewTransition&&!reduceMotion.matches)pr.style.viewTransitionName='jp';S.openJob=ds.job;S.bid={key:null};for(const k of Object.keys(S.pics))if(k.startsWith('b:'+ds.job+'~'))delete S.pics[k];go('job');return}
   if(ds.sort!==undefined){S.sort=ds.sort;render();return}
   if(ds.set!==undefined){S.draft[ds.set]=ds.val;if(ds.set==='where')S.draft.whereText='';render();return}
   if(ds.bump!==undefined){S.draft.price=String((digits(S.draft.price)||0)+ +ds.bump);render();return}
@@ -1038,6 +1080,8 @@ document.addEventListener('click',e=>{
   if(ds.sheet!==undefined){if(ds.sheet==='invitefriend')S.lastCode=null;S.err={};S.erase={pw:''};if(ds.sheet==='done'||ds.sheet==='ratePoster')S.rate={a:0,b:0,c:0,d:0,text:''};if(ds.sheet==='report')S.rep={why:ds.prewhy||'',note:'',block:false};S.sheet={type:ds.sheet,about:ds.about};render();return}
   if(ds.free!==undefined){const now=new Date(),t={'1h':+now+36e5,'3h':+now+3*36e5,day:new Date(now).setHours(23,59,0,0),off:0}[ds.free];
     saveMine(d=>{d.freeUntil=t;return d});S.sheet=null;toast(t?'You’re on the Free right now row':'Marked not free');return}
+  if(ds.pic!==undefined){S.sheet={type:'pic',k:ds.pic,i:+ds.i||0};render();return}
+  if(ds.unpic!==undefined){const o=ds.unpic==='draft'?S.draft:S.bid;o.pics=(o.pics||[]).filter((_,i)=>i!==+ds.i);render();return}
   if(ds.star!==undefined){S.rate[ds.star[0]]=+ds.star.slice(1);render();return}
   if(ds.why!==undefined){S.rep.why=ds.why;render();return}
   const D=derive(),me=S.me.id;
@@ -1054,6 +1098,10 @@ document.addEventListener('input',bind);
 document.addEventListener('change',async e=>{
   bind(e);
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}
+  if(e.target.matches('[data-pics]')){const t=e.target.dataset.pics,o=t==='draft'?S.draft:S.bid,ek=t==='draft'?'post':'bid';
+    const files=[...e.target.files].slice(0,Math.max(0,MAX_PICS-(o.pics||[]).length));e.target.value='';let bad=0;
+    for(const f of files){try{o.pics=[...(o.pics||[]),await readPic(f)]}catch{bad++}}
+    S.err=bad?{[ek]:'One photo didn\u2019t work. Use a JPG or PNG.'}:{};render();return}
   if(e.target.matches('[data-photo]')){
     try{S.onb.photo=await readPhoto(e.target.files[0]);S.err={}}catch{S.err={onb:'That photo didn’t work. Use a JPG or PNG.'}}
     render();
