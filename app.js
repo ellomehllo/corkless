@@ -4,7 +4,7 @@ const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
 
 const RINGS=['#C6F24E','#A18CFF','#FF5B6E','#4FE3E0','#FF7AD1','#FFC53D'];
-const GLOW={'#A18CFF':'rgba(161,140,255,.45)','#FF5B6E':'rgba(255,91,110,.5)','#FFC53D':'rgba(255,197,61,.35)','#4FE3E0':'rgba(79,227,224,.4)','#FF7AD1':'rgba(255,122,209,.38)','#C6F24E':'rgba(108,92,255,.32)'};
+const GLOW={'#A18CFF':'rgba(161,140,255,.45)','#FF5B6E':'rgba(255,91,110,.5)','#FFC53D':'rgba(255,197,61,.35)','#4FE3E0':'rgba(79,227,224,.4)','#FF7AD1':'rgba(255,122,209,.38)','#C6F24E':'rgba(14,159,134,.32)'};
 const KINDS=['Errand','Lifting','Ride','Print','Teach','Photo','Notes','Music','Other'];
 const WHENS=['Next hour','Today','Tomorrow','This week','No rush'];
 const WHERES=['Gate 1','Hostel B','Canteen','Library','Off campus'];
@@ -600,9 +600,9 @@ async function noteCard(j){
   x.fillStyle='#0B0E17';x.fillRect(0,0,W,H);
   const ph=j.pics?(S.pics['j:'+j.key]||[])[0]:'';
   if(ph){const im=new Image();im.src=ph;try{await im.decode()}catch{}const sc=Math.max(W/im.width,H/im.height)*1.25;x.filter='blur(70px) saturate(1.3) brightness(.62)';x.drawImage(im,(W-im.width*sc)/2,(H-im.height*sc)/2,im.width*sc,im.height*sc);x.filter='none';x.fillStyle='rgba(11,14,23,.35)';x.fillRect(0,0,W,H)}
-  else{for(const[cx,cy,r,a,bc]of[[180,1560,1100,'70',gn?'#3B5BFF':nc],[980,260,820,'40',gn?'#9C5CFF':nc],[560,980,700,'22',nc]]){const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,bc+a);g.addColorStop(1,bc+'00');x.fillStyle=g;x.fillRect(0,0,W,H)}}
+  else{for(const[cx,cy,r,a,bc]of[[180,1560,1100,'70',gn?'#1D3FD8':nc],[980,260,820,'40',gn?'#0E9C84':nc],[560,980,700,'22',nc]]){const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,bc+a);g.addColorStop(1,bc+'00');x.fillStyle=g;x.fillRect(0,0,W,H)}}
   x.fillStyle='rgba(244,241,250,.06)';for(let gy=40;gy<H;gy+=44)for(let gx=40;gx<W;gx+=44){x.beginPath();x.arc(gx,gy,2.2,0,7);x.fill()}
-  {const pg=x.createLinearGradient(88,124,136,212);pg.addColorStop(0,'#3B5BFF');pg.addColorStop(.6,'#7B4DFF');pg.addColorStop(1,'#B86BF0');drawPin(x,112,150,26,pg)}x.fillStyle='#F4F1FA';x.font='800 76px Gabarito';x.textBaseline='middle';x.fillText('tack',152,154);
+  {const pg=x.createLinearGradient(88,124,136,212);pg.addColorStop(0,'#7BF5D8');pg.addColorStop(.55,'#46E3BF');pg.addColorStop(1,'#14B894');x.shadowColor='rgba(70,227,191,.7)';x.shadowBlur=28;drawPin(x,112,150,26,pg)}x.fillStyle='#46E3BF';x.font='800 76px Gabarito';x.textBaseline='middle';x.fillText('tack',152,154);x.shadowColor='transparent';x.shadowBlur=0;
   const camp=campus();x.font='700 34px Figtree';const cw=x.measureText(camp).width+56;x.fillStyle='rgba(244,241,250,.1)';rrect(x,W-80-cw,124,cw,64,32);x.fill();x.fillStyle='#DFDAEC';x.fillText(camp,W-80-cw+28,157);
   x.font='700 60px Figtree';const lines=wrapLines(x,j.text,760,7);
   const meta=[j.where,left<36e5?'':j.when].filter(Boolean).join(' · '),urgent=left>0&&left<36e5;
@@ -611,8 +611,8 @@ async function noteCard(j){
   x.shadowColor='rgba(0,0,0,.6)';x.shadowBlur=80;x.shadowOffsetY=40;x.fillStyle='rgba(25,22,36,.94)';rrect(x,100,cy,880,ch,56);x.fill();x.shadowColor='transparent';
   x.strokeStyle='rgba(244,241,250,.1)';x.lineWidth=2;x.stroke();
   const gl=x.createRadialGradient(980,cy,0,980,cy,700);gl.addColorStop(0,nc+'38');gl.addColorStop(1,nc+'00');x.fillStyle=gl;rrect(x,100,cy,880,ch,56);x.fill();
-  const ag=(x0,x1)=>{const g=x.createLinearGradient(x0,0,x1,0);g.addColorStop(0,'#3B5BFF');g.addColorStop(.34,'#5B4BFF');g.addColorStop(.64,'#7B4DFF');g.addColorStop(.86,'#9C5CFF');g.addColorStop(1,'#C46BEE');return g};x.shadowColor=gn?'#7B4DFF':nc;x.shadowBlur=30;x.fillStyle=gn?ag(W/2-20,W/2+20):nc;x.beginPath();x.arc(W/2,cy,20,0,7);x.fill();x.shadowColor='transparent';
-  let y=cy+110;x.textBaseline='alphabetic';x.font='800 170px Gabarito';x.fillStyle=gn?ag(160,160+x.measureText('₹'+fmt(j.price)).width):nc;x.fillText('₹'+fmt(j.price),160,y+120);y+=170;
+  const ag=(x0,x1)=>{const g=x.createLinearGradient(x0,0,x1,0);g.addColorStop(0,'#1D3FD8');g.addColorStop(.3,'#1F5BD0');g.addColorStop(.68,'#0F8C9C');g.addColorStop(1,'#0E9C84');return g};x.shadowColor=gn?'#0E9C84':nc;x.shadowBlur=30;x.fillStyle=gn?ag(W/2-20,W/2+20):nc;x.beginPath();x.arc(W/2,cy,20,0,7);x.fill();x.shadowColor='transparent';
+  let y=cy+110;x.textBaseline='alphabetic';x.font='800 170px Gabarito';x.fillStyle='#F4F1FA';x.fillText('₹'+fmt(j.price),160,y+120);y+=170;
   if(urgent){y+=20;const t=Math.max(1,Math.round(left/6e4))+' min left';x.font='700 34px Figtree';const tw=x.measureText(t).width+44;x.fillStyle='rgba(255,91,110,.2)';rrect(x,160,y,tw,58,29);x.fill();x.fillStyle='#FF8C9B';x.fillText(t,182,y+41);y+=70}else y+=30;
   x.fillStyle='#F4F1FA';x.font='700 60px Figtree';for(const l of lines){y+=78;x.fillText(l,160,y-14)}
   if(meta){y+=70;x.fillStyle='#9C96AE';x.font='600 40px Figtree';x.fillText(meta,160,y)}
@@ -633,8 +633,8 @@ const PRICE_STOPS=[[0,'#6B8CFF'],[100,'#45BBF7'],[200,'#45D982'],[500,'#F5C033']
 function priceHue(p){p=Math.max(0,num(p));let i=0;while(i<PRICE_STOPS.length-2&&p>PRICE_STOPS[i+1][0])i++;const[a,b]=[PRICE_STOPS[i],PRICE_STOPS[i+1]],t=Math.min(1,(p-a[0])/(b[0]-a[0]));
   const c=(h,k)=>parseInt(h.slice(1+k*2,3+k*2),16);return'#'+[0,1,2].map(k=>Math.round(c(a[1],k)+(c(b[1],k)-c(a[1],k))*t).toString(16).padStart(2,'0')).join('')}
 const gradNote=j=>num(j&&j.price)>500;
-const gcls=j=>gradNote(j)?' gnote':'',gvars=j=>gradNote(j)?';--nc1:#3B5BFF;--nc2:#9C5CFF':'';
-function noteOf(j){return gradNote(j)?'#8F84FF':priceHue(j&&typeof j==='object'?j.price:0)}
+const gcls=j=>gradNote(j)?' gnote':'',gvars=j=>gradNote(j)?';--nc1:var(--g1);--nc2:var(--g2)':'';
+function noteOf(j){return gradNote(j)?'#5FD3BC':priceHue(j&&typeof j==='object'?j.price:0)}
 function tile(j,D,i=0){
   const c=noteOf(j),n=bidsFor(D,j.key).length,left=j.deadline-Date.now();
   const ph=j.pics?(picsOf('j:'+j.key)||[])[0]:'',d=-((Date.now()/1000+i*2.3)%32).toFixed(2);
@@ -715,7 +715,7 @@ function viewJob(D){
           ${j.pick?.ratedPoster?`<p class="note">You rated ${pn}${(S.priv.gave||{})[j.key]?' ★'+num(S.priv.gave[j.key]).toFixed(1):''}.</p>`:`<button class="cta" data-sheet="ratePoster">Rate ${pn}</button>`}
           ${j.pick?.noteToDoer?`<div class="box stack" style="gap:4px"><span class="formlabel">${pn}'s private note to you</span><span class="t2" style="color:var(--fg)">${esc(str(j.pick.noteToDoer,200))}</span></div>`:''}
           <button class="linkbtn" data-act="paid" data-val="no">I marked this by mistake</button></div>`
-        :`<div class="foot"><div class="stack gap8 box" style="border:1px solid rgba(108,92,255,.3)">
+        :`<div class="foot"><div class="stack gap8 box" style="border:1px solid rgba(14,159,134,.3)">
           <span class="t1" style="font-size:var(--t-16)">Did ${pn} pay you ₹${fmt(j.agreed)}?</span>
           <span class="t2">${pay?'You said not yet. Tap Yes once the money reaches you.':`${pn} marked this job done. Confirm once the money reaches you.`}</span></div>
           <button class="cta" data-act="paid" data-val="yes">Yes, I got it</button>
@@ -797,7 +797,7 @@ function viewBids(D){
   const oin=offerList(S.offersIn).filter(o=>D.members.includes(o.owner)&&!D.blocked.has(o.owner)&&o.status!=='declined').sort((a,b)=>num(b.at)-num(a.at));
   const oout=offerList(S.offersOut).filter(o=>o.status!=='accepted').sort((a,b)=>num(b.at)-num(a.at));
   const doing=D.jobs.filter(j=>j.accepted===me&&!myBidOn(j.key)&&j.status!=='removed').sort((a,b)=>b.at-a.at);
-  const offerCard=o=>`<div class="box stack" style="gap:10px;border:1px solid rgba(108,92,255,.3)">
+  const offerCard=o=>`<div class="box stack" style="gap:10px;border:1px solid rgba(14,159,134,.3)">
     <div style="display:flex;align-items:center;gap:10px">${ring(o.owner,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.owner))} asked you</span><span class="t2">${esc([o.where,o.when].filter(Boolean).join(' · '))}</span></span><span class="amt" style="color:var(--accent)">₹${fmt(o.price)}</span></div>
     <span style="font-size:var(--t-14);line-height:1.4;color:var(--fg);overflow-wrap:anywhere">${esc(o.text)}</span>
     ${o.status==='pending'?`<div style="display:flex;gap:8px"><button class="pick" style="flex:1;padding:11px" data-act="acceptOffer" data-key="${esc(o.key)}">Accept</button><button class="btn2" style="flex:1;padding:11px" data-act="declineOffer" data-key="${esc(o.key)}">Can't do it</button></div>`
@@ -817,8 +817,9 @@ function viewBids(D){
       const empty=t=>`<p class="note" style="text-align:left">${t}</p>`;
       return`<div class="pills" style="padding:4px 0 0" role="group" aria-label="Show">${tabs.map(([k,l,n])=>`<button class="pill ${S.actTab===k?'on':''}" data-acttab="${k}" aria-pressed="${S.actTab===k}">${l}${n?' · '+n:''}</button>`).join('')}</div>
       ${S.actTab==='all'?(()=>{const feed=[...D.notes.map(n=>({...n,kind:'n'})),...jobsNow.map(j=>({kind:'j',j,at:j.at})),...[...active,...waiting].map(y=>({kind:'b',y,at:y.at||y.j.at}))].sort((a,b)=>b.at-a.at);
-        return feed.length?`<div class="stack gap8">${feed.map(f=>f.kind==='j'?row(f.j,jobLine(f.j),f.j.price,me):f.kind==='b'?row(f.y.j,bidLine(f.y.x||{j:f.y.j}),f.y.amt)
-          :`<button class="item notif ${f.at>S.actSeenAt?'new':''}" ${f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span></span>${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`).join('')}</div>`:empty('Bids, picks and payments show up here.')})()
+        const one=f=>f.kind==='j'?row(f.j,jobLine(f.j),f.j.price,me):f.kind==='b'?row(f.y.j,bidLine(f.y.x||{j:f.y.j}),f.y.amt)
+          :`<button class="item notif ${f.at>S.actSeenAt?'new':''}" ${f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span></span>${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`;
+        return feed.length?`<div class="ifeed">${dateGroups(feed,f=>f.at).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(one).join('')}</section>`).join('')}</div>`:empty('Bids, picks and payments show up here.')})()
       :S.actTab==='jobs'?`${jobsNow.length?`<div class="stack gap8">${jobsNow.map(j=>row(j,jobLine(j),j.price,me)).join('')}</div>`:empty('Nothing pinned right now.')}
         <button class="linkbtn" data-go="post" style="align-self:flex-start;padding:0">Pin a job</button>`
       :S.actTab==='bids'?(active.length||waiting.length?grp('Active',active)+grp('Waiting',waiting):empty('Bids you place on the board show up here.'))
@@ -836,11 +837,13 @@ function inviteCard(D,big){
     ${big?'<b>No chats yet</b><p>Chats open when you work with someone: message your bidders, or ask someone who\u2019s free for a favour. Bring your friends onto the board too.</p>':'<span class="t1" style="font-size:var(--t-16)">Invite friends to tack</span><span class="t2">More people on the board means jobs get picked up faster. Each link lets one person join.</span>'}
     <button class="${big?'cta noglow':'btn2'}" data-sheet="invitefriend">Invite a friend</button>
     ${used?`<p class="note">${used} ${used===1?'person has':'people have'} joined with your links.</p>`:''}</div>`}
+function dateGroups(list,at){const d0=new Date().setHours(0,0,0,0),grp=t=>!t?'Earlier':t>=d0?'Today':t>=d0-864e5?'Yesterday':t>=d0-6*864e5?'Last 7 days':t>=d0-29*864e5?'Last 30 days':'Earlier',out=[];
+  for(const x of list){const g=grp(at(x));if(!out.length||out[out.length-1][0]!==g)out.push([g,[]]);out[out.length-1][1].push(x)}return out}
 function viewChats(D){
   return`<div class="pad narrow"><h1 class="pageh">Chats</h1>
-  ${D.threads.length?`<div class="stack gap8">${D.threads.map(t=>`<button class="item" data-thread="${esc(t.key)}">${ring(t.other,46)}
+  ${D.threads.length?`<div class="ifeed">${dateGroups(D.threads,t=>t.last?.at||t.job?.at||0).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(t=>`<button class="item" data-thread="${esc(t.key)}">${ring(t.other,46)}
     <span class="itext"><span class="t1">${esc(shortName(t.other))}${t.job?` <span style="color:${noteOf(t.job)}">· ₹${fmt(t.job.agreed||t.job.price)}</span>`:''}</span><span class="t2" style="${t.unread?'color:var(--fg);font-weight:600':''}">${esc(t.sub)}</span></span>
-    <span class="iend"><span class="time">${t.last?ago(t.last.at):''}</span>${t.unread?'<span class="udot" aria-label="Unread"></span>':''}</span></button>`).join('')}</div>`
+    <span class="iend"><span class="time">${t.last?ago(t.last.at):''}</span>${t.unread?'<span class="udot" aria-label="Unread"></span>':''}</span></button>`).join('')}</section>`).join('')}</div>`
    :inviteCard(D,true)}
   ${D.threads.length?`<div style="margin-top:18px">${inviteCard(D,false)}</div>`:''}
   </div><div style="height:24px"></div>`;
@@ -865,13 +868,13 @@ function viewChat(D){
   ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats now happen inside jobs: ask ${esc(firstName(c.other))} for a favour when they're free, or hire them again from their profile.`}</p></div>`:`
   <div class="foot" style="position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%)"><div style="display:flex;gap:9px">
     <label class="field" for="msg"><input id="msg" type="text" maxlength="1000" placeholder="Message…" value="${esc(S.chatDraft.text)}" data-bind="chatDraft.text" aria-label="Message ${esc(firstName(c.other))}" autocomplete="off"></label>
-    <button data-act="send" aria-label="Send" style="width:50px;height:50px;flex-shrink:0;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(108,92,255,.35)">${ic('send',19,2,'#fff')}</button>
+    <button data-act="send" aria-label="Send" style="width:50px;height:50px;flex-shrink:0;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(14,159,134,.35)">${ic('send',19,2,'#fff')}</button>
   </div></div>`}`;
 }
 function viewPerson(uid,D){
   const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,free=num(d.freeUntil)>Date.now();
   const does=str(d.does,60).split(',').map(s=>s.trim()).filter(Boolean).slice(0,6);
-  const tints=[['rgba(79,227,224,.16)','var(--cyan-ink)'],['rgba(255,122,209,.16)','var(--pink-ink)'],['rgba(255,197,61,.16)','var(--amber-ink)'],['rgba(108,92,255,.18)','var(--violet-ink)']];
+  const tints=[['rgba(79,227,224,.16)','var(--cyan-ink)'],['rgba(255,122,209,.16)','var(--pink-ink)'],['rgba(255,197,61,.16)','var(--amber-ink)'],['rgba(14,159,134,.18)','var(--violet-ink)']];
   return`<div class="pad">${isMe?'':back('board','Back to the board')}
   <div class="stack narrow" style="margin:6px auto 0;gap:18px">
    <div class="prof">
@@ -943,7 +946,7 @@ function viewInvites(D){
      <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="invE" class="inp" style="flex:1;min-width:200px" type="email" inputmode="email" autocapitalize="off" spellcheck="false" autocomplete="off" placeholder="name@college.edu.in" value="${esc(S.inv.email)}" data-bind="inv.email">
      <button class="pick" style="padding:12px 18px;font-size:var(--t-14)" data-act="invite" data-need="invite">Add invite</button></div>
      ${S.err.inv?`<p class="err">${esc(S.err.inv)}</p>`:''}</div>
-   ${li?`<div class="box stack" style="gap:10px;border:1px solid rgba(108,92,255,.35)">
+   ${li?`<div class="box stack" style="gap:10px;border:1px solid rgba(14,159,134,.35)">
      <span class="t1" style="font-size:var(--t-14)">${esc(li)} can sign up now. Send them the invite:</span>${shareButtons(li)}
      <p class="note" style="text-align:left">The invite has a link to the sign-up page with their email filled in.</p></div>`:''}
    <div class="stack gap8"><div class="sect"><h2 class="h2">Invited</h2><span class="time">${list.length}</span></div>
