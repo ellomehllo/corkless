@@ -65,7 +65,7 @@ const S={
   offer:{to:null,prevJob:null,text:'',price:'',when:'Next hour',where:''}, invites:{}, reports:[], myInvite:null,
   myDoc:null, pendingMine:0,
   view:'board', openJob:null, personOf:null, sort:'high', find:{q:''}, near:false,
-  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, actTab:'all', actSeenAt:0, chatDraft:{text:''},
+  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, actTab:'all', actSeenAt:0, intro:{on:false,i:0}, fresh:null, chatDraft:{text:''},
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',adult:false,rules:false},
   inv:{email:'',campus:''}, lastInvite:null,
   picks:{}, repDocs:{},
@@ -361,6 +361,7 @@ function afterData(){
     if(S.myDoc&&S.myDoc.removed)saveMine(d=>{delete d.removed;return d});
   }
   computePhase();render();
+  if(S.phase==='app'&&!S.introChecked&&!S.joining){S.introChecked=true;if(!S.priv.introSeen)setTimeout(()=>{if(!S.intro.on&&S.phase==='app'&&!S.priv.introSeen)openIntro()},700)}
 }
 function computePhase(){
   if(!S.me)return;
@@ -578,7 +579,7 @@ function onboardHTML(edit){
 function back(to,label){return`<button class="back" data-go="${to}">${ic('back',16)} ${label}</button>`}
 function tile(j,D,i=0){
   const r=ringOf(j.owner),n=bidsFor(D,j.key).length,left=j.deadline-Date.now();
-  return`<button class="tile r${i%3}" data-job="${esc(j.key)}" style="--glow:${GLOW[r]}">
+  return`<button class="tile r${i%3} ${S.fresh===j.key?'fresh':''}" data-job="${esc(j.key)}" style="--glow:${GLOW[r]};--i:${i}">
     <span class="pin" style="background:${r};box-shadow:0 0 10px ${r}"></span>
     <span class="price">₹${fmt(j.price)}</span>
     ${left<36e5?`<span class="flag">${Math.max(1,Math.round(left/6e4))} min left</span>`:''}${nearMe(j)?nearTag():''}
@@ -593,6 +594,7 @@ function wallHTML(list,D){const n=wideMQ.matches?3:2,cols=Array.from({length:n},
   return`<div class="wall">${cols.map(c=>`<div class="wcol">${c.join('')}</div>`).join('')}</div>`}
 wideMQ.addEventListener?.('change',()=>{if(S.phase==='app')render()});
 function viewBoard(D){
+  const drop=!S.boardDropped&&!S.intro.on&&!S.momentOn&&!S.joining&&S.priv.introSeen&&!reduceMotion.matches;if(drop){S.boardDropped=true;S.dropping=true;setTimeout(()=>{S.dropping=false},2200)}
   const all=boardJobs(D),list=findJobs(all),filtered=!!(S.find.q.trim()||S.near),free=freePeople(D).filter(u=>u!==S.me.id),meFree=num(S.myDoc?.freeUntil)>Date.now();
   return`<div class="boardpage"><header class="top">
     <div><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${esc(campus())} · ${all.length} pinned</span></div></div>
@@ -604,10 +606,11 @@ function viewBoard(D){
       ${free.map(u=>`<button class="person" data-ask="${esc(u)}" aria-label="Ask ${esc(firstName(u))} for a favour">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}
       ${free.length?'':`<span class="stripnote">Nobody else is marked free. Tap + to say you're around.</span>`}
     </div></section>
+  ${stepsCard(D)}
   <div class="dhead"><h1 class="h1">The board</h1><span class="muted">${all.length} pinned at ${esc(campus())}</span></div>
   <label class="search" for="q">${ic('search',17)}<input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search jobs: print, shawarma, today, library" value="${esc(S.find.q)}" data-bind="find.q" aria-label="Search jobs"></label>
   <div class="pills" role="group" aria-label="Filter and sort jobs"><button class="pill ${S.near?'on':''}" data-act="toggleNear" aria-pressed="${S.near}">${ic('place',13,2.2)} Near you</button><span class="pillsep" aria-hidden="true"></span>${[['high','Top pay'],['newest','Newest'],['closing','Closing soon']].map(([k,l])=>`<button class="pill ${S.sort===k?'on':''}" data-sort="${k}" aria-pressed="${S.sort===k}">${l}</button>`).join('')}</div>
-  <div class="wallzone">${filtered&&!list.length&&all.length?`<div class="empty"><b>${S.near&&!S.find.q.trim()?'Nothing near you right now':'No jobs match that'}</b><p>${S.near?'Only jobs pinned with a location can show as near you.':'Try another word, like the place, the time or what you need.'}</p><button class="btn2" data-act="clearFind">Show all jobs</button></div>`:list.length?wallHTML(list,D)+`<div class="boardend"><span class="endpin" aria-hidden="true"></span><p>${filtered?`${list.length} of ${all.length} jobs shown.`:`That's everything pinned at ${esc(campus())}.`}</p><button class="btn2" data-go="post">Pin a job</button></div>`
+  <div class="wallzone ${S.dropping?'dropin':''}">${filtered&&!list.length&&all.length?`<div class="empty"><b>${S.near&&!S.find.q.trim()?'Nothing near you right now':'No jobs match that'}</b><p>${S.near?'Only jobs pinned with a location can show as near you.':'Try another word, like the place, the time or what you need.'}</p><button class="btn2" data-act="clearFind">Show all jobs</button></div>`:list.length?wallHTML(list,D)+`<div class="boardend"><span class="endpin" aria-hidden="true"></span><p>${filtered?`${list.length} of ${all.length} jobs shown.`:`That's everything pinned at ${esc(campus())}.`}</p><button class="btn2" data-go="post">Pin a job</button></div>`
     :`<div class="empty"><b>Nothing pinned yet</b><p>Pin the first job: a xerox run, a lift down four floors, an hour of help before a submission.</p><button class="cta" data-go="post">Pin a job</button></div>`}</div></div>`;
 }
 function viewJob(D){
@@ -819,6 +822,7 @@ function viewPerson(uid,D){
    ${isMe?`<div class="menu">
        <button data-go="edit">${ic('edit',18)} Edit profile<span class="chev">${ic('chev',16)}</span></button>
        ${S.me.isOwner?`<button data-go="invites">${ic('users',18)} Invites and members<span class="chev">${ic('chev',16)}</span></button>`:''}
+       <button data-act="replayIntro">${ic('board',18)} How tack works<span class="chev">${ic('chev',16)}</span></button>
        <button data-go="privacy">${ic('shield',18)} Privacy<span class="chev">${ic('chev',16)}</span></button>
        <button data-act="logout">${ic('out',18)} Log out</button>
        <button data-sheet="erase" class="danger">${ic('trash',18)} Delete my account</button></div>
@@ -979,6 +983,49 @@ function sheetHTML(D){
 
 const VIEWS={board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewPrivacy,invites:viewInvites,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
 let lastView=null,lastSheet=null;const scrollMem={};
+const INTRO=[
+  {k:'board',t:'This is the board.',b:'Classmates pin small jobs here. A print run, a lift down four floors, an hour of help before a deadline.'},
+  {k:'bid',t:'Bid what it\u2019s worth.',b:'Name your price and pitch yourself in one line. Only the poster sees your bid.'},
+  {k:'pick',t:'Get picked. Sort it in chat.',b:'The poster picks one person and you plan it together. You pay each other on UPI or cash. tack never touches the money.'},
+  {k:'rate',t:'Rate each other.',b:'When it\u2019s done, you both rate the other. Profiles show the averages, never who gave them.'},
+  {k:'end'}];
+function introScene(k){const me=S.me?.id;
+  if(k==='board')return`<div class="sc sc-board" aria-hidden="true">${[['₹120','Print 40 pages at Sai Xerox','#A18CFF'],['₹60','Parcel from Gate 1','#FF7AD1'],['₹300','20 photos at golden hour','#4FE3E0']].map(([p,t,c],i)=>`<span class="sct" style="--i:${i}"><span class="pin" style="background:${c};box-shadow:0 0 10px ${c}"></span><b>${p}</b><i>${t}</i></span>`).join('')}</div>`;
+  if(k==='bid')return`<div class="sc sc-bid" aria-hidden="true"><span class="sct" style="--i:0"><span class="pin" style="background:#FFC53D;box-shadow:0 0 10px #FFC53D"></span><b>₹150</b><i>Help me move a cupboard</i></span>
+    <span class="bubble" style="--i:1">${me?face(me,26):''}<b>₹120</b><span>I can do it by 5</span></span><span class="lock" style="--i:2">${ic('shield',13,2.2)} Only the poster sees this</span></div>`;
+  if(k==='pick')return`<div class="sc sc-pick" aria-hidden="true"><span class="who" style="--i:0">${me?ring(me,56):''}</span><span class="link" style="--i:1"></span><span class="who" style="--i:0"><span class="ring" style="border-color:#4FE3E0;width:56px;height:56px"><span class="av av-empty" style="background:#4FE3E02e;color:#4FE3E0;width:48px;height:48px;font-size:19px">S</span></span></span>
+    <span class="bubble b2" style="--i:2">On my way. 10 minutes.</span><span class="lock" style="--i:3">UPI or cash, between you two</span></div>`;
+  if(k==='rate')return`<div class="sc sc-rate" aria-hidden="true"><span class="stars">${[0,1,2,3,4].map(i=>`<span class="st" style="--i:${i}">${ic('star',30,2,'currentColor','currentColor')}</span>`).join('')}</span><span class="lock" style="--i:6">${ic('shield',13,2.2)} Anonymous, always</span></div>`;
+  return`<div class="sc sc-end" aria-hidden="true"><span class="bigpin"></span></div>`}
+function renderIntro(){let r=$('introRoot');
+  if(!S.intro.on){if(r)r.remove();return}
+  if(!r){r=document.createElement('div');r.id='introRoot';document.body.appendChild(r);
+    let x0=null;r.addEventListener('touchstart',e=>{x0=e.touches[0].clientX},{passive:true});
+    r.addEventListener('touchend',e=>{if(x0==null)return;const dx=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(dx)>50)introStep(dx<0?1:-1)},{passive:true})}
+  const i=S.intro.i,sl=INTRO[i],last=sl.k==='end',fn=esc(S.me?firstName(S.me.id):'');
+  r.innerHTML=`<div class="intro" role="dialog" aria-modal="true" aria-labelledby="introT">
+    <div class="introtop"><span class="mark">tack</span>${last?'':'<button class="linkbtn" data-act="introSkip">Skip</button>'}</div>
+    <div class="introbody" data-k="${sl.k}">${introScene(sl.k)}
+      <div class="introtext">${last?`<h1 id="introT" class="ia">You\u2019re in${fn?', '+fn:''}.</h1><p class="ib">Pin something you need, or find something to do. The board is yours.</p>`
+        :`<span class="ik">${i+1} of ${INTRO.length-1}</span><h1 id="introT" class="ia">${sl.t}</h1><p class="ib">${sl.b}</p>`}</div></div>
+    <div class="introfoot">${last?`<button class="cta inext" data-act="introDone">Show me the board</button><button class="btn2 inext2" data-act="introPost">Pin my first job</button>`
+      :`<div class="idots" aria-hidden="true">${INTRO.slice(0,-1).map((_,j)=>`<span class="${j===i?'on':''}"></span>`).join('')}</div><button class="cta inext" data-act="introNext">${i===INTRO.length-2?'Got it':'Next'}</button>`}</div></div>`;
+  requestAnimationFrame(()=>r.querySelector('.inext')?.focus({preventScroll:true}))}
+function openIntro(back){S.intro={on:true,i:0,back:back||null};renderIntro()}
+function introStep(d){const i=S.intro.i+d;if(i<0||i>=INTRO.length)return;S.intro.i=i;renderIntro()}
+function closeIntro(to){const back=S.intro.back;S.intro={on:false,i:0};renderIntro();if(!S.priv.introSeen)savePriv({introSeen:Date.now()});go(to||back||'board')}
+function moment(title,sub,ms=1300){
+  const r=document.createElement('div');r.className='momentroot';r.setAttribute('role','status');
+  r.innerHTML=`<div class="moment"><span class="bigpin"></span><h2>${esc(title)}</h2>${sub?`<p>${esc(sub)}</p>`:''}</div>`;
+  document.body.appendChild(r);S.momentOn=true;const t=reduceMotion.matches?Math.min(ms,700):ms;
+  return new Promise(res=>setTimeout(()=>{r.classList.add('out');setTimeout(()=>{r.remove();S.momentOn=false;res();if(S.phase==='app')render()},reduceMotion.matches?0:260)},t))}
+function stepsCard(D){if(!S.priv.introSeen||S.priv.stepsHidden)return'';const me=S.me.id,d=S.myDoc||{};
+  const steps=[[!!d.photo,'Add a profile photo','A real face helps people say yes.','data-go="edit"'],[num(d.freeUntil)>0,'Mark yourself free','Free people show up first for quick asks.','data-sheet="free"'],
+    [D.jobs.some(j=>j.owner===me)||Object.keys(S.pitchMine).length>0,'Pin or bid on a job','The first one is the hardest.','data-go="post"']];
+  const n=steps.filter(x=>x[0]).length;if(n===steps.length)return'';
+  return`<section class="steps" aria-label="Your first steps"><div class="stepshead"><b>Your first steps</b><span>${n} of ${steps.length} done</span><button class="iconbtn" data-act="hideSteps" aria-label="Hide first steps">${ic('x',14,2.4)}</button></div>
+    <div class="stepbar"><span style="width:${Math.round(n/steps.length*100)}%"></span></div>
+    ${steps.map(([done,t,h,at])=>`<button class="step ${done?'done':''}" ${done?'disabled':at}><span class="stepdot">${done?ic('tick',12,3.2):''}</span><span class="rowtext"><span class="t1">${t}</span><span class="t2">${done?'Done':h}</span></span>${done?'':`<span class="chev">${ic('chev',16)}</span>`}</button>`).join('')}</section>`}
 const NEED={
   signup:()=>S.form.name.trim().length>=2&&validEmail(S.form.email.trim())&&S.form.pw.length>=8,
   login:()=>validEmail(S.form.email.trim())&&!!S.form.pw,
@@ -1061,7 +1108,8 @@ const ACT={
   join(){const o=S.onb;
     if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.')||!need(o.adult,'onb','tack is for students who are 18 or older.')||!need(o.rules,'onb','Tick the posting rule to continue.'))return;
     saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),does:o.does.trim().slice(0,60),ring:o.ring,adult:true,joinedAt:d.joinedAt||Date.now(),jobs:d.jobs||{}}));
-    S.err={};S.view='board';computePhase();render();toast('You’re on the board')},
+    S.err={};S.view='board';S.joining=true;computePhase();render();
+    moment(`You\u2019re on the board, ${o.name.trim().split(/\s+/)[0]}.`,'Give us a second to show you around.',1600).then(()=>{S.joining=false;if(!S.priv.introSeen)openIntro()})},
   saveProfile(){const o=S.onb;if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.'))return;
     saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),does:o.does.trim().slice(0,60),ring:o.ring}));go('me');toast('Profile saved')},
   post(){const d=S.draft,text=d.text.trim(),price=digits(d.price);
@@ -1070,7 +1118,7 @@ const ACT={
     const pics=cleanPics(d.pics),geo=d.useLoc&&LOC.pos?{lat:Math.round(LOC.pos.lat*1e3)/1e3,lng:Math.round(LOC.pos.lng*1e3)/1e3}:null;
     saveMine(x=>{x.jobs={...(x.jobs||{}),[id]:{text:text.slice(0,200),more:d.more.trim().slice(0,600),price,kind:d.kind,when:d.when,where,at,deadline:deadlineFor(d.when,at),status:'open',...(pics.length?{pics:pics.length}:{}),...(geo?{geo}:{})}};return x});
     if(pics.length){S.pics['j:'+S.me.id+'~'+id]=pics;S.fb.setDoc(S.fb.doc(S.db,'jobpics',S.me.id+'~'+id),{owner:S.me.id,job:id,pics,at}).catch(e=>{console.warn(e);toast('Your job is up, but the photos didn\u2019t upload.')})}
-    S.draft=blankDraft();S.sort='newest';go('board');toast('Pinned to the board')},
+    S.draft=blankDraft();S.sort='newest';S.fresh=S.me.id+'~'+id;go('board');moment('Pinned.','Classmates can bid on it now.',1100);setTimeout(()=>{S.fresh=null},4000)},
   repost(){const j=derive().jobByKey[S.openJob];if(!j)return;S.draft={...blankDraft(),text:j.text,price:String(j.price),kind:KINDS.includes(j.kind)?j.kind:'Other',where:WHERES.includes(j.where)?j.where:'Gate 1',whereText:WHERES.includes(j.where)?'':j.where,more:j.more,pics:[...(S.pics['j:'+j.key]||[])]};
     saveMine(x=>{if(x.jobs?.[j.id])x.jobs[j.id].status='closed';return x});go('post')},
   bid(){const j=derive().jobByKey[S.openJob];if(!j)return;const amt=digits(S.bid.amt);
@@ -1093,6 +1141,12 @@ const ACT={
     deleteDoc(doc(S.db,'reviewpics',s.rid)).catch(()=>{});deleteDoc(doc(S.db,'reviews',s.rid)).then(()=>{delete S.revs[s.about];toast('Review deleted');render()}).catch(writeErr);
     S.sheet=null;render()},
   allReviews(el){S.allRevs=el.dataset.uid;render()},
+  introNext(){if(S.intro.i>=INTRO.length-1)return closeIntro();introStep(1)},
+  introSkip(){closeIntro()},
+  introDone(){closeIntro('board')},
+  introPost(){closeIntro('post')},
+  replayIntro(){openIntro(S.view)},
+  hideSteps(){savePriv({stepsHidden:true})},
   toggleNear(){if(S.near){S.near=false;render();return}
     if(LOC.pos){S.near=true;render();return}
     toast('Finding where you are…');getLoc().then(p=>{if(p){S.near=true;render()}else toast('Couldn\u2019t get your location. Allow location for this site in your browser settings.')})},
@@ -1235,6 +1289,7 @@ document.addEventListener('change',async e=>{
   }
 });
 document.addEventListener('keydown',e=>{
+  if(S.intro.on){if(e.key==='ArrowRight'){e.preventDefault();introStep(1)}else if(e.key==='ArrowLeft'){e.preventDefault();introStep(-1)}else if(e.key==='Escape')closeIntro();return}
   if(e.key==='Escape'&&S.sheet){closeSheet();return}
   if(e.key==='Enter'&&e.target.id==='msg'){e.preventDefault();sendMsg();return}
   if(e.key==='Enter'&&e.target.id==='invE'){e.preventDefault();ACT.invite();return}
