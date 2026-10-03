@@ -114,7 +114,7 @@ const organiser=()=>{const o=ownerId();return o&&fullName(o)?firstName(o):'the o
 const isMember=uid=>{const d=pdoc(uid);return !!d.adult&&!d.removed};
 
 function normJob(id,j,uid){
-  return{id,owner:uid,key:uid+'~'+id,text:str(j.text,200),more:str(j.more,600),price:num(j.price),kind:str(j.kind,20),
+  return{id,owner:uid,key:uid+'~'+id,text:str(j.text,400),more:str(j.more,600),price:num(j.price),kind:str(j.kind,20),
     when:str(j.when,20),where:str(j.where,40),at:num(j.at),deadline:num(j.deadline),
     status:STATUSES.includes(j.status)?j.status:'open',doneAt:num(j.doneAt),pics:Math.min(MAX_PICS,Math.max(0,Math.floor(num(j.pics)))),geo:geoOk(j.geo),accepted:null,agreed:0,pick:null};
 }
@@ -767,28 +767,38 @@ function viewJob(D){
   </div>
   ${!mine?`<div class="reportrow"><button class="linkbtn" data-sheet="report" data-about="${esc(j.owner)}">Report this job</button>${mod}</div>`:''}`;
 }
+const NOTE_WORDS=50,noteCount=t=>`${words(t)} / ${NOTE_WORDS} words`;
+function noteTone(){const p=digits(S.draft.price)||0,j={price:p};return{c:noteOf(j),g:gradNote(j)}}
+function syncNoteTone(){const n=$('bignote');if(!n)return;const {c,g}=noteTone();n.style.setProperty('--nc',c);n.classList.toggle('gnote',g);
+  if(g){n.style.setProperty('--nc1','var(--g1)');n.style.setProperty('--nc2','var(--g2)')}else{n.style.removeProperty('--nc1');n.style.removeProperty('--nc2')}
+  const pr=$('bnPrice');if(pr)pr.classList.toggle('blank',!digits(S.draft.price))}
 function viewPost(){
-  const d=S.draft;
-  const group=(t,g,list)=>`<div class="stack gap8"><span class="formlabel" id="g-${g}">${t}</span><div class="chips" role="group" aria-labelledby="g-${g}">${list.map(v=>`<button class="chip ${d[g]===v&&!(g==='where'&&d.whereText.trim())?'on':''}" data-set="${g}" data-val="${esc(v)}" aria-pressed="${d[g]===v}">${esc(v)}</button>`).join('')}</div></div>`;
-  return`<div class="pad">${back('board','Close')}
-  <div class="stack narrow" style="margin-top:6px;gap:22px">
-   <div class="stack gap8"><label for="jt" class="formlabel">What do you need?</label>
-     <textarea id="jt" class="ta" rows="3" maxlength="200" placeholder="Pick up my print-outs from Sai Xerox before 4. Roll no. is on the slip." data-bind="draft.text">${esc(d.text)}</textarea></div>
-   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap">
-     <label for="jp" class="stack" style="gap:4px"><span class="formlabel">You'll pay</span>
-       <span class="priceIn">₹<input id="jp" type="text" inputmode="numeric" maxlength="5" placeholder="150" value="${esc(d.price)}" data-bind="draft.price"></span></label>
-     <div style="display:flex;gap:7px;padding-bottom:8px"><button class="pill" data-bump="50">+50</button><button class="pill" data-bump="100">+100</button></div>
+  const d=S.draft,{c,g}=noteTone(),me=S.me.id,ph=(d.pics||[])[0]||'';
+  const group=(t,k,list)=>`<div class="stack gap8"><span class="formlabel" id="g-${k}">${t}</span><div class="chips" role="group" aria-labelledby="g-${k}">${list.map(v=>`<button class="chip ${d[k]===v&&!(k==='where'&&d.whereText.trim())?'on':''}" data-set="${k}" data-val="${esc(v)}" aria-pressed="${d[k]===v&&!(k==='where'&&d.whereText.trim())}">${esc(v)}</button>`).join('')}</div></div>`;
+  return`<div class="pad postpage">${back('board','Close')}
+   <h1 class="pageh" style="margin:6px 0 2px">Pin a job</h1>
+   <p class="note" style="text-align:left;margin:0 0 14px">Write it on the note. This is exactly how it shows on the board.</p>
+   <div class="bignote tile ntile${g?' gnote':''}" id="bignote" style="--nc:${c}${g?';--nc1:var(--g1);--nc2:var(--g2)':''};--d:0s">
+     <span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span>
+     <span class="pin" aria-hidden="true"></span>
+     <label class="bnprice ${digits(d.price)?'':'blank'}" id="bnPrice" for="jp"><span>₹</span><input id="jp" type="text" inputmode="numeric" maxlength="5" placeholder="150" value="${esc(d.price)}" data-bind="draft.price" aria-label="You'll pay, in rupees"></label>
+     <textarea id="jt" class="bntext" rows="4" maxlength="400" placeholder="What do you need? Pick up my print-outs from Sai Xerox before 4." data-bind="draft.text" aria-label="What do you need?">${esc(d.text)}</textarea>
+     <span class="bnfoot"><span class="by">${face(me,22)}<span class="nm">${esc(firstName(me))}</span></span><span class="wc ${words(d.text)>NOTE_WORDS?'over':''}" id="jtWc">${noteCount(d.text)}</span></span>
    </div>
-   ${group('By when','when',WHENS)}${group('Where','where',WHERES)}
-   <input id="jw" class="inp" maxlength="40" placeholder="Or type a place: Seminar hall, B-wing 4th floor…" value="${esc(d.whereText)}" data-bind="draft.whereText" aria-label="Other place">
-   <div class="stack gap8"><label for="jm" class="formlabel">Anything else <span class="muted">(optional)</span></label>
-     <textarea id="jm" class="inp" rows="2" maxlength="600" style="resize:vertical" placeholder="Details the person doing it should know." data-bind="draft.more">${esc(d.more)}</textarea>
-     ${picEdit('draft',d.pics)}</div>
-   <button class="locbtn" data-act="toggleJobLoc" aria-pressed="${!!d.useLoc}">${ic(d.useLoc?'tick':'place',16,2.4)}<span class="rowtext"><span class="t1">${d.useLoc?'Tagged with where you are now':'Tag this job with where you are'}</span><span class="t2">${d.useLoc?'Members nearby see a Near you tag. Turn off if the job is somewhere else.':'Helps people close by find it. Rounded to about 100 m, never shown on a map.'}</span></span></button>
-   <div class="card">${ring(S.me.id,38)}<span style="font-size:var(--t-12);font-weight:500;color:var(--fg2)">Posting as <b style="color:var(--fg)">${esc(shortName(S.me.id))}${metaOf(S.me.id)?' · '+esc(metaOf(S.me.id)):''}</b>. Your photo and name show on the board.</span></div>
-  </div></div>
-  <div class="foot">${S.err.post?`<p class="err">${esc(S.err.post)}</p>`:''}<button class="cta" data-act="post" data-need="post">Put it on the board</button>
-   <p class="note">No assignment or exam work. Nothing illegal, nothing that puts someone at risk.</p></div>`;
+   <div class="bnbump"><span class="formlabel">You'll pay</span><button class="pill" data-bump="50">+₹50</button><button class="pill" data-bump="100">+₹100</button></div>
+   <div class="stack postsec"><h2 class="h2">Tags</h2>
+     ${group('By when','when',WHENS)}${group('Where','where',WHERES)}
+     <input id="jw" class="inp" maxlength="40" placeholder="Or type a place: Seminar hall, B-wing 4th floor…" value="${esc(d.whereText)}" data-bind="draft.whereText" aria-label="Other place">
+     <button class="locbtn" data-act="toggleJobLoc" aria-pressed="${!!d.useLoc}">${ic(d.useLoc?'tick':'place',16,2.4)}<span class="rowtext"><span class="t1">${d.useLoc?'Tagged with where you are now':'Tag this job with where you are'}</span><span class="t2">${d.useLoc?'Members nearby see a Near you tag. Turn off if the job is somewhere else.':'Helps people close by find it. Rounded to about 100 m, never shown on a map.'}</span></span></button>
+   </div>
+   <div class="stack postsec"><h2 class="h2">Job description</h2>
+     <div class="pitchbox"><label class="pitchlabel" for="jm">Details <span class="labelhint">· optional, shown on the job page</span></label>
+       <textarea id="jm" rows="5" maxlength="600" placeholder="Anything the person doing it should know: roll number, floor, what to bring, how you'll pay." data-bind="draft.more">${esc(d.more)}</textarea>
+       <div class="pitchfoot">${picEdit('draft',d.pics)}<span class="wc">${d.more.length} / 600</span></div></div>
+   </div>
+   <div class="foot">${S.err.post?`<p class="err">${esc(S.err.post)}</p>`:''}<button class="cta" data-act="post" data-need="post">Pin it to the board</button>
+     <p class="note">Your photo and first name show on the note. No assignment or exam work, nothing illegal or unsafe.</p></div>
+  </div><div style="height:24px"></div>`;
 }
 function viewBids(D){
   const me=S.me.id;
@@ -1187,7 +1197,7 @@ const NEED={
   join:()=>S.onb.name.trim().length>=2&&!!S.onb.year&&!!S.onb.branch.trim()&&!!S.onb.adult&&!!S.onb.rules,
   profile:()=>S.onb.name.trim().length>=2&&!!S.onb.year&&!!S.onb.branch.trim(),
   bid:()=>{const a=digits(S.bid.amt);return a>=1&&a<=50000},
-  post:()=>{const p=digits(S.draft.price);return S.draft.text.trim().length>=8&&p>=10&&p<=20000},
+  post:()=>{const p=digits(S.draft.price);return S.draft.text.trim().length>=8&&words(S.draft.text)<=NOTE_WORDS&&p>=10&&p<=20000},
   rate:()=>!!(S.rate.a&&S.rate.b&&S.rate.c&&S.rate.d),
   review:()=>S.rate.rev.trim().length>=3,
   offer:()=>{const p=digits(S.offer.price);return S.offer.text.trim().length>=6&&p>=10&&p<=20000},
@@ -1269,10 +1279,10 @@ const ACT={
   saveProfile(){const o=S.onb;if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.'))return;
     saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),does:o.does.trim().slice(0,60),ring:o.ring}));go('me');toast('Profile saved')},
   post(){const d=S.draft,text=d.text.trim(),price=digits(d.price);
-    if(!need(text.length>=8,'post','Say what you need in a few more words.')||!need(price>=10&&price<=20000,'post','Set a price between ₹10 and ₹20,000.'))return;
+    if(!need(words(text)<=NOTE_WORDS,'post','Keep the note to '+NOTE_WORDS+' words. Put the rest in the details.')||!need(text.length>=8,'post','Say what you need in a few more words.')||!need(price>=10&&price<=20000,'post','Set a price between ₹10 and ₹20,000.'))return;
     const id=rid(),at=Date.now(),where=(d.whereText.trim()||d.where).slice(0,40);
     const pics=cleanPics(d.pics),geo=d.useLoc&&LOC.pos?{lat:Math.round(LOC.pos.lat*1e3)/1e3,lng:Math.round(LOC.pos.lng*1e3)/1e3}:null;
-    saveMine(x=>{x.jobs={...(x.jobs||{}),[id]:{text:text.slice(0,200),more:d.more.trim().slice(0,600),price,kind:d.kind,when:d.when,where,at,deadline:deadlineFor(d.when,at),status:'open',...(pics.length?{pics:pics.length}:{}),...(geo?{geo}:{})}};return x});
+    saveMine(x=>{x.jobs={...(x.jobs||{}),[id]:{text:text.slice(0,400),more:d.more.trim().slice(0,600),price,kind:d.kind,when:d.when,where,at,deadline:deadlineFor(d.when,at),status:'open',...(pics.length?{pics:pics.length}:{}),...(geo?{geo}:{})}};return x});
     if(pics.length){S.pics['j:'+S.me.id+'~'+id]=pics;S.fb.setDoc(S.fb.doc(S.db,'jobpics',S.me.id+'~'+id),{owner:S.me.id,job:id,pics,at}).catch(e=>{console.warn(e);toast('Your job is up, but the photos didn\u2019t upload.')})}
     S.draft=blankDraft();S.sort='newest';S.fresh=S.me.id+'~'+id;go('board');moment('Pinned.','Classmates can bid on it now.',1100);setTimeout(()=>{S.fresh=null},4000)},
   repost(){const j=derive().jobByKey[S.openJob];if(!j)return;S.draft={...blankDraft(),text:j.text,price:String(j.price),kind:KINDS.includes(j.kind)?j.kind:'Other',where:WHERES.includes(j.where)?j.where:'Gate 1',whereText:WHERES.includes(j.where)?'':j.where,more:j.more,pics:[...(S.pics['j:'+j.key]||[])]};
@@ -1483,7 +1493,7 @@ document.addEventListener('submit',e=>{
   if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
-document.addEventListener('input',e=>{bind(e);if(e.target.id==='q')render();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}syncNeed()}});
+document.addEventListener('input',e=>{bind(e);if(e.target.id==='q')render();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){w.textContent=noteCount(e.target.value);w.classList.toggle('over',words(e.target.value)>NOTE_WORDS)}}if(e.target.id==='jp')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
 document.addEventListener('change',async e=>{
   bind(e);syncNeed();
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}
