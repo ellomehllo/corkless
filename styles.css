@@ -443,3 +443,50 @@ html[data-nav="tab"]::view-transition-new(main){animation:fadeIn .2s ease both}
 .tbg.ph::after{inset:0;width:auto;aspect-ratio:auto;border-radius:0;animation:none;
   background:linear-gradient(160deg,rgba(15,13,20,.74),rgba(15,13,20,.6) 45%,color-mix(in srgb,var(--nc) 20%,rgba(15,13,20,.8)))}
 @media (prefers-reduced-motion:reduce){.tbg::before,.tbg::after,.tbg img{animation:none}}
+/* settings */
+.seth{margin:0 4px 8px;font-size:var(--t-12);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.setcard{background:var(--surface);border-radius:var(--r-lg);overflow:hidden}
+.setrow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:14px 16px;border-top:1px solid var(--line);color:var(--fg)}
+.setcard>.setrow:first-child,.setcard>:first-child{border-top:0}
+.setrow .t1{font-size:var(--t-14);font-weight:600}
+.setrow .t2{font-size:var(--t-12);line-height:1.45;color:var(--muted)}
+.setrow.col{flex-direction:column;align-items:stretch;gap:12px}
+.setrow.danger .t1{color:var(--danger)}
+.setrow:not(.static):active{background:var(--surface2)}
+.setval{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;font-size:var(--t-12);font-weight:700;color:var(--accent)}
+.seticon{width:36px;height:36px;flex-shrink:0;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--fg2)}
+.setbtn{width:auto;padding:8px 14px;font-size:var(--t-12);flex-shrink:0}
+.setform{display:flex;flex-direction:column;gap:8px;padding:4px 16px 16px}
+.setform .inp{background:var(--surface2)}
+.setform .cta{margin-top:6px}
+.switch{position:relative;flex-shrink:0;width:44px;height:26px;border-radius:999px;background:var(--surface2);box-shadow:inset 0 0 0 1.5px var(--edge);transition:background .2s,box-shadow .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--muted);transition:transform .2s cubic-bezier(.2,.8,.2,1),background .2s}
+.switch.on{background:var(--accent);box-shadow:none}
+.switch.on::after{transform:translateX(18px);background:var(--bg)}
+.sentcard{display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;padding:12px 4px}
+.sentcard p{margin:0;font-size:var(--t-14);line-height:1.55;color:var(--fg2);max-width:40ch}
+.seen{margin:-4px 2px 2px auto;font-size:var(--t-11);font-weight:600;color:var(--muted);text-align:right}
+.inlink{display:inline;padding:0;font:inherit;color:var(--fg);text-decoration:underline;text-underline-offset:2px}
+/* legal docs */
+#docRoot{position:fixed;inset:0;z-index:60}
+.docview{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);animation:ifade .2s ease both}
+.dochead{display:flex;align-items:center;justify-content:space-between;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 12px;border-bottom:1px solid var(--line)}
+.dochead .mark{font-size:var(--t-19)}
+.docscroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 16px calc(40px + env(safe-area-inset-bottom,0px))}
+.prose.legal{max-width:680px;margin:0 auto}
+.prose.legal h2{margin-top:26px;font-size:var(--t-16)}
+.prose.legal p,.prose.legal li{font-size:var(--t-14);line-height:1.65;color:var(--fg2)}
+.prose.legal ul{padding-left:20px;margin:8px 0}
+.prose.legal li{margin:5px 0}
+.prose.legal b{color:var(--fg);font-weight:600}
+.prose.legal .lede{font-size:var(--t-16);color:var(--fg)}
+.effective{margin:2px 0 14px;font-size:var(--t-12);font-weight:600;color:var(--muted)}
+/* terms gate */
+#termsRoot{position:fixed;inset:0;z-index:50}
+.termsgate{position:absolute;inset:0;overflow-y:auto;background:radial-gradient(120% 70% at 50% 0%,rgba(161,140,255,.16),transparent 60%),var(--bg);padding:calc(28px + env(safe-area-inset-top,0px)) 20px calc(28px + env(safe-area-inset-bottom,0px));animation:ifade .3s ease both}
+.tgbox{max-width:440px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.tgbox h1{margin:18px 0 0;font-family:var(--display);font-size:var(--t-28);font-weight:800;letter-spacing:-.035em;line-height:1.1}
+.tgbox p,.tgbox li{margin:0;font-size:var(--t-14);line-height:1.55;color:var(--fg2)}
+.tgbox ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+.tglinks{display:flex;gap:8px}
+.tglinks .btn2{padding:12px 8px;font-size:var(--t-12)}
