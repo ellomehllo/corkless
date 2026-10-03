@@ -172,16 +172,11 @@ function writeErr(e){
   console.warn(e);
 }
 function prune(d){
-  const keep=(o,n,by)=>{if(!o||typeof o!=='object')return{};const e=Object.entries(o);if(e.length<=n)return o;e.sort((a,b)=>by(b[1])-by(a[1]));return Object.fromEntries(e.slice(0,n))};
   const jobs=Object.entries(d.jobs||{});const live=jobs.filter(([,j])=>j.status==='open'||j.status==='assigned');
   const rest=jobs.filter(([,j])=>!(j.status==='open'||j.status==='assigned')).sort((a,b)=>num(b[1].at)-num(a[1].at)).slice(0,80);
-  d.jobs=Object.fromEntries([...live,...rest]);d.paid=keep(d.paid,150,x=>num(x.at));
+  d.jobs=Object.fromEntries([...live,...rest]);delete d.paid;delete d.bids;
   return d;
 }
-let paidMigrated=false;
-function migratePaid(){const m=S.myDoc?.paid;if(paidMigrated||!m||typeof m!=='object')return;paidMigrated=true;
-  const left={};for(const[k,v]of Object.entries(m)){if(S.picks[k]&&S.picks[k].doer===S.me.id&&!S.picks[k].paid&&v&&typeof v.ok==='boolean')S.fb.updateDoc(S.fb.doc(S.db,'picks',k),{paid:{ok:v.ok,at:num(v.at)||Date.now()}}).catch(()=>{});else if(!S.picks[k])left[k]=v}
-  saveMine(d=>{if(Object.keys(left).length)d.paid=left;else delete d.paid;return d})}
 async function rateBatch(pickKey,about,side,vals,pickPatch){
   const {doc,writeBatch}=S.fb,me=S.me.id,t=Array.from(crypto.getRandomValues(new Uint8Array(12)),x=>x.toString(16).padStart(2,'0')).join('');
   const cur=S.repDocs[about]||{},sideCur=cur[side]&&typeof cur[side]==='object'?cur[side]:{},next={n:Math.round(num(sideCur.n))+1};
@@ -272,7 +267,7 @@ function startSubs(){
   S.subs.push(onSnapshot(doc(db,'private',me),s=>{S.priv=s.exists()?s.data():{};S.ready.priv=true;afterData()},fail));
   const pk={own:{},doer:{}},mergePicks=()=>{S.picks={...pk.doer,...pk.own};if(S.phase==='app')render()};
   S.subs.push(onSnapshot(query(collection(db,'picks'),where('owner','==',me)),snap=>{pk.own={};snap.forEach(x=>{pk.own[x.id]=x.data()});mergePicks()},e=>console.warn(e)));
-  S.subs.push(onSnapshot(query(collection(db,'picks'),where('doer','==',me)),snap=>{pk.doer={};snap.forEach(x=>{pk.doer[x.id]=x.data()});mergePicks();migratePaid()},e=>console.warn(e)));
+  S.subs.push(onSnapshot(query(collection(db,'picks'),where('doer','==',me)),snap=>{pk.doer={};snap.forEach(x=>{pk.doer[x.id]=x.data()});mergePicks()},e=>console.warn(e)));
   S.subs.push(onSnapshot(collection(db,'rep'),snap=>{const r={};snap.forEach(x=>{r[x.id]=x.data()});S.repDocs=r;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'offers'),where('to','==',me)),snap=>{const o={};snap.forEach(x=>{o[x.id]=x.data()});S.offersIn=o;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'offers'),where('owner','==',me)),snap=>{const o={};snap.forEach(x=>{o[x.id]=x.data()});S.offersOut=o;convertOffers();if(S.phase==='app')render()},e=>console.warn(e)));
@@ -296,13 +291,6 @@ function afterData(){
     if(S.me.isOwner&&ownerId()!==me)setDoc(doc(S.db,'config','app'),{...S.config,adminUid:me,campus:str(S.config.campus,40)||DEFAULT_CAMPUS}).catch(writeErr);
     if(!S.me.isOwner&&S.myInvite&&S.myInvite.uid!==me)updateDoc(doc(S.db,'invites',S.me.email),{uid:me,joinedAt:Date.now()}).catch(()=>{});
     if(S.myDoc&&S.myDoc.removed)saveMine(d=>{delete d.removed;return d});
-    const legacy=Object.entries(S.myDoc?.jobs||{}).filter(([,j])=>j&&typeof j.accepted==='string');
-    if(legacy.length){(async()=>{for(const[id,j]of legacy){try{await S.fb.setDoc(doc(S.db,'picks',me+'~'+id),{owner:me,job:id,doer:j.accepted,agreed:num(j.agreed)||num(j.price),at:num(j.assignedAt)||num(j.at),status:j.status==='done'?'done':'assigned',...(j.doneAt?{doneAt:num(j.doneAt)}:{}),legacy:true})}catch(e){console.warn(e)}}
-      saveMine(d=>{for(const[id]of legacy){const o=d.jobs?.[id];if(o){delete o.accepted;delete o.agreed;delete o.rating;delete o.assignedAt}}return d})})()}
-    const old=Object.entries(S.myDoc?.bids||{}).filter(([,b])=>b&&num(b.amt)>0);
-    if(old.length){for(const[k,b]of old)S.fb.setDoc(doc(S.db,'pitches',k+'~'+me),{owner:k.split('~')[0],by:me,job:k,amt:num(b.amt),at:num(b.at)||Date.now(),...(typeof b.say==='string'&&b.say?{say:b.say.slice(0,90)}:{})},{merge:true}).catch(()=>{});
-      saveMine(d=>{delete d.bids;return d})}
-    else if(S.myDoc&&S.myDoc.bids)saveMine(d=>{delete d.bids;return d});
   }
   computePhase();render();
 }
@@ -933,7 +921,7 @@ const ACT={
   clearPhoto(){S.onb.photo='';render()},
   join(){const o=S.onb;
     if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.')||!need(o.adult,'onb','tack is for students who are 18 or older.')||!need(o.rules,'onb','Tick the posting rule to continue.'))return;
-    saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),does:o.does.trim().slice(0,60),ring:o.ring,adult:true,joinedAt:d.joinedAt||Date.now(),jobs:d.jobs||{},bids:d.bids||{}}));
+    saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),does:o.does.trim().slice(0,60),ring:o.ring,adult:true,joinedAt:d.joinedAt||Date.now(),jobs:d.jobs||{}}));
     S.err={};S.view='board';computePhase();render();toast('You’re on the board')},
   saveProfile(){const o=S.onb;if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.'))return;
     saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),does:o.does.trim().slice(0,60),ring:o.ring}));go('me');toast('Profile saved')},
