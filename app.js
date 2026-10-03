@@ -55,7 +55,7 @@ const S={
   offer:{to:null,prevJob:null,text:'',price:'',when:'Next hour',where:''}, invites:{}, reports:[], myInvite:null,
   myDoc:null, pendingMine:0,
   view:'board', openJob:null, personOf:null, sort:'high',
-  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, chatDraft:{text:''},
+  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, actTab:'jobs', chatDraft:{text:''},
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',adult:false,rules:false},
   inv:{email:'',campus:''}, lastInvite:null,
   picks:{}, repDocs:{},
@@ -692,11 +692,11 @@ function viewBids(D){
     ${oin.length?`<div class="sect"><h2 class="h2">Offers for you</h2></div><div class="stack gap8">${oin.map(offerCard).join('')}</div>`:''}
     ${oout.length?`<div class="sect"><h2 class="h2">Offers you sent</h2></div><div class="stack gap8">${oout.map(o=>`<div class="row">${ring(o.to,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.to))} · ₹${fmt(o.price)}</span><span class="t2">${o.status==='declined'?'Can\u2019t do it this time':'Waiting for them to answer'} · ${esc(o.text)}</span></span>
       <button class="btn2" style="width:auto;padding:8px 12px;font-size:var(--t-12)" data-act="withdrawOffer" data-key="${esc(o.key)}">${o.status==='declined'?'Dismiss':'Withdraw'}</button></div>`).join('')}</div>`:''}
-    ${doing.length?`<div class="sect"><h2 class="h2">Jobs you're doing</h2></div><div class="stack gap8">${doing.map(j=>row(j,bidLine({j}),j.agreed||j.price)).join('')}</div>`:''}
-    <div class="sect"><h2 class="h2">On your jobs</h2><button class="linkbtn" data-go="post" style="padding:0">Pin a job</button></div>
-    ${myJobs.length?`<div class="stack gap8">${myJobs.map(j=>row(j,jobLine(j),j.price)).join('')}</div>`:'<p class="note" style="text-align:left">You haven’t pinned anything yet.</p>'}
-    <div class="sect"><h2 class="h2">Your bids</h2></div>
-    ${myBids.length?`<div class="stack gap8">${myBids.map(x=>row(x.j,bidLine(x),num(x.b.amt))).join('')}</div>`:'<p class="note" style="text-align:left">Bids you place on the board show up here.</p>'}
+    <div class="pills" style="padding:4px 0 0" role="group" aria-label="Show">${[['jobs','Your jobs',myJobs.length],['bids','Your bids',myBids.length+doing.length]].map(([k,l,n])=>`<button class="pill ${S.actTab===k?'on':''}" data-acttab="${k}" aria-pressed="${S.actTab===k}">${l}${n?' · '+n:''}</button>`).join('')}</div>
+    ${S.actTab==='jobs'?`${myJobs.length?`<div class="stack gap8">${myJobs.map(j=>row(j,jobLine(j),j.price)).join('')}</div>`:'<p class="note" style="text-align:left">You haven’t pinned anything yet.</p>'}
+    <button class="linkbtn" data-go="post" style="align-self:flex-start;padding:0">Pin a job</button>`
+    :`${doing.length?`<div class="sect"><h2 class="h2">Jobs you're doing</h2></div><div class="stack gap8">${doing.map(j=>row(j,bidLine({j}),j.agreed||j.price)).join('')}</div>`:''}
+    ${myBids.length?`${doing.length?'<div class="sect"><h2 class="h2">Bids</h2></div>':''}<div class="stack gap8">${myBids.map(x=>row(x.j,bidLine(x),num(x.b.amt))).join('')}</div>`:doing.length?'':'<p class="note" style="text-align:left">Bids you place on the board show up here.</p>'}`}
    </div></div><div style="height:24px"></div>`;
 }
 const codeLink=c=>`${SITE}?code=${c}`;
@@ -1110,7 +1110,7 @@ const ACT={
 };
 
 document.addEventListener('click',e=>{
-  const el=e.target.closest('[data-pic],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
+  const el=e.target.closest('[data-acttab],[data-pic],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
   if(!el)return;const ds=el.dataset;
   if(ds.ask!==undefined){if(ds.ask===S.me?.id)return;S.offer={to:ds.ask,prevJob:ds.prev||null,text:'',price:'',when:'Next hour',where:''};S.err={};S.sheet={type:'offer'};render();return}
   if(ds.ofwhen!==undefined){S.offer.when=ds.ofwhen;render();return}
@@ -1118,6 +1118,7 @@ document.addEventListener('click',e=>{
   if(ds.act!==undefined){const f=ACT[ds.act];if(f){e.preventDefault();f(el)}return}
   if(ds.go!==undefined){go(ds.go);return}
   if(ds.job!==undefined){const pr=el.classList.contains('tile')&&el.querySelector('.price');if(pr&&document.startViewTransition&&!reduceMotion.matches)pr.style.viewTransitionName='jp';S.openJob=ds.job;S.bid={key:null};for(const k of Object.keys(S.pics))if(k.startsWith('b:'+ds.job+'~'))delete S.pics[k];go('job');return}
+  if(ds.acttab!==undefined){S.actTab=ds.acttab;render();return}
   if(ds.sort!==undefined){S.sort=ds.sort;render();return}
   if(ds.set!==undefined){S.draft[ds.set]=ds.val;if(ds.set==='where')S.draft.whereText='';render();return}
   if(ds.bump!==undefined){S.draft.price=String((digits(S.draft.price)||0)+ +ds.bump);render();return}
