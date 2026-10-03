@@ -597,3 +597,10 @@ button.jcover{cursor:zoom-in}
 .tglinks .btn2{padding:12px 8px;font-size:var(--t-12)}
 
 .mark{font-family:Unbounded,var(--display);font-weight:800;letter-spacing:-.035em}
+input:focus-visible,textarea:focus-visible,select:focus-visible{outline:none}
+.search:focus-within,.upload:focus-within,.pic.add:focus-within{outline:none}
+.pitchbox:focus-within{box-shadow:inset 0 0 0 1px var(--line)}
+.onb input:not([type=checkbox]):not([type=radio]):focus-visible,.onb textarea:focus-visible{outline:1px solid color-mix(in srgb,var(--accent) 40%,transparent);outline-offset:2px}
+.search input::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
+.sclear{flex-shrink:0;width:28px;height:28px;margin-right:-6px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--surface2);color:var(--fg2)}
+.sclear:active{transform:scale(.9)}

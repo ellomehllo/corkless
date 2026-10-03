@@ -562,7 +562,7 @@ function gateHTML(){
 }
 function onboardHTML(edit){
   const o=S.onb,me=S.me.id;
-  return`<div class="gatebox" style="gap:20px">
+  return`<div class="gatebox onb" style="gap:20px">
    ${edit?'':'<div class="mark">tack</div>'}
    <div><h1>${edit?'Edit your profile':'Set up your profile'}</h1>
    ${edit?'':`<p style="margin-top:8px">Classmates see this when you post or bid. A real photo helps people trust you.</p>`}</div>
@@ -673,7 +673,7 @@ function viewBoard(D){
     </div></section>
   ${stepsCard(D)}
   <div class="dhead"><h1 class="h1">The board</h1><span class="muted">${all.length} pinned at ${esc(campus())}</span></div>
-  <label class="search" for="q">${ic('search',17)}<input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search jobs: print, shawarma, today, library" value="${esc(S.find.q)}" data-bind="find.q" aria-label="Search jobs"></label>
+  <label class="search" for="q">${ic('search',17)}<input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search jobs: print, shawarma, today, library" value="${esc(S.find.q)}" data-bind="find.q" aria-label="Search jobs">${S.find.q?`<button class="sclear" data-act="clearSearch" aria-label="Clear search">${ic('x',14,2.4)}</button>`:''}</label>
   <div class="pills" role="group" aria-label="Filter and sort jobs"><button class="pill ${S.near?'on':''}" data-act="toggleNear" aria-pressed="${S.near}">${ic('place',13,2.2)} Near you</button><span class="pillsep" aria-hidden="true"></span>${[['high','Top pay'],['newest','Newest'],['closing','Closing soon']].map(([k,l])=>`<button class="pill ${S.sort===k?'on':''}" data-sort="${k}" aria-pressed="${S.sort===k}">${l}</button>`).join('')}</div>
   <div class="wallzone ${S.dropping?'dropin':''}">${filtered&&!list.length&&all.length?`<div class="empty"><b>${S.near&&!S.find.q.trim()?'Nothing near you right now':'No jobs match that'}</b><p>${S.near?'Only jobs pinned with a location can show as near you.':'Try another word, like the place, the time or what you need.'}</p><button class="btn2" data-act="clearFind">Show all jobs</button></div>`:list.length?wallHTML(list,D)+`<div class="boardend"><span class="endpin" aria-hidden="true"></span><p>${filtered?`${list.length} of ${all.length} jobs shown.`:`That's everything pinned at ${esc(campus())}.`}</p><button class="btn2" data-go="post">Pin a job</button></div>`
     :`<div class="empty"><b>Nothing pinned yet</b><p>Pin the first job: a xerox run, a lift down four floors, an hour of help before a submission.</p><button class="cta" data-go="post">Pin a job</button></div>`}</div></div>`;
@@ -1431,6 +1431,7 @@ const ACT={
       else if(to==='save'){if(img){saveImg();toast('Image saved')}else toast('Making the image, try again in a second.')}
       else if(to==='copy')navigator.clipboard.writeText(jobLink(j)).then(()=>toast('Link copied'),()=>toast('Couldn’t copy'))}catch{}},
   async igText(el){const t=el.dataset.text||'';if(navigator.share){try{await navigator.share({text:t})}catch{}return}try{await navigator.clipboard.writeText(t);toast('Copied. Paste it in an Instagram DM or story.')}catch{toast('Couldn’t copy.')}},
+  clearSearch(){S.find.q='';render();setTimeout(()=>$('q')?.focus(),0)},
   copy(el){const t=el.dataset.text||'';
     try{navigator.clipboard.writeText(t).then(()=>toast('Copied'),()=>toast('Couldn’t copy. Select the text and copy it.'))}catch{toast('Couldn’t copy.')}}
 };
