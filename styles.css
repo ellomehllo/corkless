@@ -603,3 +603,5 @@ button.jcover{cursor:zoom-in}
 .tgbox ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
 .tglinks{display:flex;gap:8px}
 .tglinks .btn2{padding:12px 8px;font-size:var(--t-12)}
+
+.mark{font-family:Unbounded,var(--display);font-weight:800;letter-spacing:-.035em}
