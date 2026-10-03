@@ -65,7 +65,7 @@ const S={
   offer:{to:null,prevJob:null,text:'',price:'',when:'Next hour',where:''}, invites:{}, reports:[], myInvite:null,
   myDoc:null, pendingMine:0,
   view:'board', openJob:null, personOf:null, sort:'high', find:{q:''}, near:false,
-  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, actTab:'jobs', chatDraft:{text:''},
+  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, actTab:'all', actSeenAt:0, chatDraft:{text:''},
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',adult:false,rules:false},
   inv:{email:'',campus:''}, lastInvite:null,
   picks:{}, repDocs:{},
@@ -127,6 +127,7 @@ function derive(){
     j.accepted=pk.doer;j.agreed=num(pk.agreed);j.pick=pk;if(pk.doneAt)j.doneAt=num(pk.doneAt)}
   const D={members,jobs,jobByKey,bidsByJob,blocked};
   D.threads=threadsOf(D);D.unread=D.threads.filter(t=>t.unread).length;
+  D.notes=notesOf(D);D.newNotes=S.view==='bids'?0:D.notes.filter(n=>n.at>num(S.priv.actSeen)&&n.at<=Date.now()+6e4).length;
   D.toConfirm=jobs.filter(j=>j.accepted===me&&j.status==='done'&&!payOf(j)?.ok).length;
   D.offersWaiting=offerList(S.offersIn).filter(o=>o.status==='pending'&&D.members.includes(o.owner)&&!D.blocked.has(o.owner)).length;
   return D;
@@ -140,6 +141,28 @@ function workedWith(uid,D){const me=S.me.id;return D.jobs.filter(j=>(j.status===
 function lastJobFor(uid,D){return D.jobs.filter(j=>j.owner===S.me.id&&j.accepted===uid&&(j.status==='assigned'||j.status==='done')).sort((a,b)=>b.at-a.at)[0]||null}
 const offerList=o=>Object.entries(o).map(([k,v])=>({key:k,...v})).filter(x=>x&&typeof x.text==='string');
 function bidsFor(D,key){return (D.bidsByJob[key]||[]).filter(b=>!D.blocked.has(b.by))}
+function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str(j.text,200).trim().replace(/[.!?\s]+$/,'');return'<i>\u201c'+esc(x.length>56?x.slice(0,55).trim()+'\u2026':x)+'\u201d</i>'},nm=u=>'<b>'+esc(firstName(u))+'</b>',ok=u=>u&&D.members.includes(u)&&!D.blocked.has(u);
+  const add=(at,who,html,go)=>{if(at>0)out.push({at,who,html,...go})};
+  const joined=num(S.myDoc?.joinedAt);add(joined,'tack','Welcome to tack. Pin a small job or bid on one from the board.',{go:'board'});
+  for(const j of D.jobs){
+    if(j.owner===me){
+      for(const b of bidsFor(D,j.key))if(b.by!==me&&ok(b.by))add(b.at,b.by,`${nm(b.by)} bid ₹${fmt(b.amt)} on ${t(j)}`,{job:j.key});
+      const pk=j.pick;if(pk&&ok(pk.doer)){const pay=payOf(j);
+        if(pay)add(pay.at,pk.doer,pay.ok?`${nm(pk.doer)} confirmed they got ₹${fmt(j.agreed)} for ${t(j)}`:`${nm(pk.doer)} hasn\u2019t got your ₹${fmt(j.agreed)} for ${t(j)} yet`,{job:j.key})}
+      const st=jobState(j);
+      if(st==='expired')add(j.deadline,'tack',`Time ran out on ${t(j)}. Pin it again if you still need it.`,{job:j.key});
+      if(st==='removed')add(j.at,'tack',`${t(j)} was taken off the board by ${esc(organiser())}.`,{job:j.key});
+    }else if(j.accepted===me&&j.pick){const pk=j.pick;
+      add(num(pk.at),j.owner,`${nm(j.owner)} picked you for ${t(j)} · ₹${fmt(j.agreed)}`,{job:j.key});
+      if(pk.status==='done')add(num(pk.doneAt),j.owner,`${nm(j.owner)} marked ${t(j)} as done. Did you get ₹${fmt(j.agreed)}?`,{job:j.key});
+      if(typeof pk.review==='string')add(num(pk.doneAt)+1,'tack','Someone you worked for left you a public review.',{person:me});
+    }
+  }
+  for(const o of offerList(S.offersIn))if(ok(o.owner))add(num(o.at),o.owner,`${nm(o.owner)} asked you: ${esc(str(o.text,60))} · ₹${fmt(num(o.price))}`,{go:'bids'});
+  for(const o of offerList(S.offersOut))if(ok(o.to)&&o.status!=='pending')add(num(o.respondedAt),o.to,o.status==='accepted'?`${nm(o.to)} said yes to ${esc(str(o.text,60))}`:`${nm(o.to)} can\u2019t do ${esc(str(o.text,60))} this time`,{go:'bids'});
+  return out.sort((a,b)=>b.at-a.at).slice(0,80);
+}
+function tackFace(s){return`<span class="tackav" style="width:${s}px;height:${s}px" role="img" aria-label="tack"></span>`}
 function boardJobs(D){
   const now=Date.now();
   const l=D.jobs.filter(j=>j.status==='open'&&j.deadline>now&&!D.blocked.has(j.owner));
@@ -717,11 +740,14 @@ function viewBids(D){
       const pastBid=({j})=>j.accepted===me?(jobState(j)==='done'&&payOf(j)?.ok&&j.pick?.ratedPoster):jobState(j)!=='open'||!!j.accepted;
       const jobsNow=myJobs.filter(j=>!pastJob(j)),active=all.filter(y=>y.j.accepted===me&&!pastBid(y)),waiting=all.filter(y=>y.j.accepted!==me&&!pastBid(y));
       const hist=[...D.jobs.filter(j=>j.owner===me&&pastJob(j)).map(j=>({j,mine:true,amt:j.agreed||j.price,at:Math.max(j.doneAt||0,j.at)})),...all.filter(pastBid).map(y=>({...y,at:Math.max(y.j.doneAt||0,y.at||0,y.j.at)}))].sort((a,b)=>b.at-a.at);
-      const tabs=[['jobs','Your jobs',jobsNow.length],['bids','Your bids',active.length+waiting.length],['history','History',hist.length]];
+      const tabs=[['all','All',0],['jobs','Your jobs',jobsNow.length],['bids','Your bids',active.length+waiting.length],['history','History',hist.length]];
       const grp=(t,l)=>l.length?`<div class="sect"><h2 class="h2">${t}</h2></div><div class="stack gap8">${l.map(y=>row(y.j,bidLine(y.x||{j:y.j}),y.amt)).join('')}</div>`:'';
       const empty=t=>`<p class="note" style="text-align:left">${t}</p>`;
       return`<div class="pills" style="padding:4px 0 0" role="group" aria-label="Show">${tabs.map(([k,l,n])=>`<button class="pill ${S.actTab===k?'on':''}" data-acttab="${k}" aria-pressed="${S.actTab===k}">${l}${n?' · '+n:''}</button>`).join('')}</div>
-      ${S.actTab==='jobs'?`${jobsNow.length?`<div class="stack gap8">${jobsNow.map(j=>row(j,jobLine(j),j.price,me)).join('')}</div>`:empty('Nothing pinned right now.')}
+      ${S.actTab==='all'?(()=>{const feed=[...D.notes.map(n=>({...n,kind:'n'})),...jobsNow.map(j=>({kind:'j',j,at:j.at})),...[...active,...waiting].map(y=>({kind:'b',y,at:y.at||y.j.at}))].sort((a,b)=>b.at-a.at);
+        return feed.length?`<div class="stack gap8">${feed.map(f=>f.kind==='j'?row(f.j,jobLine(f.j),f.j.price,me):f.kind==='b'?row(f.y.j,bidLine(f.y.x||{j:f.y.j}),f.y.amt)
+          :`<button class="item notif ${f.at>S.actSeenAt?'new':''}" ${f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span></span>${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`).join('')}</div>`:empty('Bids, picks and payments show up here.')})()
+      :S.actTab==='jobs'?`${jobsNow.length?`<div class="stack gap8">${jobsNow.map(j=>row(j,jobLine(j),j.price,me)).join('')}</div>`:empty('Nothing pinned right now.')}
         <button class="linkbtn" data-go="post" style="align-self:flex-start;padding:0">Pin a job</button>`
       :S.actTab==='bids'?(active.length||waiting.length?grp('Active',active)+grp('Waiting',waiting):empty('Bids you place on the board show up here.'))
       :hist.length?`<div class="stack gap8">${hist.map(y=>y.mine?row(y.j,jobLine(y.j),y.amt,me):row(y.j,bidLine(y.x||{j:y.j}),y.amt)).join('')}</div>`:empty('Finished and closed jobs and bids show up here.')}`})()}
@@ -970,13 +996,13 @@ function render(){
     $('sidebar').innerHTML=`<div style="padding:0 6px"><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${esc(campus())} · ${boardJobs(D).length} pinned</span></div></div>
       <button class="cta" data-go="post" style="padding:13px 10px;font-size:var(--t-16)">+ Pin a job</button>
       <nav style="display:flex;flex-direction:column;gap:3px" aria-label="Sections">${[['board','Board','board'],['bids','Activity','bids'],['chats','Chats','chat'],['me','Profile','me']].concat(S.me.isOwner?[['invites','Invites','users']]:[])
-        .map(([v,l,i])=>`<button class="navitem ${navOn(v)?'on':''}" data-go="${v}" ${navOn(v)?'aria-current="page"':''}>${ic(i,18)} ${l}${v==='chats'&&D.unread?'<span class="udot" aria-label="Unread"></span>':''}${v==='bids'&&(D.toConfirm||D.offersWaiting)?'<span class="udot" aria-label="Needs your answer"></span>':''}</button>`).join('')}</nav>
+        .map(([v,l,i])=>`<button class="navitem ${navOn(v)?'on':''}" data-go="${v}" ${navOn(v)?'aria-current="page"':''}>${ic(i,18)} ${l}${v==='chats'&&D.unread?'<span class="udot" aria-label="Unread"></span>':''}${v==='bids'&&(D.toConfirm||D.offersWaiting||D.newNotes)?'<span class="udot" aria-label="New activity"></span>':''}</button>`).join('')}</nav>
       <button class="card" style="margin-top:auto;padding:10px 12px;border-radius:var(--r-sm)" data-go="me">${ring(S.me.id,38)}<span class="rowtext"><span style="font-size:var(--t-12);font-weight:700">${esc(shortName(S.me.id))}</span>
         <span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc(metaOf(S.me.id)||campus())}</span></span></button>`;
     $('tabbar').innerHTML=[['board','Board','board'],['bids','Activity','bids'],['post','','plus'],['chats','Chats','chat'],['me','Me','me']].map(([v,l,i])=>v==='post'
       ?`<button class="tab" data-go="post" aria-label="Pin a job"><span class="fab">${ic('plus',24,3,'var(--bg)')}</span></button>`
-      :`<button class="tab ${navOn(v)||(v==='me'&&S.view==='invites')?'on':''}" data-go="${v}">${ic(i,20)}<span>${l}</span>${(v==='chats'&&D.unread)||(v==='bids'&&(D.toConfirm||D.offersWaiting))?'<span class="udot"></span>':''}</button>`).join('');
-    const attn=D.unread+D.offersWaiting+D.toConfirm;document.title=attn?`(${attn}) tack`:'tack';
+      :`<button class="tab ${navOn(v)||(v==='me'&&S.view==='invites')?'on':''}" data-go="${v}">${ic(i,20)}<span>${l}</span>${(v==='chats'&&D.unread)||(v==='bids'&&(D.toConfirm||D.offersWaiting||D.newNotes))?'<span class="udot"></span>':''}</button>`).join('');
+    const attn=D.unread+D.offersWaiting+D.toConfirm+D.newNotes;document.title=attn?`(${attn}) tack`:'tack';
     const st=S.sheet?S.sheet.type:null;$('sheetRoot').innerHTML=sheetHTML(D);
     if(st&&st!==lastSheet)$('sheetRoot').classList.add('enter');else if(!st)$('sheetRoot').classList.remove('enter');
     if(st!==lastSheet&&st)requestAnimationFrame(()=>requestAnimationFrame(()=>$('sheetRoot').classList.remove('enter')));
@@ -991,7 +1017,7 @@ const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
 function go(v,keepThread){
   const from=S.view;
   if(v!=='chat'&&!keepThread)closeThread();
-  const apply=()=>{S.view=v;S.sheet=null;S.err={};if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit')seedOnb();if(v==='invites')S.inv.campus='';render();
+  const apply=()=>{if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}S.view=v;S.sheet=null;S.err={};if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit')seedOnb();if(v==='invites')S.inv.campus='';render();
     if(v==='board'&&from==='job'&&S.openJob){const p=document.querySelector(`.tile[data-job="${CSS.escape(S.openJob)}"] .price`);if(p)p.style.viewTransitionName='jp'}};
   if(from===v||S.phase!=='app'||!document.startViewTransition||reduceMotion.matches){apply();return}
   const d=(DEPTH[v]??1)-(DEPTH[from]??1),root=document.documentElement;
