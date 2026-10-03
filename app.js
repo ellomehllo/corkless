@@ -1,11 +1,10 @@
 import firebaseConfig from './firebase-config.js';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
 
 const RINGS=['#C6F24E','#A18CFF','#FF5B6E','#4FE3E0','#FF7AD1','#FFC53D'];
-const GLOW={'#A18CFF':'rgba(161,140,255,.45)','#FF5B6E':'rgba(255,91,110,.5)','#FFC53D':'rgba(255,197,61,.35)','#4FE3E0':'rgba(79,227,224,.4)','#FF7AD1':'rgba(255,122,209,.38)','#C6F24E':'rgba(198,242,78,.32)'};
+const GLOW={'#A18CFF':'rgba(161,140,255,.45)','#FF5B6E':'rgba(255,91,110,.5)','#FFC53D':'rgba(255,197,61,.35)','#4FE3E0':'rgba(79,227,224,.4)','#FF7AD1':'rgba(255,122,209,.38)','#C6F24E':'rgba(108,92,255,.32)'};
 const KINDS=['Errand','Lifting','Ride','Print','Teach','Photo','Notes','Music','Other'];
 const WHENS=['Next hour','Today','Tomorrow','This week','No rush'];
 const WHERES=['Gate 1','Hostel B','Canteen','Library','Off campus'];
@@ -47,15 +46,21 @@ const I={
  place:'<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/>',
  clock:'<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
  out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+ share:'<circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><line x1="8.3" y1="10.8" x2="15.7" y2="6.2"/><line x1="8.3" y1="13.2" x2="15.7" y2="17.8"/>',
+ bookmark:'<path d="M6 3h12v18l-6-4.5L6 21Z"/>',
+ download:'<path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M4 19h16"/>',
+ link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/>',
  search:'<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
  x:'<path d="M6 6l12 12M18 6 6 18"/>',
  camera:'<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.5" r="3.5"/>'
 };
+const SAY_MAX=90,SAY_WORDS=500,words=t=>(String(t||'').trim().match(/\S+/g)||[]).length,sayOver=t=>SAY_MAX<1000?String(t||'').length>SAY_MAX:words(t)>SAY_WORDS,sayCount=t=>SAY_MAX<1000?`${String(t||'').length} / ${SAY_MAX} characters`:`${words(t)} / ${SAY_WORDS} words`;
 const ic=(n,s=20,w=2,c='currentColor',fill='none')=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="${fill}" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
 
 const blankDraft=()=>({text:'',price:'',kind:'Errand',when:'Today',where:'Gate 1',whereText:'',more:'',pics:[],useLoc:locOptIn()});
 const inviteParam=(new URLSearchParams(location.search).get('invite')||'').trim().toLowerCase();
+const jobParam=(new URLSearchParams(location.search).get('job')||'').slice(0,80);
 const codeParam=((new URLSearchParams(location.search).get('code')||'').trim().toLowerCase().match(/^[a-z0-9]{8,24}$/)||[''])[0];
 const S={
   phase:'loading', fb:null, db:null, auth:null, user:null, me:null, signingUp:false, erased:false,
@@ -66,7 +71,7 @@ const S={
   offer:{to:null,prevJob:null,text:'',price:'',when:'Next hour',where:''}, invites:{}, reports:[], myInvite:null,
   myDoc:null, pendingMine:0,
   view:'board', openJob:null, personOf:null, sort:'high', find:{q:''}, near:false,
-  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, pw:{cur:'',nw:''}, pwOpen:false, help:{kind:null,job:null,why:'',note:'',sent:null}, actTab:'all', actSeenAt:0, intro:{on:false,i:0}, fresh:null, chatDraft:{text:''},
+  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, actTab:'all', actSeenAt:0, intro:{on:false,i:0}, fresh:null, chatDraft:{text:''},
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',adult:false,rules:false},
   inv:{email:'',campus:''}, lastInvite:null,
   picks:{}, repDocs:{},
@@ -123,7 +128,7 @@ function derive(){
   }
   for(const p of [...Object.values(S.pitchIn),...Object.values(S.pitchMine)]){
     if(!p||typeof p.job!=='string'||typeof p.by!=='string'||!jobByKey[p.job]||!members.includes(p.by)||!(num(p.amt)>0))continue;
-    const l=(bidsByJob[p.job]=bidsByJob[p.job]||[]);if(!l.some(b=>b.by===p.by))l.push({by:p.by,amt:num(p.amt),say:str(p.say,90),at:num(p.at),pics:Math.min(MAX_PICS,num(p.pics)),near:p.near===true})}
+    const l=(bidsByJob[p.job]=bidsByJob[p.job]||[]);if(!l.some(b=>b.by===p.by))l.push({by:p.by,amt:num(p.amt),say:str(p.say,SAY_MAX),at:num(p.at),pics:Math.min(MAX_PICS,num(p.pics)),near:p.near===true})}
   for(const[k,pk]of Object.entries(S.picks)){const j=jobByKey[k];if(!j||!pk||typeof pk.doer!=='string')continue;
     j.accepted=pk.doer;j.agreed=num(pk.agreed);j.pick=pk;if(pk.doneAt)j.doneAt=num(pk.doneAt)}
   const D={members,jobs,jobByKey,bidsByJob,blocked};
@@ -133,7 +138,7 @@ function derive(){
   D.offersWaiting=offerList(S.offersIn).filter(o=>o.status==='pending'&&D.members.includes(o.owner)&&!D.blocked.has(o.owner)).length;
   return D;
 }
-function myBidOn(jobKey){const p=S.pitchMine[jobKey+'~'+S.me.id];return p&&num(p.amt)>0?{amt:num(p.amt),say:str(p.say,90),at:num(p.at),pics:Math.min(MAX_PICS,num(p.pics))}:null}
+function myBidOn(jobKey){const p=S.pitchMine[jobKey+'~'+S.me.id];return p&&num(p.amt)>0?{amt:num(p.amt),say:str(p.say,SAY_MAX),at:num(p.at),pics:Math.min(MAX_PICS,num(p.pics))}:null}
 function threadOpen(k){return !!S.threadDocs[k]}
 function canMessage(t,D){const me=S.me.id;
   if(!t.jobKey)return false;
@@ -180,10 +185,7 @@ function sortJobs(l){
   else l.sort((a,b)=>b.at-a.at);
   return l;
 }
-const pref=(k,d=true)=>{const v=(S.priv.prefs||{})[k];return typeof v==='boolean'?v:d};
-const asksOf=u=>{const a=pdoc(u).asks;return a==='past'||a==='none'?a:'all'};
-const needTerms=()=>S.phase==='app'&&!!S.ready?.priv&&!S.joining&&(S.priv.terms||{}).v!==TERMS_V;
-function freePeople(D){const now=Date.now();return D.members.filter(u=>num(pdoc(u).freeUntil)>now&&!D.blocked.has(u)&&(u===S.me.id||asksOf(u)==='all'||(asksOf(u)==='past'&&workedWith(u,D).length)))}
+function freePeople(D){const now=Date.now();return D.members.filter(u=>num(pdoc(u).freeUntil)>now&&!D.blocked.has(u))}
 function payOf(j){const x=j.pick&&j.pick.paid;return x&&typeof x==='object'&&typeof x.ok==='boolean'?{ok:x.ok,at:num(x.at)}:null}
 const PAY_GRACE=3*864e5;
 function repOf(uid,side){const r=S.repDocs[uid],x=r&&r[side]&&typeof r[side]==='object'?r[side]:{},n=Math.max(0,Math.round(num(x.n)));
@@ -272,7 +274,7 @@ function convertOffers(){
   }
 }
 function savePitch(jobKey,say,amt,pics,near){const {doc,setDoc,deleteDoc}=S.fb,me=S.me.id,id=jobKey+'~'+me,owner=jobKey.split('~')[0];
-  if(amt){const p={owner,by:me,job:jobKey,amt,say:(say||'').slice(0,90),at:Date.now(),...(pics?{pics}:{}),...(near?{near:true}:{})};S.pitchMine={...S.pitchMine,[id]:p};return setDoc(doc(S.db,'pitches',id),p).catch(writeErr)}
+  if(amt){const p={owner,by:me,job:jobKey,amt,say:(say||'').slice(0,SAY_MAX),at:Date.now(),...(pics?{pics}:{}),...(near?{near:true}:{})};S.pitchMine={...S.pitchMine,[id]:p};return setDoc(doc(S.db,'pitches',id),p).catch(writeErr)}
   const m={...S.pitchMine};delete m[id];S.pitchMine=m;return deleteDoc(doc(S.db,'pitches',id)).catch(()=>{})}
 function saveMine(mut){
   const {doc,setDoc}=S.fb;
@@ -365,7 +367,7 @@ function afterData(){
     if(S.myDoc&&S.myDoc.removed)saveMine(d=>{delete d.removed;return d});
   }
   computePhase();render();
-  if(S.phase==='app'&&!S.introChecked&&!S.joining&&!needTerms()){S.introChecked=true;if(!S.priv.introSeen)setTimeout(()=>{if(!S.intro.on&&S.phase==='app'&&!S.priv.introSeen)openIntro()},700)}
+  if(S.phase==='app'&&!S.introChecked&&!S.joining){S.introChecked=true;if(!S.priv.introSeen)setTimeout(()=>{if(!S.intro.on&&S.phase==='app'&&!S.priv.introSeen)openIntro()},700)}
 }
 function computePhase(){
   if(!S.me)return;
@@ -454,7 +456,6 @@ function markSeen(){
   const c=S.chat;if(!c.key||S.view!=='chat')return;
   const last=Math.max(0,...c.msgs.filter(m=>m.by!==S.me.id).map(m=>m.at));
   if(last>num((S.priv.seen||{})[c.key]))savePriv({seen:{[c.key]:last}});
-  if(pref('receipts')&&threadOpen(c.key)&&last>num(((S.threadDocs[c.key]||{}).read||{})[S.me.id]))S.fb.setDoc(S.fb.doc(S.db,'threads',c.key),{read:{[S.me.id]:last}},{merge:true}).catch(()=>{});
 }
 function sendMsg(){
   const c=S.chat,t=S.chatDraft.text.trim();if(!c.key||!t)return;
@@ -574,7 +575,7 @@ function onboardHTML(edit){
    <div class="stack gap8"><span class="formlabel" id="rl">Your ring colour</span>
      <div class="chips" role="group" aria-labelledby="rl">${RINGS.map(r=>`<button class="swatch ${o.ring===r?'on':''}" style="background:${r}" data-onb="ring" data-val="${r}" aria-label="Ring colour ${r}" aria-pressed="${o.ring===r}"></button>`).join('')}</div></div>
    ${edit?'':`<label class="check" for="oad"><input type="checkbox" id="oad" data-bind="onb.adult" ${o.adult?'checked':''}> I'm 18 or older.</label>
-   <label class="check" for="oru"><input type="checkbox" id="oru" data-bind="onb.rules" ${o.rules?'checked':''}> <span>I agree to the <button type="button" class="inlink" data-doc="terms">Terms of Use</button> and <button type="button" class="inlink" data-doc="privacy">Privacy Policy</button>, including no assignment or exam work and nothing illegal or unsafe.</span></label>`}
+   <label class="check" for="oru"><input type="checkbox" id="oru" data-bind="onb.rules" ${o.rules?'checked':''}> I won't post assignment or exam work, anything illegal, or anything that puts someone at risk.</label>`}
    ${S.err.onb?`<p class="err" role="alert">${esc(S.err.onb)}</p>`:''}
    <button class="cta" data-act="${edit?'saveProfile':'join'}" data-need="${edit?'profile':'join'}">${edit?'Save profile':'Join the board'}</button>
    ${edit?'<button class="linkbtn" data-go="me">Cancel</button>':'<button class="linkbtn" data-act="logout">Log out</button>'}
@@ -582,12 +583,62 @@ function onboardHTML(edit){
 }
 
 function back(to,label){return`<button class="back" data-go="${to}">${ic('back',16)} ${label}</button>`}
+const LOGO={
+  wa:'<svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><path fill="#fff" d="M16 4.5A11.4 11.4 0 0 0 6.2 21.7L4.6 27.4l5.9-1.5A11.4 11.4 0 1 0 16 4.5Z"/><path fill="#25D366" d="M16 6.6a9.3 9.3 0 0 0-7.9 14.3l.2.4-1 3.4 3.5-.9.4.2A9.3 9.3 0 1 0 16 6.6Z"/><path fill="#fff" d="M12.5 10.6c-.2-.5-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0-1.1 2.7c0 1.6 1.2 3.1 1.3 3.3s2.3 3.6 5.6 4.9c2.8 1.1 3.3.9 4 .8s2-.8 2.2-1.6.3-1.5.2-1.6-.3-.2-.6-.4l-2.1-1c-.3-.1-.5-.2-.7.1l-1 1.2c-.2.2-.4.2-.7.1a7.6 7.6 0 0 1-2.2-1.4 8.4 8.4 0 0 1-1.5-1.9c-.2-.3 0-.5.1-.6l.5-.6.3-.5a.6.6 0 0 0 0-.5l-1-2.4Z"/></svg>',
+  ig:'<svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><rect x="5.5" y="5.5" width="21" height="21" rx="6.5" fill="none" stroke="#fff" stroke-width="2.4"/><circle cx="16" cy="16" r="5" fill="none" stroke="#fff" stroke-width="2.4"/><circle cx="21.9" cy="10.1" r="1.5" fill="#fff"/></svg>'};
+const slogo=(k,label,attrs)=>`<${/href=/.test(attrs)?'a':'button'} class="slogo" ${attrs}><span class="slogo-i s-${k}">${LOGO[k]||ic(k,22)}</span><span>${label}</span></${/href=/.test(attrs)?'a':'button'}>`;
+const jobLink=j=>SITE+'?job='+encodeURIComponent(j.key);
+const jobShareText=j=>`₹${fmt(j.price)} on tack: ${j.text}${j.where?' ('+j.where+')':''}. Bid on it here: ${jobLink(j)}`;
+const isSaved=k=>Array.isArray(S.priv.saved)&&S.priv.saved.includes(k);
+function wrapLines(x,t,w,max){const out=[];let line='';for(const word of String(t).split(/\s+/)){const tryL=line?line+' '+word:word;if(x.measureText(tryL).width>w&&line){out.push(line);line=word}else line=tryL;if(out.length===max)break}
+  if(out.length<max&&line)out.push(line);if(out.length===max&&out.join(' ').length<String(t).trim().length){let l=out[max-1];while(l&&x.measureText(l+'…').width>w)l=l.slice(0,-1);out[max-1]=l.trimEnd()+'…'}return out}
+function rrect(x,X,Y,W,H,R){x.beginPath();x.moveTo(X+R,Y);x.arcTo(X+W,Y,X+W,Y+H,R);x.arcTo(X+W,Y+H,X,Y+H,R);x.arcTo(X,Y+H,X,Y,R);x.arcTo(X,Y,X+W,Y,R);x.closePath()}
+function drawPin(x,cx,cy,r,col){x.fillStyle=col;x.beginPath();x.arc(cx,cy,r,0,7);x.fill();x.fillStyle='rgba(11,14,23,.28)';x.beginPath();x.arc(cx-r*.35,cy-r*.32,r*.28,0,7);x.fill();x.fillStyle=col;rrect(x,cx-r*.17,cy+r*.75,r*.35,r*1.5,r*.17);x.fill()}
+async function noteCard(j){
+  try{await Promise.all(['800 180px Gabarito','700 60px Figtree','600 40px Figtree'].map(f=>document.fonts.load(f)))}catch{}
+  const W=1080,H=1920,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),gn=gradNote(j),nc=noteOf(j),left=j.deadline-Date.now();
+  x.fillStyle='#0B0E17';x.fillRect(0,0,W,H);
+  const ph=j.pics?(S.pics['j:'+j.key]||[])[0]:'';
+  if(ph){const im=new Image();im.src=ph;try{await im.decode()}catch{}const sc=Math.max(W/im.width,H/im.height)*1.25;x.filter='blur(70px) saturate(1.3) brightness(.62)';x.drawImage(im,(W-im.width*sc)/2,(H-im.height*sc)/2,im.width*sc,im.height*sc);x.filter='none';x.fillStyle='rgba(11,14,23,.35)';x.fillRect(0,0,W,H)}
+  else{for(const[cx,cy,r,a,bc]of[[180,1560,1100,'70',gn?'#3B5BFF':nc],[980,260,820,'40',gn?'#9C5CFF':nc],[560,980,700,'22',nc]]){const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,bc+a);g.addColorStop(1,bc+'00');x.fillStyle=g;x.fillRect(0,0,W,H)}}
+  x.fillStyle='rgba(244,241,250,.06)';for(let gy=40;gy<H;gy+=44)for(let gx=40;gx<W;gx+=44){x.beginPath();x.arc(gx,gy,2.2,0,7);x.fill()}
+  {const pg=x.createLinearGradient(88,124,136,212);pg.addColorStop(0,'#3B5BFF');pg.addColorStop(.6,'#7B4DFF');pg.addColorStop(1,'#B86BF0');drawPin(x,112,150,26,pg)}x.fillStyle='#F4F1FA';x.font='800 76px Gabarito';x.textBaseline='middle';x.fillText('tack',152,154);
+  const camp=campus();x.font='700 34px Figtree';const cw=x.measureText(camp).width+56;x.fillStyle='rgba(244,241,250,.1)';rrect(x,W-80-cw,124,cw,64,32);x.fill();x.fillStyle='#DFDAEC';x.fillText(camp,W-80-cw+28,157);
+  x.font='700 60px Figtree';const lines=wrapLines(x,j.text,760,7);
+  const meta=[j.where,left<36e5?'':j.when].filter(Boolean).join(' · '),urgent=left>0&&left<36e5;
+  const ch=110+170+(urgent?90:30)+lines.length*78+(meta?90:0)+80,cy=(H-ch)/2-30;
+  x.save();x.translate(W/2,cy+ch/2);x.rotate(-.022);x.translate(-W/2,-(cy+ch/2));
+  x.shadowColor='rgba(0,0,0,.6)';x.shadowBlur=80;x.shadowOffsetY=40;x.fillStyle='rgba(25,22,36,.94)';rrect(x,100,cy,880,ch,56);x.fill();x.shadowColor='transparent';
+  x.strokeStyle='rgba(244,241,250,.1)';x.lineWidth=2;x.stroke();
+  const gl=x.createRadialGradient(980,cy,0,980,cy,700);gl.addColorStop(0,nc+'38');gl.addColorStop(1,nc+'00');x.fillStyle=gl;rrect(x,100,cy,880,ch,56);x.fill();
+  const ag=(x0,x1)=>{const g=x.createLinearGradient(x0,0,x1,0);g.addColorStop(0,'#3B5BFF');g.addColorStop(.34,'#5B4BFF');g.addColorStop(.64,'#7B4DFF');g.addColorStop(.86,'#9C5CFF');g.addColorStop(1,'#C46BEE');return g};x.shadowColor=gn?'#7B4DFF':nc;x.shadowBlur=30;x.fillStyle=gn?ag(W/2-20,W/2+20):nc;x.beginPath();x.arc(W/2,cy,20,0,7);x.fill();x.shadowColor='transparent';
+  let y=cy+110;x.textBaseline='alphabetic';x.font='800 170px Gabarito';x.fillStyle=gn?ag(160,160+x.measureText('₹'+fmt(j.price)).width):nc;x.fillText('₹'+fmt(j.price),160,y+120);y+=170;
+  if(urgent){y+=20;const t=Math.max(1,Math.round(left/6e4))+' min left';x.font='700 34px Figtree';const tw=x.measureText(t).width+44;x.fillStyle='rgba(255,91,110,.2)';rrect(x,160,y,tw,58,29);x.fill();x.fillStyle='#FF8C9B';x.fillText(t,182,y+41);y+=70}else y+=30;
+  x.fillStyle='#F4F1FA';x.font='700 60px Figtree';for(const l of lines){y+=78;x.fillText(l,160,y-14)}
+  if(meta){y+=70;x.fillStyle='#9C96AE';x.font='600 40px Figtree';x.fillText(meta,160,y)}
+  x.restore();
+  x.textAlign='center';x.fillStyle='#F4F1FA';x.font='800 64px Gabarito';x.fillText('Bid on it on tack',W/2,H-250);
+  x.fillStyle='#9C96AE';x.font='600 36px Figtree';x.fillText(SITE.replace(/^https?:\/\//,'').replace(/\/$/,''),W/2,H-180);
+  x.fillStyle='#6F6987';x.font='600 30px Figtree';x.fillText('Invite-only job board for '+campus()+' students',W/2,H-124);
+  return new Promise(r=>c.toBlob(r,'image/png'))}
+function openShare(k){const j=derive().jobByKey[k];if(!j)return;S.sheet={type:'share',key:k};render();
+  if(S.shareImg?.key===k)return;S.shareImg=null;const go2=()=>noteCard(j).then(b=>{if(!b)return;S.shareImg={key:k,blob:b,url:URL.createObjectURL(b)};if(S.sheet?.type==='share')render()});
+  if(j.pics&&picsOf('j:'+k)===null)setTimeout(go2,700);else go2()}
+function saveImg(){if(!S.shareImg)return;const a=document.createElement('a');a.href=S.shareImg.url;a.download='tack-job.png';document.body.appendChild(a);a.click();a.remove()}
+function viewSaved(D){const keys=Array.isArray(S.priv.saved)?S.priv.saved:[],list=keys.map(k=>D.jobByKey[k]).filter(j=>j&&j.status!=='removed'),gone=keys.length-list.length;
+  return`<div class="pad narrow">${back('me','Profile')}<h1 class="pageh">Saved jobs</h1>${list.length?'':`<div class="empty" style="margin:8px 0"><b>Nothing saved yet</b><p>Hold a note on the board, or tap the bookmark on a job, to keep it here.</p></div>`}</div>
+  ${list.length?`<div class="wallzone">${wallHTML(list,D)}</div>`:''}${gone?`<p class="note" style="padding:0 16px 24px">${gone} saved ${gone===1?'job is':'jobs are'} no longer on the board.</p>`:''}`}
 const NOTES=['#A18CFF','#4FE3E0','#FF7AD1','#FFC53D','#FF9F45','#6CB6FF'];
-function noteOf(k){let h=2166136261;for(const c of String(k)){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return NOTES[(h>>>0)%NOTES.length]}
+const PRICE_STOPS=[[0,'#6B8CFF'],[100,'#45BBF7'],[200,'#45D982'],[500,'#F5C033']];
+function priceHue(p){p=Math.max(0,num(p));let i=0;while(i<PRICE_STOPS.length-2&&p>PRICE_STOPS[i+1][0])i++;const[a,b]=[PRICE_STOPS[i],PRICE_STOPS[i+1]],t=Math.min(1,(p-a[0])/(b[0]-a[0]));
+  const c=(h,k)=>parseInt(h.slice(1+k*2,3+k*2),16);return'#'+[0,1,2].map(k=>Math.round(c(a[1],k)+(c(b[1],k)-c(a[1],k))*t).toString(16).padStart(2,'0')).join('')}
+const gradNote=j=>num(j&&j.price)>500;
+const gcls=j=>gradNote(j)?' gnote':'',gvars=j=>gradNote(j)?';--nc1:#3B5BFF;--nc2:#9C5CFF':'';
+function noteOf(j){return gradNote(j)?'#8F84FF':priceHue(j&&typeof j==='object'?j.price:0)}
 function tile(j,D,i=0){
-  const c=noteOf(j.key),n=bidsFor(D,j.key).length,left=j.deadline-Date.now();
+  const c=noteOf(j),n=bidsFor(D,j.key).length,left=j.deadline-Date.now();
   const ph=j.pics?(picsOf('j:'+j.key)||[])[0]:'',d=-((Date.now()/1000+i*2.3)%32).toFixed(2);
-  return`<button class="tile ntile r${i%3} ${S.fresh===j.key?'fresh':''}" data-job="${esc(j.key)}" style="--nc:${c};--i:${i};--d:${d}s">
+  return`<button class="tile ntile${gcls(j)} r${i%3} ${S.fresh===j.key?'fresh':''}" data-job="${esc(j.key)}" style="--nc:${c};--i:${i};--d:${d}s${gvars(j)}">
     <span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span>
     <span class="pin"></span>
     <span class="price">₹${fmt(j.price)}</span>
@@ -647,12 +698,14 @@ function viewJob(D){
     else if(st==='expired')foot=`<div class="foot"><button class="btn2" data-act="repost">Pin it again</button></div>`;
   }else{
     if(st==='open')foot=`<div class="foot">
+      <h2 class="h2">${myBid?'Change your bid':'Place your bid'}</h2>
       <div style="display:flex;gap:9px"><label class="field" for="bidAmt"><span class="fl">Your bid ₹</span>
         <input id="bidAmt" type="text" inputmode="numeric" maxlength="6" value="${esc(S.bid.amt)}" data-bind="bid.amt" aria-label="Your bid in rupees"
          style="font-family:var(--display);font-size:var(--t-19);font-weight:800;letter-spacing:-.035em;font-variant-numeric:tabular-nums"></label>
         ${threadOpen(jobThreadKey(j.key,me))?`<button class="iconbtn" style="width:52px;height:auto;border-radius:999px;background:var(--surface)" data-thread-job aria-label="Message ${esc(firstName(j.owner))}">${ic('chat',20)}</button>`:''}</div>
-      <label class="field" for="bidSay"><input id="bidSay" maxlength="90" placeholder="Pitch yourself in one line (only ${esc(firstName(j.owner))} sees it)" value="${esc(S.bid.say)}" data-bind="bid.say"></label>
-      ${S.bid.pics?picEdit('bid',S.bid.pics):'<div class="pics"><span class="pic wait" aria-hidden="true"></span></div>'}
+      <div class="pitchbox"><label class="pitchlabel" for="bidSay">Pitch yourself <span class="labelhint">· only ${esc(firstName(j.owner))} sees this</span></label>
+        <textarea id="bidSay" rows="5" maxlength="${SAY_MAX}" placeholder="Why you? Past work, what you'll bring, when you can do it." data-bind="bid.say">${esc(S.bid.say)}</textarea>
+        <div class="pitchfoot">${S.bid.pics?picEdit('bid',S.bid.pics):'<div class="pics"><span class="pic wait" aria-hidden="true"></span></div>'}<span class="wc ${sayOver(S.bid.say)?'over':''}" id="bidWc">${sayCount(S.bid.say)}</span></div></div>
       ${S.err.bid?`<p class="err">${esc(S.err.bid)}</p>`:''}
       <button class="cta" data-act="bid" data-need="bid">${myBid?'Update my bid':'Place bid'}</button>
       ${myBid?'<button class="linkbtn" data-act="withdraw">Withdraw my bid</button>':''}
@@ -662,7 +715,7 @@ function viewJob(D){
           ${j.pick?.ratedPoster?`<p class="note">You rated ${pn}${(S.priv.gave||{})[j.key]?' ★'+num(S.priv.gave[j.key]).toFixed(1):''}.</p>`:`<button class="cta" data-sheet="ratePoster">Rate ${pn}</button>`}
           ${j.pick?.noteToDoer?`<div class="box stack" style="gap:4px"><span class="formlabel">${pn}'s private note to you</span><span class="t2" style="color:var(--fg)">${esc(str(j.pick.noteToDoer,200))}</span></div>`:''}
           <button class="linkbtn" data-act="paid" data-val="no">I marked this by mistake</button></div>`
-        :`<div class="foot"><div class="stack gap8 box" style="border:1px solid rgba(198,242,78,.3)">
+        :`<div class="foot"><div class="stack gap8 box" style="border:1px solid rgba(108,92,255,.3)">
           <span class="t1" style="font-size:var(--t-16)">Did ${pn} pay you ₹${fmt(j.agreed)}?</span>
           <span class="t2">${pay?'You said not yet. Tap Yes once the money reaches you.':`${pn} marked this job done. Confirm once the money reaches you.`}</span></div>
           <button class="cta" data-act="paid" data-val="yes">Yes, I got it</button>
@@ -674,32 +727,39 @@ function viewJob(D){
     else foot=`<div class="foot"><p class="note">${st==='assigned'||st==='done'?'This job went to someone else.':'This job is closed.'}</p></div>`;
   }
   const mod=!mine&&S.me.isOwner&&st!=='removed'?`<button class="linkbtn" data-sheet="remove">Take this job off the board</button>`:'';
-  return`<div class="pad">${back('board','Back to the board')}
-  <div class="wide">
-   <div class="stack" style="margin-top:6px">
-    <span class="big" style="view-transition-name:jp">₹${fmt(j.price)}</span>
-    <h1 class="h1">${esc(j.text)}</h1>
-    <div class="chips">${[j.when,j.where].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${nearMe(j)?nearTag():''}${stTag}</div>
-    ${j.more?`<p style="margin:0;font-size:var(--t-14);line-height:1.55;color:var(--fg2);max-width:52ch;overflow-wrap:anywhere;white-space:pre-wrap">${esc(j.more)}</p>`:''}
-    ${picStrip('j:'+j.key,j.pics)}
-    <button class="card" data-person="${esc(j.owner)}">${ring(j.owner,50)}
-      <span class="rowtext" style="gap:3px"><span style="font-size:var(--t-16);font-weight:700;letter-spacing:-.015em">${esc(shortName(j.owner))}${mine?' <span class="muted">(you)</span>':''}</span>
-      <span style="font-size:var(--t-12);font-weight:500;color:var(--muted)">${esc(metaOf(j.owner)||campus())}${esc(posterLine(j.owner))} · posted ${since(j.at)}</span></span></button>
-   </div>
+  const jp=j.pics?picsOf('j:'+j.key):null,d=-((Date.now()/1000)%32).toFixed(2);
+  const hasPh=!!(jp&&jp.length),online=/^online$/i.test(j.where||'');
+  const cover=hasPh?`<button class="jcover" data-pic="${esc('j:'+j.key)}" data-i="0" aria-label="See the ${jp.length} ${jp.length===1?'photo':'photos'}"><span class="tbg ph" style="--d:${d}s"><img src="${jp[0]}" alt=""></span></button>`
+    :`<div class="jcover"><span class="tbg" style="--d:${d}s" aria-hidden="true"></span></div>`;
+  const hint=hasPh?`${ic('camera',12,2.2)} Tap to see ${jp.length} ${jp.length===1?'photo':'photos'}`:j.pics?'Loading photos…':'No pictures';
+  const bidsSec=`<section class="jbids">
    <div class="stack">
     ${mine?`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">${bids.length} ${bids.length===1?'bid':'bids'}</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--muted)">only you see these</span></div>`
-      :`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">${myBid?'Your bid':'Bids'}</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--muted)">only ${esc(firstName(j.owner))} sees who bids</span></div>`}
+      :`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">Your bid</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--muted)">only ${esc(firstName(j.owner))} sees who bids</span></div>`}
     ${bids.length?bids.map(b=>`<div class="row">
       <button class="rowmain" data-person="${esc(b.by)}">${ring(b.by,42)}<span class="rowtext">
         <span class="t1">${esc(shortName(b.by))}${b.by===me?' (you)':''}${mine&&b.near?' '+nearTag():''} <span class="muted">· ${esc(metaOf(b.by))}${esc(rateLine(b.by,D))}</span></span>
-        ${b.say?`<span class="t2">${esc(b.say)}</span>`:''}</span></button>
-      <span class="amt">₹${fmt(b.amt)}</span>
+        ${b.say?`<span class="t2 bidsay">${esc(b.say)}</span>`:''}</span></button>
+      <span class="bidend"><span class="amt">₹${fmt(b.amt)}</span>
       ${mine&&st==='open'?`<button class="pick" data-pick="${esc(b.by)}" aria-label="Pick ${esc(firstName(b.by))} for ₹${fmt(b.amt)}">Pick</button>`:''}
       ${mine&&st==='open'?`<button class="iconbtn" data-thread-with="${esc(b.by)}" aria-label="Message ${esc(firstName(b.by))}">${ic('chat',17)}</button>`:''}
-      ${j.accepted===b.by?'<span class="tag ok">Picked</span>':''}
-    </div>${picStrip('b:'+j.key+'~'+b.by,b.pics,'sub')}`).join(''):`<p class="note" style="text-align:left">${mine?'No bids yet. Classmates see this on the board now.':'Bids are private. Place yours below.'}</p>`}
+      ${j.accepted===b.by?'<span class="tag ok">Picked</span>':''}</span>
+    </div>${picStrip('b:'+j.key+'~'+b.by,b.pics,'sub')}`).join(''):`<p class="note" style="text-align:left">${mine?'No bids yet. Classmates see this on the board now.':'Your bid shows up here once you place it. Only '+esc(firstName(j.owner))+' sees it.'}</p>`}
    </div>
-  </div></div>${foot}
+  </section>`;
+  return`<div class="pad jobpage${gcls(j)}" style="--nc:${noteOf(j)}${gvars(j)}">
+  <div class="jhero">${cover}${back('board','Board')}<div class="jtools"><button class="jtool" data-act="openShare" data-key="${esc(j.key)}" aria-label="Share this job">${ic('share',18)}</button>${mine?'':`<button class="jtool ${isSaved(j.key)?'on':''}" data-act="toggleSave" data-key="${esc(j.key)}" aria-label="${isSaved(j.key)?'Remove from saved':'Save this job'}" aria-pressed="${isSaved(j.key)}">${ic('bookmark',18,2,'currentColor',isSaved(j.key)?'currentColor':'none')}</button>`}</div>
+    <div class="jhead"><h1 class="h1">${esc(j.text)}</h1><span class="jhint">${hint}</span></div></div>
+  <button class="jposter" data-person="${esc(j.owner)}"><span class="javwrap"><span class="ring" style="border-color:${noteOf(j)};width:108px;height:108px">${face(j.owner,94)}</span>${online?'<span class="onl"><i></i>Online</span>':''}</span>
+    <span class="pname">${esc(shortName(j.owner))}${mine?' <span class="muted">(you)</span>':''}</span>
+    <span class="jmeta">${esc(metaOf(j.owner)||campus())}${esc(posterLine(j.owner))} · posted ${since(j.at)}</span></button>
+  <div class="jcard stack">
+    <span class="big" style="view-transition-name:jp">₹${fmt(j.price)}</span>
+    <div class="chips">${[j.when,online?'':j.where].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${nearMe(j)?nearTag():''}${stTag}</div>
+    ${j.more?`<p class="jmore">${esc(j.more)}</p>`:''}
+  </div>
+  ${mine?bidsSec+foot:foot+bidsSec}
+  </div>
   ${!mine?`<div class="reportrow"><button class="linkbtn" data-sheet="report" data-about="${esc(j.owner)}">Report this job</button>${mod}</div>`:''}`;
 }
 function viewPost(){
@@ -733,11 +793,11 @@ function viewBids(D){
     return st==='open'?[`${n} ${n===1?'bid':'bids'} in`,'']:st==='assigned'?[`Picked ${shortName(j.accepted)} · ₹${fmt(j.agreed)}`,'ok']:st==='done'?(payOf(j)?.ok?[j.pick?.ratedDoer?'Done · Paid ✓':'Done · Paid ✓ · rate them','ok']:[`Done · ${payOf(j)?'they haven\u2019t got your payment':'waiting for them to confirm payment'}`,payOf(j)?'warn':'']):st==='expired'?['Time ran out','warn']:['Closed','']};
   const bidLine=({j})=>{const st=jobState(j);return j.accepted===me?(st==='done'?(payOf(j)?.ok?['Done · Paid ✓','ok']:['Done · confirm you got paid','warn']):[`Accepted · ₹${fmt(j.agreed)}`,'ok']):j.accepted?['Went to someone else','']:st==='open'?[`Waiting for ${firstName(j.owner)} to pick`,'']:['Closed','']};
   const row=(j,[line,cls],amt,who)=>`<button class="item" data-job="${esc(j.key)}">${ring(who||j.owner,38)}<span class="itext"><span class="t1" style="font-weight:600;color:var(--fg)">${esc(j.text)}</span>
-    <span style="font-size:var(--t-11);font-weight:700;color:${cls==='ok'?'var(--accent)':cls==='warn'?'var(--coral-ink)':'var(--muted)'}">${esc(line)}</span></span><span class="amt" style="font-size:var(--t-16);color:var(--fg2)">₹${fmt(amt)}</span></button>`;
+    <span style="font-size:var(--t-11);font-weight:700;color:${cls==='ok'?'var(--accent)':cls==='warn'?'var(--coral-ink)':'var(--muted)'}">${esc(line)}</span></span><span class="amt" style="font-size:var(--t-16);color:${noteOf(j)}">₹${fmt(amt)}</span></button>`;
   const oin=offerList(S.offersIn).filter(o=>D.members.includes(o.owner)&&!D.blocked.has(o.owner)&&o.status!=='declined').sort((a,b)=>num(b.at)-num(a.at));
   const oout=offerList(S.offersOut).filter(o=>o.status!=='accepted').sort((a,b)=>num(b.at)-num(a.at));
   const doing=D.jobs.filter(j=>j.accepted===me&&!myBidOn(j.key)&&j.status!=='removed').sort((a,b)=>b.at-a.at);
-  const offerCard=o=>`<div class="box stack" style="gap:10px;border:1px solid rgba(198,242,78,.3)">
+  const offerCard=o=>`<div class="box stack" style="gap:10px;border:1px solid rgba(108,92,255,.3)">
     <div style="display:flex;align-items:center;gap:10px">${ring(o.owner,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.owner))} asked you</span><span class="t2">${esc([o.where,o.when].filter(Boolean).join(' · '))}</span></span><span class="amt" style="color:var(--accent)">₹${fmt(o.price)}</span></div>
     <span style="font-size:var(--t-14);line-height:1.4;color:var(--fg);overflow-wrap:anywhere">${esc(o.text)}</span>
     ${o.status==='pending'?`<div style="display:flex;gap:8px"><button class="pick" style="flex:1;padding:11px" data-act="acceptOffer" data-key="${esc(o.key)}">Accept</button><button class="btn2" style="flex:1;padding:11px" data-act="declineOffer" data-key="${esc(o.key)}">Can't do it</button></div>`
@@ -768,20 +828,18 @@ function viewBids(D){
 const codeLink=c=>`${SITE}?code=${c}`;
 const codeText=c=>`Join me on tack, the ${campus()} board for quick jobs and favours. This invite link is just for you:\n${codeLink(c)}`;
 function codeShare(c){return`<div class="copyrow"><span>${esc(codeLink(c))}</span></div>
-  <div class="sharebtns">${navigator.share?`<button class="primary" data-act="shareCode" data-code="${esc(c)}">Share…</button>`:''}
-    <a ${navigator.share?'':'class="primary"'} href="https://wa.me/?text=${encodeURIComponent(codeText(c))}" target="_blank" rel="noopener">WhatsApp</a>
-    <button data-act="copy" data-text="${esc(codeText(c))}">Copy for Discord or Instagram</button></div>`}
+  <div class="slogos">${slogo('wa','WhatsApp',`href="https://wa.me/?text=${encodeURIComponent(codeText(c))}" target="_blank" rel="noopener"`)}${slogo('ig','Instagram',`data-act="igText" data-text="${esc(codeText(c))}"`)}${navigator.share?slogo('share','More',`data-act="shareCode" data-code="${esc(c)}"`):''}${slogo('link','Copy',`data-act="copy" data-text="${esc(codeText(c))}"`)}</div>`}
 function inviteCard(D,big){
   if(S.config.memberInvites===false&&!S.me.isOwner)return big?'<div class="empty" style="margin:8px 0"><b>No chats yet</b><p>Bid on a job, or tap Ask on someone who\u2019s free, to start talking.</p></div>':'';
   const used=Object.values(S.myCodes).filter(c=>c&&c.usedBy).length;
   return`<div class="${big?'empty':'box stack'}" style="${big?'margin:8px 0':'gap:10px'}">
     ${big?'<b>No chats yet</b><p>Chats open when you work with someone: message your bidders, or ask someone who\u2019s free for a favour. Bring your friends onto the board too.</p>':'<span class="t1" style="font-size:var(--t-16)">Invite friends to tack</span><span class="t2">More people on the board means jobs get picked up faster. Each link lets one person join.</span>'}
-    <button class="${big?'cta':'btn2'}" data-sheet="invitefriend">Invite a friend</button>
+    <button class="${big?'cta noglow':'btn2'}" data-sheet="invitefriend">Invite a friend</button>
     ${used?`<p class="note">${used} ${used===1?'person has':'people have'} joined with your links.</p>`:''}</div>`}
 function viewChats(D){
   return`<div class="pad narrow"><h1 class="pageh">Chats</h1>
   ${D.threads.length?`<div class="stack gap8">${D.threads.map(t=>`<button class="item" data-thread="${esc(t.key)}">${ring(t.other,46)}
-    <span class="itext"><span class="t1">${esc(shortName(t.other))}${t.job?` <span class="muted">· ₹${fmt(t.job.agreed||t.job.price)}</span>`:''}</span><span class="t2" style="${t.unread?'color:var(--fg);font-weight:600':''}">${esc(t.sub)}</span></span>
+    <span class="itext"><span class="t1">${esc(shortName(t.other))}${t.job?` <span style="color:${noteOf(t.job)}">· ₹${fmt(t.job.agreed||t.job.price)}</span>`:''}</span><span class="t2" style="${t.unread?'color:var(--fg);font-weight:600':''}">${esc(t.sub)}</span></span>
     <span class="iend"><span class="time">${t.last?ago(t.last.at):''}</span>${t.unread?'<span class="udot" aria-label="Unread"></span>':''}</span></button>`).join('')}</div>`
    :inviteCard(D,true)}
   ${D.threads.length?`<div style="margin-top:18px">${inviteCard(D,false)}</div>`:''}
@@ -795,26 +853,25 @@ function viewChat(D){
   return`<div class="pad" style="padding-bottom:10px"><div style="display:flex;align-items:center;gap:10px">
      <button class="back" data-go="chats" aria-label="Back to chats" style="padding:0">${ic('back',20)}</button>
      <button class="rowmain" data-person="${esc(c.other)}">${ring(c.other,42)}<span class="rowtext"><span style="font-size:var(--t-16);font-weight:700;letter-spacing:-.015em">${esc(shortName(c.other))}</span>
-       <span style="font-size:var(--t-12);font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${j?`₹${fmt(j.agreed||j.price)} · ${esc(j.text)}`:esc(metaOf(c.other)||campus())}</span></span></button>
+       <span style="font-size:var(--t-12);font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${j?`<span style="color:${noteOf(j)};font-weight:700">₹${fmt(j.agreed||j.price)}</span> · ${esc(j.text)}`:esc(metaOf(c.other)||campus())}</span></span></button>
      <button class="iconbtn" data-sheet="report" data-about="${esc(c.other)}" aria-label="Report or block">${ic('flag',17)}</button></div></div>
   <div class="msgs">
    ${accepted?`<div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${payOf(j)?.ok?`Paid ✓ · ₹${fmt(j.agreed)}`:`Bid accepted · ₹${fmt(j.agreed)} · pay on UPI after`}</div>`:''}
-   ${j&&!accepted?`<button class="banner" style="background:var(--surface2);color:var(--fg2)" data-job="${esc(j.key)}">About: ${esc(j.text.slice(0,40))}${j.text.length>40?'…':''}</button>`:''}
+   ${j&&!accepted?`<button class="banner" style="background:color-mix(in srgb,${noteOf(j)} 14%,var(--surface2));color:${noteOf(j)}" data-job="${esc(j.key)}">About: ${esc(j.text.slice(0,40))}${j.text.length>40?'…':''}</button>`:''}
    ${!c.msgs.length?`<p class="note" style="margin:10px 0">${c.loaded?'Say hi. Sort out the time and place here.':'Loading messages…'}</p>`:''}
-   ${(()=>{const lastOut=[...c.msgs].reverse().find(m=>m.by===me),readAt=num(((S.threadDocs[c.key]||{}).read||{})[c.other]),seen=pref('receipts')&&lastOut&&readAt>=lastOut.at;
-     return c.msgs.map(m=>`<div class="${m.by===me?'out':'in'}">${esc(m.t)}<span class="time">${stamp(m.at)}</span></div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`).join('')})()}
+   ${c.msgs.map(m=>`<div class="${m.by===me?'out':'in'}">${esc(m.t)}<span class="time">${stamp(m.at)}</span></div>`).join('')}
    <p class="note" style="margin-top:4px">Keep it here. If you report someone, we can see this chat.</p>
   </div>
   ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats now happen inside jobs: ask ${esc(firstName(c.other))} for a favour when they're free, or hire them again from their profile.`}</p></div>`:`
   <div class="foot" style="position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%)"><div style="display:flex;gap:9px">
     <label class="field" for="msg"><input id="msg" type="text" maxlength="1000" placeholder="Message…" value="${esc(S.chatDraft.text)}" data-bind="chatDraft.text" aria-label="Message ${esc(firstName(c.other))}" autocomplete="off"></label>
-    <button data-act="send" aria-label="Send" style="width:50px;height:50px;flex-shrink:0;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(198,242,78,.35)">${ic('send',19,2,'var(--bg)')}</button>
+    <button data-act="send" aria-label="Send" style="width:50px;height:50px;flex-shrink:0;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(108,92,255,.35)">${ic('send',19,2,'#fff')}</button>
   </div></div>`}`;
 }
 function viewPerson(uid,D){
   const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,free=num(d.freeUntil)>Date.now();
   const does=str(d.does,60).split(',').map(s=>s.trim()).filter(Boolean).slice(0,6);
-  const tints=[['rgba(79,227,224,.16)','var(--cyan-ink)'],['rgba(255,122,209,.16)','var(--pink-ink)'],['rgba(255,197,61,.16)','var(--amber-ink)'],['rgba(161,140,255,.18)','var(--violet-ink)']];
+  const tints=[['rgba(79,227,224,.16)','var(--cyan-ink)'],['rgba(255,122,209,.16)','var(--pink-ink)'],['rgba(255,197,61,.16)','var(--amber-ink)'],['rgba(108,92,255,.18)','var(--violet-ink)']];
   return`<div class="pad">${isMe?'':back('board','Back to the board')}
   <div class="stack narrow" style="margin:6px auto 0;gap:18px">
    <div class="prof">
@@ -823,119 +880,57 @@ function viewPerson(uid,D){
      <div class="chips" style="justify-content:center">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campus())}</span>
        ${uid===ownerId()?'<span class="chip vio">Organiser</span>':''}${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${free?'<span class="chip on">Free right now</span>':''}</div>
    </div>
-   <div class="stats"><div><b>${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b style="color:var(--accent)">${st.avg??'New'}</b><span>rating</span></div>${isMe?`<div><b>${fmt(st.earned)}</b><span>₹ earned · only you</span></div>`:`<div><b>${st.poster.n?st.poster.avg.toFixed(1):'–'}</b><span>as a poster</span></div>`}</div>
+   <div class="stats"><div><b style="color:var(--cyan)">${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b style="color:var(--amber)">${st.avg??'New'}</b><span>rating</span></div>${isMe?`<div><b style="color:var(--accent)">${fmt(st.earned)}</b><span>₹ earned · only you</span></div>`:`<div><b style="color:var(--violet)">${st.poster.n?st.poster.avg.toFixed(1):'–'}</b><span>as a poster</span></div>`}</div>
    ${st.doer.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a doer · from ${st.doer.n} ${st.doer.n===1?'rating':'ratings'}</span>${st.doer.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
    ${reviewList(uid)}
    ${st.poster.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a poster · from ${st.poster.n} ${st.poster.n===1?'rating':'ratings'}</span>${st.poster.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
+   ${isMe?`<button class="card" data-go="saved">${ic('bookmark',20)}<span class="rowtext"><span class="t1">Saved jobs${(S.priv.saved||[]).length?' · '+S.priv.saved.length:''}</span><span class="t2">Jobs you kept for later</span></span><span class="chev">${ic('chev',18)}</span></button>`:''}
    ${isMe?`<button class="card" data-sheet="free">${ic('clock',20)}<span class="rowtext"><span class="t1">${free?'You’re free until '+clock(num(d.freeUntil)):'Free right now?'}</span><span class="t2">${free?'Anyone can message you until then. Tap to change.':'Show you’re around and open to quick requests'}</span></span><span class="chev">${ic('chev',18)}</span></button>`:''}
    ${does.length?`<div class="chips">${does.map((x,i)=>`<span class="chip" style="background:${tints[i%4][0]};color:${tints[i%4][1]};font-weight:700">${esc(x)}</span>`).join('')}</div>`:''}
    ${isMe?`<div class="menu">
        <button data-go="edit">${ic('edit',18)} Edit profile<span class="chev">${ic('chev',16)}</span></button>
        ${S.me.isOwner?`<button data-go="invites">${ic('users',18)} Invites and members<span class="chev">${ic('chev',16)}</span></button>`:''}
        <button data-act="replayIntro">${ic('board',18)} How tack works<span class="chev">${ic('chev',16)}</span></button>
-       <button data-go="settings">${ic('shield',18)} Settings and privacy<span class="chev">${ic('chev',16)}</span></button>
-       <button data-go="help">${ic('flag',18)} Report or feedback<span class="chev">${ic('chev',16)}</span></button>
-       <button data-act="logout">${ic('out',18)} Log out</button></div>
+       <button data-go="privacy">${ic('shield',18)} Privacy<span class="chev">${ic('chev',16)}</span></button>
+       <button data-act="logout">${ic('out',18)} Log out</button>
+       <button data-sheet="erase" class="danger">${ic('trash',18)} Delete my account</button></div>
        <p class="note">Logged in as ${esc(S.me.email)}</p>`
      :`${(()=>{const fn=esc(firstName(uid)),freeNow=num(d.freeUntil)>Date.now(),prev=lastJobFor(uid,D);
-        const asks=asksOf(uid),canAsk=freeNow&&(asks==='all'||(asks==='past'&&prev));
-        if(asks==='none')return`<p class="note">${fn} isn\u2019t taking favour requests right now.</p>`;
-        return (canAsk?`<button class="cta" data-ask="${esc(uid)}">Ask ${fn} for a favour</button>`:'')
+        return (freeNow?`<button class="cta" data-ask="${esc(uid)}">Ask ${fn} for a favour</button>`:'')
           +(prev?`<button class="${freeNow?'btn2':'cta'}" data-ask="${esc(uid)}" data-prev="${esc(prev.id)}">Hire ${fn} again</button>`:'')
-          +(!canAsk&&!prev?`<p class="note">You can ask ${fn} for a favour when they're marked Free right now.</p>`:'')})()}
+          +(!freeNow&&!prev?`<p class="note">You can ask ${fn} for a favour when they're marked Free right now.</p>`:'')})()}
        <button class="linkbtn" data-sheet="report" data-about="${esc(uid)}">Report or block</button>`}
   </div></div><div style="height:24px"></div>`;
 }
-function viewSettings(D){const me=S.me.id,asks=asksOf(me),blocked=arr(S.priv.blocked).filter(u=>typeof u==='string'),t=S.priv.terms||{};
-  const row=(t1,t2,attrs,end='')=>`<button class="setrow" ${attrs}><span class="rowtext"><span class="t1">${t1}</span>${t2?`<span class="t2">${t2}</span>`:''}</span>${end||`<span class="chev">${ic('chev',16)}</span>`}</button>`;
-  const tog=(on,t1,t2,attrs)=>`<button class="setrow" role="switch" aria-checked="${on}" ${attrs}><span class="rowtext"><span class="t1">${t1}</span><span class="t2">${t2}</span></span><span class="switch ${on?'on':''}" aria-hidden="true"></span></button>`;
-  return`<div class="pad">${back('me','Back')}<div class="stack narrow" style="margin-top:6px;gap:24px">
-   <h1 class="pageh">Settings</h1>
-   <section class="setsec"><h2 class="seth">Account</h2><div class="setcard">
-     <div class="setrow static"><span class="rowtext"><span class="t1">Email</span><span class="t2">${esc(S.me.email)}</span></span></div>
-     ${row('Change password','You’ll need your current password.',`data-act="togglePwForm" aria-expanded="${S.pwOpen}"`,`<span class="chev" style="transform:rotate(${S.pwOpen?90:0}deg)">${ic('chev',16)}</span>`)}
-     ${S.pwOpen?`<div class="setform">
-       <label class="formlabel" for="pwCur">Current password</label><input id="pwCur" class="inp" type="password" autocomplete="current-password" value="${esc(S.pw.cur)}" data-bind="pw.cur">
-       <label class="formlabel" for="pwNew">New password</label><input id="pwNew" class="inp" type="password" autocomplete="new-password" placeholder="At least 8 characters" value="${esc(S.pw.nw)}" data-bind="pw.nw">
-       ${S.err.pw?`<p class="err" role="alert">${esc(S.err.pw)}</p>`:''}
-       <button class="cta" data-act="changePw" data-need="pw" ${S.busy?'disabled':''}>${S.busy?'Saving…':'Save new password'}</button></div>`:''}
-     ${row('Edit profile','Name, photo, year, branch, what you’re good at and ring colour.','data-go="edit"')}
-   </div></section>
-   <section class="setsec"><h2 class="seth">Privacy</h2><div class="setcard">
-     <div class="setrow static"><span class="rowtext"><span class="t1">Who can see your bids</span><span class="t2">Only the poster of that job. Other members never see who bid or how much.</span></span><span class="setval">${ic('shield',14,2.2)} Poster only</span></div>
-     ${tog(pref('near'),'Show Near you on my bids','Tells the poster you were close to the job when you bid. Never your location.','data-pref="near"')}
-     ${tog(pref('receipts'),'Read receipts','Let people see when you’ve read their messages. If you turn this off, you won’t see theirs either.','data-pref="receipts"')}
-     ${tog(locOptIn(),'Use my location','Shows jobs near you and lets you tag jobs. Your location stays on this device.','data-act="toggleLocPref"')}
-     <div class="setrow static col"><span class="rowtext"><span class="t1">Who can ask you for a favour</span><span class="t2">Favour requests are private offers sent to you directly.</span></span>
-       <div class="chips">${[['all','Anyone, when I’m free'],['past','People I’ve worked with'],['none','No one']].map(([k,l])=>`<button class="chip ${asks===k?'on':''}" data-asks="${k}" aria-pressed="${asks===k}">${l}</button>`).join('')}</div></div>
-   </div></section>
-   <section class="setsec"><h2 class="seth">Blocked people</h2><div class="setcard">
-     ${blocked.length?blocked.map(u=>`<div class="setrow static">${ring(u,34)}<span class="rowtext"><span class="t1">${esc(shortName(u))}</span><span class="t2">You don’t see their jobs, bids or messages.</span></span><button class="btn2 setbtn" data-act="unblock" data-uid="${esc(u)}">Unblock</button></div>`).join('')
-       :`<div class="setrow static"><span class="rowtext"><span class="t2">You haven’t blocked anyone.</span></span></div>`}
-   </div></section>
-   <section class="setsec"><h2 class="seth">Help</h2><div class="setcard">
-     ${row('Report or feedback','Report a problem with a job or a person, or tell us what to improve.','data-go="help"')}
-     ${row('How tack works','Replay the introduction.','data-act="replayIntro"')}
-   </div></section>
-   <section class="setsec"><h2 class="seth">Legal</h2><div class="setcard">
-     ${row('Privacy Policy','','data-doc="privacy"')}
-     ${row('Terms of Use','','data-doc="terms"')}
-     <div class="setrow static"><span class="rowtext"><span class="t2">${t.at?`You accepted the current Terms on ${new Date(num(t.at)).toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}.`:`Effective ${EFFECTIVE}.`}</span></span></div>
-   </div></section>
-   <section class="setsec"><h2 class="seth">Your data</h2><div class="setcard">
-     ${row('Download my data','A copy of your profile, jobs, bids, offers, picks, settings and the messages you sent.','data-act="exportData"',`<span class="chev">${ic('chev',16)}</span>`)}
-     <button class="setrow danger" data-sheet="erase"><span class="rowtext"><span class="t1">Delete my account</span><span class="t2">Erases your profile, jobs, bids, photos and messages for good.</span></span></button>
-   </div></section>
-  </div></div><div style="height:28px"></div>`;
+function viewPrivacy(){
+  return`<div class="pad">${back('me','Back')}<div class="prose" style="margin-top:6px">
+   <h1 class="pageh" style="margin-bottom:6px">Privacy</h1>
+   <p>tack is private to people ${esc(organiser())} invited. Nothing on the board is public.</p>
+   <h2>What tack keeps</h2>
+   <p>Your email address and a password to log in. Your name, photo, year, branch, what you're good at and your ring colour. The jobs you pin, the bids you place, any photos you add to them, the ratings and reviews you give and your messages. Photos are shrunk on your phone first, which also strips their location data. When you mark yourself free, the time it ends. If you tag a job with your location, that spot rounded to about 100 m.</p>
+   <h2>Location</h2>
+   <p>Near you works on your phone: your location is used there to sort out which jobs are close, and is never saved. A job only has a location if its poster tagged it, rounded to about 100 m and never shown on a map. When you bid, tack saves only whether you were near the job, not where you were.</p>
+   <h2>What other members see</h2>
+   <p>Your name, photo, year and branch, the jobs you post, your ratings and reviews. They never see your email address. Your bids are private: only the poster of that job sees your bid, pitch and bid photos. Other members can't see who bid on a job or who took it.</p>
+   <h2>Ratings</h2>
+   <p>After a job, the poster and the doer rate each other from 1 to 5 on four things. Profiles show only the averages and how many ratings there are, never who gave them or for which job. A note you write goes only to the person you rated.</p>
+   <p>A poster can also write a short public review, with photos, of the person who did the job. It shows on that person's profile with the month, never the poster's name or the job. The poster can delete it later, and the organiser can remove reviews that break the rules.</p>
+   <h2>Invite links</h2>
+   <p>Invite links are personal: whoever joins with yours is recorded as invited by you.</p>
+   <h2>Chats</h2>
+   <p>Chats only happen inside a job: between a poster and their bidders, or between two people working on a job together, including favours you ask for and accept. There are no direct messages. Only the two people in a chat can read it in the app. ${esc(organiser())} runs this board and can read chats to handle a report.</p>
+   <h2>Money</h2>
+   <p>tack never touches money. You pay each other directly in cash or UPI.</p>
+   <h2>Deleting your account</h2>
+   <p>Go to Me, then Delete my account. It erases your profile, jobs, bids and messages and removes your login straight away.</p>
+   <h2>Questions or complaints</h2>
+   <p>Message ${esc(organiser())}${ownerId()&&ownerId()!==S.me.id?' from their profile':''}.</p>
+  </div></div><div style="height:24px"></div>`;
 }
-const HELP_KINDS=[['past','Report a problem with a past job','Something went wrong on a job you posted or did.','flag'],['board','Report something on the board','A job that breaks the rules, or someone acting unsafely.','board'],
-  ['feedback','Send feedback or an idea','Tell us what to fix, or what you’d like next.','chat'],['data','Account, privacy or data request','Ask about your data, correct something, or raise a complaint.','shield']];
-const HELP_WHY={past:['No-show','Didn’t pay or paid less','Work not as agreed','Unsafe or harassing','Something else'],board:['Breaks the posting rules','Assignment or exam work','Scam or spam','Unsafe or harassing','Something else']};
-function viewHelp(D){const h=S.help,me=S.me.id;
-  const head=(t,sub,backAct)=>`<div class="pad">${backAct?`<button class="back" data-act="${backAct}">${ic('back',16)} Back</button>`:back('settings','Back')}<div class="stack narrow" style="margin-top:6px;gap:18px"><div class="stack gap8"><h1 class="pageh">${t}</h1>${sub?`<p class="note" style="text-align:left;margin:0">${sub}</p>`:''}</div>`;
-  const tail=`</div></div><div style="height:28px"></div>`;
-  if(h.sent)return head(h.sent==='feedback'?'Thank you.':'We’ve got it.','',null)+`<div class="sentcard"><span class="bigpin"></span><p>${h.sent==='feedback'?'Your feedback goes straight to the organiser. Ideas like yours shape what tack does next.':'Your report has been sent to the organiser. You’ll get an acknowledgement within 24 hours, and we aim to resolve it within 15 days. Nobody else can see what you sent.'}</p>
-    <button class="cta" data-act="helpDone">Done</button></div>`+tail;
-  if(!h.kind)return head('Report or feedback','Tell us what happened or what could be better. Only the organiser sees what you send.')+`<div class="setcard">${HELP_KINDS.map(([k,t,sub,icn])=>`<button class="setrow" data-helpkind="${k}"><span class="seticon">${ic(icn,18)}</span><span class="rowtext"><span class="t1">${t}</span><span class="t2">${sub}</span></span><span class="chev">${ic('chev',16)}</span></button>`).join('')}</div>`+tail;
-  const kt=HELP_KINDS.find(x=>x[0]===h.kind);
-  if((h.kind==='past'||h.kind==='board')&&!h.job){
-    const list=h.kind==='past'?D.jobs.filter(j=>(j.owner===me&&j.accepted)||j.accepted===me).sort((a,b)=>Math.max(b.doneAt||0,b.at)-Math.max(a.doneAt||0,a.at))
-      :boardJobs(D).filter(j=>j.owner!==me);
-    return head(kt[1],h.kind==='past'?'Which job was it?':'Which job is it about?','helpBack')+(list.length?`<div class="stack gap8">${list.map(j=>{const other=j.owner===me?j.accepted:j.owner;
-      return`<button class="item" data-helpjob="${esc(j.key)}">${ring(other,38)}<span class="itext"><span class="t1" style="font-weight:600;color:var(--fg)">${esc(j.text)}</span><span class="t2">${esc(j.owner===me?'You posted · '+shortName(other)+' did it':shortName(j.owner)+' posted')} · ${since(Math.max(j.doneAt||0,j.at))}</span></span><span class="amt" style="font-size:var(--t-16);color:var(--fg2)">₹${fmt(j.agreed||j.price)}</span></button>`}).join('')}</div>`
-      :`<p class="note" style="text-align:left">${h.kind==='past'?'You don’t have any jobs with someone yet.':'Nothing else is on the board right now.'}</p>`)+tail}
-  const j=h.job?D.jobByKey[h.job]:null,other=j?(j.owner===me?j.accepted:j.owner):null;
-  return head(kt[1],'',h.job?'helpUnjob':'helpBack')+`${j?`<div class="card">${ring(other,38)}<span class="rowtext"><span class="t1">${esc(j.text)}</span><span class="t2">${esc(j.owner===me?'With '+shortName(other):'Posted by '+shortName(j.owner))}</span></span></div>`:''}
-    ${HELP_WHY[h.kind]?`<div class="stack gap8"><span class="formlabel" id="hw">What happened?</span><div class="chips" role="group" aria-labelledby="hw">${HELP_WHY[h.kind].map(w=>`<button class="chip ${h.why===w?'on':''}" data-helpwhy="${esc(w)}" aria-pressed="${h.why===w}">${esc(w)}</button>`).join('')}</div></div>`:''}
-    <div class="stack gap8"><label class="formlabel" for="helpN">${h.kind==='feedback'?'Your feedback':h.kind==='data'?'Your request':'Details'} ${HELP_WHY[h.kind]?'<span class="muted">(optional)</span>':''}</label>
-      <textarea id="helpN" class="inp" rows="5" maxlength="1000" style="resize:vertical" placeholder="${h.kind==='feedback'?'What would make tack better for you?':h.kind==='data'?'Tell us what you need. For example: a copy of my data, correcting my details, or a complaint.':'What happened, and when? Include anything that helps us understand.'}" data-bind="help.note">${esc(h.note)}</textarea></div>
-    ${S.err.help?`<p class="err">${esc(S.err.help)}</p>`:''}
-    <button class="cta" data-act="sendHelp" data-need="help">${h.kind==='feedback'?'Send feedback':h.kind==='data'?'Send request':'Send report'}</button>
-    <p class="note">Only the organiser sees this. ${h.kind==='past'||h.kind==='board'?'The person you report isn’t told who reported them.':''}</p>`+tail;
-}
-function openDoc(k){let r=$('docRoot');if(!r){r=document.createElement('div');r.id='docRoot';document.body.appendChild(r)}
-  r.innerHTML=`<div class="docview" role="dialog" aria-modal="true" aria-labelledby="docT"><div class="dochead"><span class="mark">tack</span><button class="iconbtn" data-act="closeDoc" aria-label="Close">${ic('x',18,2.4)}</button></div>
-    <div class="docscroll"><article class="prose legal"><h1 id="docT" class="pageh">${k==='terms'?'Terms of Use':'Privacy Policy'}</h1><p class="effective">Effective ${EFFECTIVE}</p>${k==='terms'?TERMS:PRIVACY}</article></div></div>`;
-  requestAnimationFrame(()=>r.querySelector('.iconbtn')?.focus({preventScroll:true}))}
-function closeDoc(){$('docRoot')?.remove()}
-function renderTermsGate(){let r=$('termsRoot');
-  if(!needTerms()){if(r)r.remove();return}
-  if(r)return;r=document.createElement('div');r.id='termsRoot';document.body.appendChild(r);
-  r.innerHTML=`<div class="termsgate" role="dialog" aria-modal="true" aria-labelledby="tgT"><div class="tgbox"><span class="mark">tack</span>
-    <h1 id="tgT">We’ve updated our terms.</h1>
-    <p>To keep using tack, please read and accept the Terms of Use and Privacy Policy. In short:</p>
-    <ul><li>tack is a noticeboard. Jobs and payments are agreed directly between members, at their own risk.</li><li>tack never handles money and isn’t responsible for disputes between members.</li>
-      <li>No academic work, nothing illegal or unsafe. Breaking the rules can get your account removed.</li><li>New controls in Settings: read receipts, who can ask you for favours, blocked people and downloading your data.</li></ul>
-    <div class="tglinks"><button class="btn2" data-doc="terms">Read Terms of Use</button><button class="btn2" data-doc="privacy">Read Privacy Policy</button></div>
-    <button class="cta" data-act="acceptTerms">I agree</button><button class="linkbtn" data-act="logout">Log out</button></div></div>`}
-const NEED_EXTRA={pw:()=>!!S.pw.cur&&S.pw.nw.length>=8,help:()=>{const h=S.help;return h.kind==='past'||h.kind==='board'?!!(h.job&&h.why):h.note.trim().length>=10}};
 const inviteLink=e=>`${SITE}?invite=${encodeURIComponent(e)}`;
 const inviteText=e=>`You're invited to tack, the ${campus()} noticeboard for small jobs. Post something you need done, or bid on a classmate's job.\n\nSign up with this email address (${e}):\n${inviteLink(e)}`;
 function shareButtons(e){
-  return`<div class="sharebtns">
-    <a class="primary" href="mailto:${encodeURIComponent(e)}?subject=${encodeURIComponent('You’re invited to tack')}&body=${encodeURIComponent(inviteText(e))}">${ic('mail',15)} Email invite</a>
-    <a href="https://wa.me/?text=${encodeURIComponent(inviteText(e))}" target="_blank" rel="noopener">${ic('chat',15)} WhatsApp</a>
-    <button data-act="copy" data-text="${esc(inviteText(e))}">Copy invite</button></div>`;
+  return`<div class="slogos">${slogo('mail','Email',`href="mailto:${encodeURIComponent(e)}?subject=${encodeURIComponent('You’re invited to tack')}&body=${encodeURIComponent(inviteText(e))}"`)}${slogo('wa','WhatsApp',`href="https://wa.me/?text=${encodeURIComponent(inviteText(e))}" target="_blank" rel="noopener"`)}${slogo('link','Copy',`data-act="copy" data-text="${esc(inviteText(e))}"`)}</div>`;
 }
 function viewInvites(D){
   if(!S.me.isOwner)return viewBoard(D);
@@ -948,7 +943,7 @@ function viewInvites(D){
      <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="invE" class="inp" style="flex:1;min-width:200px" type="email" inputmode="email" autocapitalize="off" spellcheck="false" autocomplete="off" placeholder="name@college.edu.in" value="${esc(S.inv.email)}" data-bind="inv.email">
      <button class="pick" style="padding:12px 18px;font-size:var(--t-14)" data-act="invite" data-need="invite">Add invite</button></div>
      ${S.err.inv?`<p class="err">${esc(S.err.inv)}</p>`:''}</div>
-   ${li?`<div class="box stack" style="gap:10px;border:1px solid rgba(198,242,78,.35)">
+   ${li?`<div class="box stack" style="gap:10px;border:1px solid rgba(108,92,255,.35)">
      <span class="t1" style="font-size:var(--t-14)">${esc(li)} can sign up now. Send them the invite:</span>${shareButtons(li)}
      <p class="note" style="text-align:left">The invite has a link to the sign-up page with their email filled in.</p></div>`:''}
    <div class="stack gap8"><div class="sect"><h2 class="h2">Invited</h2><span class="time">${list.length}</span></div>
@@ -1030,10 +1025,21 @@ function sheetHTML(D){
     <div class="chips" role="group" aria-label="By when">${WHENS.map(w=>`<button class="chip ${o.when===w?'on':''}" data-ofwhen="${w}" aria-pressed="${o.when===w}">${w}</button>`).join('')}</div>
     ${S.err.offer?`<p class="err">${esc(S.err.offer)}</p>`:''}
     <button class="cta" data-act="sendOffer" data-need="offer">Send to ${fn}</button>`;break}
+  case'share':{const sj=D.jobByKey[s.key];if(!sj){b='<h2 id="sheetT">This job is gone</h2>';break}const img=S.shareImg?.key===s.key?S.shareImg.url:'';
+    b=`<h2 id="sheetT">Share this job</h2>
+    <div class="sharepreview">${img?`<img src="${img}" alt="Share image: ₹${fmt(sj.price)}, ${esc(sj.text)}">`:'<span class="pic wait"></span>'}</div>
+    <div class="slogos">${slogo('wa','WhatsApp','data-act="shareTo" data-to="wa"')}${slogo('ig','Instagram','data-act="shareTo" data-to="ig"')}${navigator.share?slogo('share','More','data-act="shareTo" data-to="sys"'):''}${slogo('download','Save image','data-act="shareTo" data-to="save"')}${slogo('link','Copy link','data-act="shareTo" data-to="copy"')}</div>
+    <p class="note">The image shows the price, the job and where. Never your name or photo. Only invited members can open the link.</p>`;break}
+  case'jobmenu':{const mj=D.jobByKey[s.key];if(!mj){b='<h2 id="sheetT">This job is gone</h2>';break}const own=mj.owner===S.me.id,sv=isSaved(mj.key);
+    b=`<div class="jmhead${gcls(mj)}" style="--nc:${noteOf(mj)}"><span class="jmprice">₹${fmt(mj.price)}</span><h2 id="sheetT">${esc(mj.text.length>70?mj.text.slice(0,70)+'…':mj.text)}</h2></div>
+    <div class="menu"><button data-act="openShare" data-key="${esc(mj.key)}">${ic('share',18)} Share</button>
+      ${own?'':`<button data-act="toggleSave" data-key="${esc(mj.key)}">${ic('bookmark',18,2,'currentColor',sv?'currentColor':'none')} ${sv?'Remove from saved':'Save for later'}</button>`}
+      <button data-job="${esc(mj.key)}">${ic('chev',18)} Open job</button>
+      ${own?'':`<button class="danger" data-sheet="report" data-about="${esc(mj.owner)}">${ic('flag',18)} Report</button>`}</div>`;break}
   case'invitefriend':{const off=S.config.memberInvites===false&&!S.me.isOwner,c=S.lastCode;
     b=off?`<h2 id="sheetT">Invites are off</h2><p>${esc(Organiser())} has turned off member invites for now.</p><button class="linkbtn" data-act="closeSheet">OK</button>`
      :`<h2 id="sheetT">Invite a friend</h2><p>Each link works for one person. They sign up with any email. You're vouching for them, so only invite people you know.</p>
-      ${c?codeShare(c):`<button class="cta" data-act="makeCode">Create invite link</button>`}
+      ${c?codeShare(c):`<button class="cta noglow" data-act="makeCode">Create invite link</button>`}
       ${c?'<button class="linkbtn" data-act="makeCode">Make another link</button>':''}`;break}
   case'reshare':b=`<h2 id="sheetT">Send the invite again</h2><p>${esc(s.about)}</p>${shareButtons(s.about)}<button class="linkbtn" data-act="closeSheet">Done</button>`;break;
   case'report':b=`<h2 id="sheetT">Report ${esc(shortName(s.about))}</h2><p>${esc(organiser())} sees your report and can read chats with them.</p>
@@ -1048,10 +1054,10 @@ function sheetHTML(D){
     ${S.err.erase?`<p class="err" role="alert">${esc(S.err.erase)}</p>`:''}
     <button class="cta destructive" data-act="confirmErase" data-need="erase" ${S.busy?'disabled':''}>${S.busy?'Deleting…':'Delete everything'}</button><button class="linkbtn" data-act="closeSheet">Keep my account</button>`;break;
   }
-  return`<div class="scrim" data-act="closeSheet"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetT">${b}</div>`;
+  return`<div class="scrim" data-act="closeSheet"></div><div class="sheet sheet-${s.type}" role="dialog" aria-modal="true" aria-labelledby="sheetT">${b}</div>`;
 }
 
-const VIEWS={board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewSettings,settings:viewSettings,help:viewHelp,invites:viewInvites,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
+const VIEWS={board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewPrivacy,invites:viewInvites,saved:viewSaved,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
 let lastView=null,lastSheet=null;const scrollMem={};
 const INTRO=[
   {k:'board',t:'This is the board.',b:'Classmates pin small jobs here. A print run, a lift down four floors, an hour of help before a deadline.'},
@@ -1120,23 +1126,22 @@ const NEED={
   erase:()=>!!S.erase.pw,
   invite:()=>validEmail(S.inv.email.trim().toLowerCase()),
 };
-Object.assign(NEED,NEED_EXTRA);
 function syncNeed(){document.querySelectorAll('[data-need]').forEach(b=>{let ok=true;try{ok=!!NEED[b.dataset.need]?.()}catch{}b.classList.toggle('wait',!ok);if(ok)b.removeAttribute('aria-disabled');else b.setAttribute('aria-disabled','true')})}
 function render(){
-  queueMicrotask(syncNeed);queueMicrotask(renderTermsGate);
+  queueMicrotask(syncNeed);
   const a=document.activeElement,fid=a&&a.id;let s0=null,s1=null;try{s0=a.selectionStart;s1=a.selectionEnd}catch{}
   const gate=$('gate'),app=$('app');
   if(S.phase!=='app'){
     app.hidden=true;gate.hidden=false;document.title='tack';gate.className='gate'+(['onboard','auth'].includes(S.phase)?' scroll':'');gate.innerHTML=gateHTML();$('sheetRoot').innerHTML='';lastView=null;
   }else{
     gate.hidden=true;app.hidden=false;if(gate.innerHTML)gate.innerHTML='';
-    const D=derive(),main=$('main');if(lastView&&lastView!==S.view)scrollMem[lastView]=main.scrollTop;
+    const D=derive(),main=$('main');if(jobParam&&!S.deepDone&&D.jobByKey[jobParam]){S.deepDone=true;S.openJob=jobParam;S.bid={key:null};S.view='job'}if(lastView&&lastView!==S.view)scrollMem[lastView]=main.scrollTop;
     const keep=lastView===S.view?main.scrollTop:((DEPTH[S.view]??1)===0?scrollMem[S.view]||0:0);
     main.innerHTML=(VIEWS[S.view]||viewBoard)(D);main.scrollTop=keep;
     if(lastView!==S.view&&S.view==='chat')requestAnimationFrame(()=>{main.scrollTop=main.scrollHeight});
     lastView=S.view;
     $('rail').innerHTML=railHTML(D);
-    const navOn=v=>S.view===v||(v==='board'&&['job','person'].includes(S.view))||(v==='chats'&&S.view==='chat')||(v==='me'&&['privacy','edit'].includes(S.view))||(v==='invites'&&S.view==='invites');
+    const navOn=v=>S.view===v||(v==='board'&&['job','person'].includes(S.view))||(v==='chats'&&S.view==='chat')||(v==='me'&&['privacy','edit','saved'].includes(S.view))||(v==='invites'&&S.view==='invites');
     $('sidebar').innerHTML=`<div style="padding:0 6px"><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${esc(campus())} · ${boardJobs(D).length} pinned</span></div></div>
       <button class="cta" data-go="post" style="padding:13px 10px;font-size:var(--t-16)">+ Pin a job</button>
       <nav style="display:flex;flex-direction:column;gap:3px" aria-label="Sections">${[['board','Board','board'],['bids','Activity','bids'],['chats','Chats','chat'],['me','Profile','me']].concat(S.me.isOwner?[['invites','Invites','users']]:[])
@@ -1144,7 +1149,7 @@ function render(){
       <button class="card" style="margin-top:auto;padding:10px 12px;border-radius:var(--r-sm)" data-go="me">${ring(S.me.id,38)}<span class="rowtext"><span style="font-size:var(--t-12);font-weight:700">${esc(shortName(S.me.id))}</span>
         <span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc(metaOf(S.me.id)||campus())}</span></span></button>`;
     $('tabbar').innerHTML=[['board','Board','board'],['bids','Activity','bids'],['post','','plus'],['chats','Chats','chat'],['me','Me','me']].map(([v,l,i])=>v==='post'
-      ?`<button class="tab" data-go="post" aria-label="Pin a job"><span class="fab">${ic('plus',24,3,'var(--bg)')}</span></button>`
+      ?`<button class="tab" data-go="post" aria-label="Pin a job"><span class="fab">${ic('plus',24,3,'#fff')}</span></button>`
       :`<button class="tab ${navOn(v)||(v==='me'&&S.view==='invites')?'on':''}" data-go="${v}">${ic(i,20)}<span>${l}</span>${(v==='chats'&&D.unread)||(v==='bids'&&(D.toConfirm||D.offersWaiting||D.newNotes))?'<span class="udot"></span>':''}</button>`).join('');
     const attn=D.unread+D.offersWaiting+D.toConfirm+D.newNotes;document.title=attn?`(${attn}) tack`:'tack';
     const st=S.sheet?S.sheet.type:null;$('sheetRoot').innerHTML=sheetHTML(D);
@@ -1156,12 +1161,12 @@ function render(){
 }
 let toastT;
 function toast(msg){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},2800)}
-const DEPTH={board:0,bids:0,chats:0,me:0,invites:1,post:1,job:1,person:1,chat:1,privacy:1,settings:1,help:2,edit:2};
+const DEPTH={board:0,bids:0,chats:0,me:0,saved:1,invites:1,post:1,job:1,person:1,chat:1,privacy:1,edit:1};
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
 function go(v,keepThread){
   const from=S.view;
   if(v!=='chat'&&!keepThread)closeThread();
-  const apply=()=>{if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}S.view=v;S.sheet=null;S.err={};if(v==='help'&&from!=='help')S.help={kind:null,job:null,why:'',note:'',sent:null};if(v==='settings'){S.pwOpen=false}if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit')seedOnb();if(v==='invites')S.inv.campus='';render();
+  const apply=()=>{if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}S.view=v;S.sheet=null;S.err={};if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit')seedOnb();if(v==='invites')S.inv.campus='';render();
     if(v==='board'&&from==='job'&&S.openJob){const p=document.querySelector(`.tile[data-job="${CSS.escape(S.openJob)}"] .price`);if(p)p.style.viewTransitionName='jp'}};
   if(from===v||S.phase!=='app'||!document.startViewTransition||reduceMotion.matches){apply();return}
   const d=(DEPTH[v]??1)-(DEPTH[from]??1),root=document.documentElement;
@@ -1186,8 +1191,7 @@ const ACT={
   async resendVerify(){try{await sendVerify(S.auth.currentUser);toast('Sent. Check your inbox and spam.')}catch(e){toast(authMsg(e))}},
   clearPhoto(){S.onb.photo='';render()},
   join(){const o=S.onb;
-    if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.')||!need(o.adult,'onb','tack is for students who are 18 or older.')||!need(o.rules,'onb','Agree to the Terms of Use and Privacy Policy to continue.'))return;
-    savePriv({terms:{v:TERMS_V,at:Date.now()}});
+    if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.')||!need(o.adult,'onb','tack is for students who are 18 or older.')||!need(o.rules,'onb','Tick the posting rule to continue.'))return;
     saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),does:o.does.trim().slice(0,60),ring:o.ring,adult:true,joinedAt:d.joinedAt||Date.now(),jobs:d.jobs||{}}));
     S.err={};S.view='board';S.joining=true;computePhase();render();
     moment(`You\u2019re on the board, ${o.name.trim().split(/\s+/)[0]}.`,'Give us a second to show you around.',1600).then(()=>{S.joining=false;if(!S.priv.introSeen)openIntro()})},
@@ -1203,9 +1207,9 @@ const ACT={
   repost(){const j=derive().jobByKey[S.openJob];if(!j)return;S.draft={...blankDraft(),text:j.text,price:String(j.price),kind:KINDS.includes(j.kind)?j.kind:'Other',where:WHERES.includes(j.where)?j.where:'Gate 1',whereText:WHERES.includes(j.where)?'':j.where,more:j.more,pics:[...(S.pics['j:'+j.key]||[])]};
     saveMine(x=>{if(x.jobs?.[j.id])x.jobs[j.id].status='closed';return x});go('post')},
   bid(){const j=derive().jobByKey[S.openJob];if(!j)return;const amt=digits(S.bid.amt);
-    if(!need(amt>=1&&amt<=50000,'bid','Enter a bid in rupees.'))return;const had=!!myBidOn(j.key);
+    if(!need(amt>=1&&amt<=50000,'bid','Enter a bid in rupees.'))return;if(!need(!sayOver(S.bid.say),'bid',SAY_MAX<1000?'Keep your pitch under '+SAY_MAX+' characters.':'Keep your pitch under '+SAY_WORDS+' words.'))return;const had=!!myBidOn(j.key);
     const id=j.key+'~'+S.me.id,old=num(myBidOn(j.key)?.pics),pics=S.bid.pics?cleanPics(S.bid.pics):null,n=pics?pics.length:old;
-    savePitch(j.key,S.bid.say.trim(),amt,n,!!(pref('near')&&j.geo&&LOC.pos&&distM(LOC.pos,j.geo)<=NEAR_M));render();S.err={};toast(had?'Bid updated':'Bid placed');
+    savePitch(j.key,S.bid.say.trim(),amt,n,!!(j.geo&&LOC.pos&&distM(LOC.pos,j.geo)<=NEAR_M));render();S.err={};toast(had?'Bid updated':'Bid placed');
     if(pics){const {doc,setDoc,deleteDoc}=S.fb;S.pics['b:'+id]=pics;
       if(pics.length)setDoc(doc(S.db,'bidpics',id),{owner:j.owner,by:S.me.id,job:j.key,pics,at:Date.now()}).catch(e=>{console.warn(e);toast('Your bid is in, but the photos didn\u2019t upload.')});
       else if(old)deleteDoc(doc(S.db,'bidpics',id)).catch(()=>{})}},
@@ -1228,33 +1232,6 @@ const ACT={
   introPost(){closeIntro('post')},
   replayIntro(){openIntro(S.view)},
   hideSteps(){savePriv({stepsHidden:true})},
-  acceptTerms(){savePriv({terms:{v:TERMS_V,at:Date.now()}});$('termsRoot')?.remove();
-    if(!S.introChecked){S.introChecked=true;if(!S.priv.introSeen)setTimeout(()=>{if(!S.intro.on)openIntro()},400)}},
-  closeDoc(){closeDoc()},
-  togglePwForm(){S.pwOpen=!S.pwOpen;S.pw={cur:'',nw:''};S.err={};render();if(S.pwOpen)$('pwCur')?.focus()},
-  async changePw(){const {EmailAuthProvider,reauthenticateWithCredential,updatePassword}=S.fb,u=S.auth.currentUser;
-    if(!need(S.pw.cur,'pw','Enter your current password.')||!need(S.pw.nw.length>=8,'pw','Use a new password of at least 8 characters.'))return;
-    S.busy=true;render();
-    try{await reauthenticateWithCredential(u,EmailAuthProvider.credential(u.email,S.pw.cur))}catch(e){S.busy=false;S.err={pw:e.code==='auth/too-many-requests'?authMsg(e):'That isn\u2019t your current password.'};render();return}
-    try{await updatePassword(u,S.pw.nw);S.pwOpen=false;S.pw={cur:'',nw:''};S.err={};toast('Password changed')}catch(e){S.err={pw:authMsg(e)}}
-    S.busy=false;render()},
-  unblock(el){savePriv({blocked:arr(S.priv.blocked).filter(u=>u!==el.dataset.uid)});toast('Unblocked')},
-  toggleLocPref(){if(locOptIn()){try{localStorage.removeItem('tack.loc')}catch{}LOC.pos=null;S.near=false;if(S.draft)S.draft.useLoc=false;render();toast('Location off')}
-    else getLoc().then(p=>{render();toast(p?'Location on':'Couldn\u2019t get your location. Allow location for this site in your browser settings.')})},
-  async exportData(){const {collection,query,where,getDocs}=S.fb,me=S.me.id;toast('Preparing your data…');
-    const msgs={};for(const k of Object.keys(S.threadDocs)){try{const q=await getDocs(query(collection(S.db,'threads',k,'msgs'),where('by','==',me)));msgs[k]=q.docs.map(d=>d.data())}catch{}}
-    const data={exportedAt:new Date().toISOString(),account:{uid:me,email:S.me.email},profile:S.myDoc,settings:S.priv,bids:S.pitchMine,picks:S.picks,offersSent:S.offersOut,offersReceived:S.offersIn,messagesSent:msgs};
-    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download=`tack-my-data-${new Date().toISOString().slice(0,10)}.json`;
-    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)},
-  helpBack(){S.help={kind:null,job:null,why:'',note:'',sent:null};S.err={};render()},
-  helpUnjob(){S.help.job=null;S.help.why='';S.err={};render()},
-  helpDone(){S.help={kind:null,job:null,why:'',note:'',sent:null};go('settings')},
-  sendHelp(){const h=S.help,D=derive(),j=h.job?D.jobByKey[h.job]:null,me=S.me.id;
-    if(h.kind==='past'||h.kind==='board'){if(!need(j,'help','Pick the job first.')||!need(h.why,'help','Pick what happened.'))return}
-    else if(!need(h.note.trim().length>=10,'help','Write a little more so we can help.'))return;
-    const about=j?(j.owner===me?j.accepted:j.owner):null;
-    S.fb.addDoc(S.fb.collection(S.db,'reports'),{by:me,kind:h.kind,...(about?{about}:{}),...(j?{job:j.key}:{}),...(h.why?{why:h.why}:{}),note:h.note.trim().slice(0,1000),at:Date.now()}).catch(writeErr);
-    S.help={kind:null,job:null,why:'',note:'',sent:h.kind};S.err={};render()},
   toggleNear(){if(S.near){S.near=false;render();return}
     if(LOC.pos){S.near=true;render();return}
     toast('Finding where you are…');getLoc().then(p=>{if(p){S.near=true;render()}else toast('Couldn\u2019t get your location. Allow location for this site in your browser settings.')})},
@@ -1346,12 +1323,22 @@ const ACT={
   toggleMemberInvites(el){S.config={...S.config,memberInvites:!!el.checked};render();S.fb.setDoc(S.fb.doc(S.db,'config','app'),S.config).catch(writeErr);toast(el.checked?'Members can invite friends':'Member invites are off')},
   saveCampus(){const c=(S.inv.campus||'').trim();if(!c)return;const {doc,setDoc}=S.fb;
     S.config={...S.config,campus:c.slice(0,40)};setDoc(doc(S.db,'config','app'),S.config).catch(writeErr);toast('Campus name saved');render()},
+  openShare(el){openShare(el.dataset.key)},
+  toggleSave(el){const k=el.dataset.key,was=isSaved(k),l=(S.priv.saved||[]).filter(x=>x!==k);if(!was)l.unshift(k);if(S.sheet?.type==='jobmenu')S.sheet=null;savePriv({saved:l.slice(0,100)});toast(was?'Removed from saved':'Saved. Find it under Profile, Saved jobs')},
+  async shareTo(el){const j=derive().jobByKey[S.sheet?.key];if(!j)return;const to=el.dataset.to,text=jobShareText(j),img=S.shareImg?.key===j.key?S.shareImg:null;
+    const f=img&&typeof File==='function'?new File([img.blob],'tack-job.png',{type:'image/png'}):null,files=f&&navigator.canShare?.({files:[f]})?[f]:null;
+    try{if(to==='wa'){if(files)await navigator.share({files,text});else window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener')}
+      else if(to==='ig'){if(files)await navigator.share({files});else{saveImg();toast(img?'Image saved. Add it to your Instagram story.':'Making the image, try again in a second.')}}
+      else if(to==='sys')await navigator.share(files?{files,text}:{text,url:jobLink(j)});
+      else if(to==='save'){if(img){saveImg();toast('Image saved')}else toast('Making the image, try again in a second.')}
+      else if(to==='copy')navigator.clipboard.writeText(jobLink(j)).then(()=>toast('Link copied'),()=>toast('Couldn’t copy'))}catch{}},
+  async igText(el){const t=el.dataset.text||'';if(navigator.share){try{await navigator.share({text:t})}catch{}return}try{await navigator.clipboard.writeText(t);toast('Copied. Paste it in an Instagram DM or story.')}catch{toast('Couldn’t copy.')}},
   copy(el){const t=el.dataset.text||'';
     try{navigator.clipboard.writeText(t).then(()=>toast('Copied'),()=>toast('Couldn’t copy. Select the text and copy it.'))}catch{toast('Couldn’t copy.')}}
 };
 
 document.addEventListener('click',e=>{
-  const el=e.target.closest('[data-doc],[data-pref],[data-asks],[data-helpkind],[data-helpjob],[data-helpwhy],[data-acttab],[data-pic],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
+  const el=e.target.closest('[data-acttab],[data-pic],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
   if(!el)return;const ds=el.dataset;
   if(ds.ask!==undefined){if(ds.ask===S.me?.id)return;S.offer={to:ds.ask,prevJob:ds.prev||null,text:'',price:'',when:'Next hour',where:''};S.err={};S.sheet={type:'offer'};render();return}
   if(ds.ofwhen!==undefined){S.offer.when=ds.ofwhen;render();return}
@@ -1359,12 +1346,6 @@ document.addEventListener('click',e=>{
   if(ds.act!==undefined){const f=ACT[ds.act];if(f){e.preventDefault();f(el)}return}
   if(ds.go!==undefined){go(ds.go);return}
   if(ds.job!==undefined){const pr=el.classList.contains('tile')&&el.querySelector('.price');if(pr&&document.startViewTransition&&!reduceMotion.matches)pr.style.viewTransitionName='jp';S.openJob=ds.job;S.bid={key:null};for(const k of Object.keys(S.pics))if(k.startsWith('b:'+ds.job+'~'))delete S.pics[k];go('job');return}
-  if(ds.doc!==undefined){e.preventDefault();openDoc(ds.doc);return}
-  if(ds.pref!==undefined){savePriv({prefs:{...(S.priv.prefs||{}),[ds.pref]:!pref(ds.pref)}});return}
-  if(ds.asks!==undefined){saveMine(d=>{d.asks=ds.asks;return d});render();return}
-  if(ds.helpkind!==undefined){S.help={kind:ds.helpkind,job:null,why:'',note:'',sent:null};S.err={};render();return}
-  if(ds.helpjob!==undefined){S.help.job=ds.helpjob;S.err={};render();return}
-  if(ds.helpwhy!==undefined){S.help.why=ds.helpwhy;render();return}
   if(ds.acttab!==undefined){S.actTab=ds.acttab;render();return}
   if(ds.sort!==undefined){S.sort=ds.sort;render();return}
   if(ds.set!==undefined){S.draft[ds.set]=ds.val;if(ds.set==='where')S.draft.whereText='';render();return}
@@ -1384,12 +1365,20 @@ document.addEventListener('click',e=>{
   if(ds.threadJob!==undefined){const j=D.jobByKey[S.openJob];if(j&&canMessage({key:jobThreadKey(j.key,me),other:j.owner,jobKey:j.key},D))openThread({key:jobThreadKey(j.key,me),other:j.owner,jobKey:j.key});return}
   if(ds.threadWith!==undefined){const j=D.jobByKey[S.openJob];if(j)openThread({key:jobThreadKey(j.key,ds.threadWith),other:ds.threadWith,jobKey:j.key});return}
 });
+let lp=null;
+function openJobMenu(k){S.sheet={type:'jobmenu',key:k};render()}
+document.addEventListener('pointerdown',e=>{const t=e.target.closest('.tile[data-job]');if(!t||e.button>0)return;if(lp)clearTimeout(lp.t);
+  lp={x:e.clientX,y:e.clientY,fired:false,t:setTimeout(()=>{lp.fired=true;navigator.vibrate?.(12);openJobMenu(t.dataset.job)},480)}});
+document.addEventListener('pointermove',e=>{if(lp&&!lp.fired&&Math.hypot(e.clientX-lp.x,e.clientY-lp.y)>10)clearTimeout(lp.t)});
+['pointerup','pointercancel'].forEach(n=>document.addEventListener(n,()=>{if(!lp)return;clearTimeout(lp.t);if(lp.fired){lp.until=Date.now()+400;lp.fired=false}}));
+document.addEventListener('click',e=>{if(lp&&lp.until>Date.now()){lp=null;e.stopPropagation();e.preventDefault()}},true);
+document.addEventListener('contextmenu',e=>{const t=e.target.closest('.tile[data-job]');if(!t)return;e.preventDefault();if(lp?.fired||lp?.until>Date.now())return;if(lp)clearTimeout(lp.t);openJobMenu(t.dataset.job)});
 document.addEventListener('submit',e=>{
   const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();
   if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
-document.addEventListener('input',e=>{bind(e);if(e.target.id==='q')render();else syncNeed()});
+document.addEventListener('input',e=>{bind(e);if(e.target.id==='q')render();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}syncNeed()}});
 document.addEventListener('change',async e=>{
   bind(e);syncNeed();
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}
@@ -1403,7 +1392,6 @@ document.addEventListener('change',async e=>{
   }
 });
 document.addEventListener('keydown',e=>{
-  if($('docRoot')){if(e.key==='Escape')closeDoc();return}
   if(S.intro.on){if(e.key==='ArrowRight'){e.preventDefault();introStep(1)}else if(e.key==='ArrowLeft'){e.preventDefault();introStep(-1)}else if(e.key==='Escape')closeIntro();return}
   if(e.key==='Escape'&&S.sheet){closeSheet();return}
   if(e.key==='Enter'&&e.target.id==='msg'){e.preventDefault();sendMsg();return}
