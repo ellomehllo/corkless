@@ -1001,20 +1001,29 @@ function introScene(k){const me=S.me?.id;
     <span class="bubble b2" style="--i:2">On my way. 10 minutes.</span><span class="lock" style="--i:3">UPI or cash, between you two</span></div>`;
   if(k==='rate')return`<div class="sc sc-rate" aria-hidden="true"><span class="stars">${[0,1,2,3,4].map(i=>`<span class="st" style="--i:${i}">${ic('star',30,2,'currentColor','currentColor')}</span>`).join('')}</span><span class="lock" style="--i:6">${ic('shield',13,2.2)} Anonymous, always</span></div>`;
   return`<div class="sc sc-end" aria-hidden="true"><span class="bigpin"></span></div>`}
+function introBodyHTML(i){const sl=INTRO[i],last=sl.k==='end',fn=esc(S.me?firstName(S.me.id):'');
+  return`${introScene(sl.k)}<div class="introtext">${last?`<h1 id="introT" class="ia">You’re in${fn?', '+fn:''}.</h1><p class="ib">Pin something you need, or find something to do. The board is yours.</p>`
+    :`<span class="ik">${i+1} of ${INTRO.length-1}</span><h1 id="introT" class="ia">${sl.t}</h1><p class="ib">${sl.b}</p>`}</div>`}
 function renderIntro(){let r=$('introRoot');
   if(!S.intro.on){if(r)r.remove();return}
+  const i=S.intro.i,last=INTRO[i].k==='end';
   if(!r){r=document.createElement('div');r.id='introRoot';document.body.appendChild(r);
     let x0=null;r.addEventListener('touchstart',e=>{x0=e.touches[0].clientX},{passive:true});
-    r.addEventListener('touchend',e=>{if(x0==null)return;const dx=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(dx)>50)introStep(dx<0?1:-1)},{passive:true})}
-  const i=S.intro.i,sl=INTRO[i],last=sl.k==='end',fn=esc(S.me?firstName(S.me.id):'');
-  r.innerHTML=`<div class="intro" role="dialog" aria-modal="true" aria-labelledby="introT">
-    <div class="introtop"><span class="mark">tack</span>${last?'':'<button class="linkbtn" data-act="introSkip">Skip</button>'}</div>
-    <div class="introbody" data-k="${sl.k}">${introScene(sl.k)}
-      <div class="introtext">${last?`<h1 id="introT" class="ia">You\u2019re in${fn?', '+fn:''}.</h1><p class="ib">Pin something you need, or find something to do. The board is yours.</p>`
-        :`<span class="ik">${i+1} of ${INTRO.length-1}</span><h1 id="introT" class="ia">${sl.t}</h1><p class="ib">${sl.b}</p>`}</div></div>
-    <div class="introfoot">${last?`<button class="cta inext" data-act="introDone">Show me the board</button><button class="btn2 inext2" data-act="introPost">Pin my first job</button>`
-      :`<div class="idots" aria-hidden="true">${INTRO.slice(0,-1).map((_,j)=>`<span class="${j===i?'on':''}"></span>`).join('')}</div><button class="cta inext" data-act="introNext">${i===INTRO.length-2?'Got it':'Next'}</button>`}</div></div>`;
-  requestAnimationFrame(()=>r.querySelector('.inext')?.focus({preventScroll:true}))}
+    r.addEventListener('touchend',e=>{if(x0==null)return;const dx=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(dx)>50)introStep(dx<0?1:-1)},{passive:true});
+    r.innerHTML=`<div class="intro" role="dialog" aria-modal="true" aria-labelledby="introT">
+      <div class="introtop"><span class="mark">tack</span><button class="linkbtn iskip" data-act="introSkip">Skip</button></div>
+      <div class="introbody">${introBodyHTML(i)}</div>
+      <div class="introfoot"><div class="idots" aria-hidden="true">${INTRO.slice(0,-1).map(()=>'<span></span>').join('')}</div>
+        <button class="cta inext" data-act="introNext"></button><button class="btn2 inext2" data-act="introPost" hidden>Pin my first job</button></div></div>`;
+    r.dataset.i=i}
+  else if(+r.dataset.i!==i){r.dataset.i=i;const old=r.querySelector('.introbody'),nb=document.createElement('div');nb.className='introbody';nb.innerHTML=introBodyHTML(i);
+    if(reduceMotion.matches)old.replaceWith(nb);else{old.classList.add('leaving');old.after(nb);setTimeout(()=>old.remove(),220)}}
+  r.querySelectorAll('.idots span').forEach((d,j)=>d.classList.toggle('on',j===i));
+  r.querySelector('.idots').style.visibility=last?'hidden':'';
+  r.querySelector('.iskip').style.visibility=last?'hidden':'';
+  const nx=r.querySelector('.inext');nx.textContent=last?'Show me the board':i===INTRO.length-2?'Got it':'Next';nx.dataset.act=last?'introDone':'introNext';
+  r.querySelector('.inext2').hidden=!last;
+  requestAnimationFrame(()=>nx.focus({preventScroll:true}))}
 function openIntro(back){S.intro={on:true,i:0,back:back||null};renderIntro()}
 function introStep(d){const i=S.intro.i+d;if(i<0||i>=INTRO.length)return;S.intro.i=i;renderIntro()}
 function closeIntro(to){const back=S.intro.back;S.intro={on:false,i:0};renderIntro();if(!S.priv.introSeen)savePriv({introSeen:Date.now()});go(to||back||'board')}
