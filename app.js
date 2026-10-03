@@ -73,7 +73,7 @@ const S={
   myDoc:null, pendingMine:0,
   view:'board', openJob:null, personOf:null, sort:'high', find:{q:''}, near:false,
   draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, pw:{cur:'',nw:''}, pwOpen:false, help:{kind:null,job:null,why:'',note:'',sent:null}, actTab:'all', actSeenAt:0, intro:{on:false,i:0}, fresh:null, chatDraft:{text:''}, pay:{upi:null,ref:''},
-  onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',adult:false,rules:false},
+  onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',banner:'',adult:false,rules:false},
   inv:{email:'',campus:''}, lastInvite:null,
   picks:{}, repDocs:{},
   sheet:null, rate:{a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]}, rep:{why:'',note:'',block:false}, erase:{pw:''},
@@ -399,7 +399,7 @@ function computePhase(){
   if(!S.myDoc||!S.myDoc.adult){if(S.phase!=='onboard')seedOnb();S.phase='onboard';return}
   S.phase='app';
 }
-function seedOnb(){const d=S.myDoc||{};S.onb={name:str(d.name,60)||S.user?.displayName||'',photo:PHOTO_RE.test(d.photo||'')?d.photo:'',year:str(d.year,12),branch:str(d.branch,24),does:str(d.does,60),ring:RINGS.includes(d.ring)?d.ring:ringOf(S.me.id),adult:!!d.adult,rules:!!d.adult}}
+function seedOnb(){const d=S.myDoc||{};S.onb={name:str(d.name,60)||S.user?.displayName||'',photo:PHOTO_RE.test(d.photo||'')?d.photo:'',year:str(d.year,12),branch:str(d.branch,24),does:str(d.bio,BIO_MAX)||str(d.does,60),banner:bannerOk(d.banner)?d.banner:'',ring:RINGS.includes(d.ring)?d.ring:ringOf(S.me.id),adult:!!d.adult,rules:!!d.adult}}
 
 const AUTH_ERR={
   'auth/invalid-credential':'Wrong email or password.','auth/wrong-password':'Wrong email or password.','auth/user-not-found':'Wrong email or password.',
@@ -492,6 +492,29 @@ function sendMsg(){
   requestAnimationFrame(()=>{$('msg')?.focus()});
 }
 
+const BIO_MAX=160,BANNER_MAX=90000,BANNERS={ocean:'linear-gradient(120deg,#1D3FD8,#0F8C9C 60%,#0E9C84)',dusk:'linear-gradient(120deg,#3B2A8F,#B4508C 60%,#F08A4B)',grove:'linear-gradient(120deg,#0E5C47,#2E9E6A 55%,#B9D96A)',ember:'linear-gradient(120deg,#5A1E2A,#C2412D 55%,#F2B84B)',night:'radial-gradient(120% 140% at 20% 0%,#2C3E8F 0%,#0D1530 55%,#050A1C 100%)',candy:'linear-gradient(120deg,#6A5CFF,#E58AC0 55%,#FFC9A8)',mint:'linear-gradient(120deg,#0E9C84,#7FE0CF 60%,#E7FFF8)',mono:'linear-gradient(120deg,#1E2536,#3A4560 55%,#5E6B8A)'};
+const bannerOk=b=>typeof b==='string'&&(BANNERS[b]||(b.length<=BANNER_MAX&&PIC_RE.test(b)));
+function bannerStyle(b){return BANNERS[b]?`background:${BANNERS[b]}`:bannerOk(b)?`background:center/cover url(${b})`:''}
+function openCrop(file,target){if(!file)return;const url=URL.createObjectURL(file),img=new Image();
+  img.onload=()=>{S.crop={target,url,w:img.naturalWidth,h:img.naturalHeight,cx:img.naturalWidth/2,cy:img.naturalHeight/2,z:1,aspect:target==='banner'?3:1};S.cropImg=img;S.err={};S.sheet={type:'crop'};render()};
+  img.onerror=()=>{URL.revokeObjectURL(url);S.err={onb:'That photo couldn’t be opened. Try another one, or a screenshot of it.'};render()};
+  img.src=url}
+function cropGeom(){const c=S.crop,box=$('cropBox');if(!c||!box)return null;const W=box.clientWidth,H=box.clientHeight,s0=Math.max(W/c.w,H/c.h),sc=s0*c.z;
+  const hx=W/(2*sc),hy=H/(2*sc);c.cx=Math.min(Math.max(c.cx,hx),c.w-hx);c.cy=Math.min(Math.max(c.cy,hy),c.h-hy);return{W,H,sc,hx,hy}}
+function cropApply(){const c=S.crop,g=cropGeom(),im=$('cropImg');if(!g||!im)return;
+  im.style.width=c.w*g.sc+'px';im.style.height=c.h*g.sc+'px';im.style.transform=`translate(${g.W/2-c.cx*g.sc}px,${g.H/2-c.cy*g.sc}px)`;const z=$('cropZoom');if(z&&+z.value!==c.z)z.value=c.z}
+function cropDone(){const c=S.crop,g=cropGeom();if(!c||!g||!S.cropImg)return;const out=c.target==='banner'?[960,320]:[256,256],cv=document.createElement('canvas');cv.width=out[0];cv.height=out[1];
+  const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,out[0],out[1]);x.drawImage(S.cropImg,c.cx-g.hx,c.cy-g.hy,g.hx*2,g.hy*2,0,0,out[0],out[1]);
+  let q=.82,d=cv.toDataURL('image/jpeg',q);while(c.target==='banner'&&d.length>BANNER_MAX&&q>.4){q-=.08;d=cv.toDataURL('image/jpeg',q)}
+  if(c.target==='banner')S.onb.banner=d;else S.onb.photo=d;URL.revokeObjectURL(c.url);S.crop=null;S.cropImg=null;S.sheet=null;render()}
+let cropPtrs=new Map(),cropPinch=0;
+document.addEventListener('pointerdown',e=>{if(!e.target.closest('#cropBox')||!S.crop)return;e.preventDefault();cropPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY});e.target.setPointerCapture?.(e.pointerId);
+  if(cropPtrs.size===2){const[a,b]=[...cropPtrs.values()];cropPinch=Math.hypot(a.x-b.x,a.y-b.y)}});
+document.addEventListener('pointermove',e=>{if(!S.crop||!cropPtrs.has(e.pointerId))return;const p=cropPtrs.get(e.pointerId),g=cropGeom();if(!g)return;
+  if(cropPtrs.size===2){cropPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY});const[a,b]=[...cropPtrs.values()],dd=Math.hypot(a.x-b.x,a.y-b.y);if(cropPinch){S.crop.z=Math.min(4,Math.max(1,S.crop.z*dd/cropPinch))}cropPinch=dd}
+  else{S.crop.cx-=(e.clientX-p.x)/g.sc;S.crop.cy-=(e.clientY-p.y)/g.sc;cropPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY})}cropApply()});
+['pointerup','pointercancel'].forEach(n=>document.addEventListener(n,e=>{cropPtrs.delete(e.pointerId);if(cropPtrs.size<2)cropPinch=0}));
+document.addEventListener('wheel',e=>{if(!S.crop||!e.target.closest('#cropBox'))return;e.preventDefault();S.crop.z=Math.min(4,Math.max(1,S.crop.z*(e.deltaY<0?1.08:1/1.08)));cropApply()},{passive:false});
 function readPhoto(file){
   return new Promise((res,rej)=>{
     if(!file||!/^image\//.test(file.type))return rej(new Error('type'));
@@ -582,20 +605,26 @@ function gateHTML(){
 function onboardHTML(edit){
   const o=S.onb,me=S.me.id;
   return`<div class="gatebox onb" style="gap:20px">
-   ${edit?'':'<div class="mark">tack</div>'}
-   <div><h1>${edit?'Edit your profile':'Set up your profile'}</h1>
+   ${edit?`<button class="back" data-go="me" style="padding:0">${ic('back',16)} Profile</button>`:'<div class="mark">tack</div>'}
+   <div><h1>${edit?'Edit profile':'Set up your profile'}</h1>
    ${edit?'':`<p style="margin-top:8px">Classmates see this when you post or bid. A real photo helps people trust you.</p>`}</div>
-   <div class="photopick">${ring(me,76)}<div class="stack gap8">
-     <label class="upload" for="oph">${ic('camera',16)} ${o.photo?'Change photo':'Add a photo'}<input id="oph" type="file" accept="image/jpeg,image/png,image/webp" data-photo></label>
-     ${o.photo?'<button class="linkbtn" style="align-self:flex-start;padding:0" data-act="clearPhoto">Remove photo</button>':''}</div></div>
+   ${edit?`<div class="eprev">
+     <div class="eban" style="${bannerStyle(o.banner)}"><label class="ebtn" for="obn">${ic('camera',14)} ${o.banner?'Change banner':'Add banner'}<input id="obn" type="file" accept="image/*" data-bannerfile></label></div>
+     <div class="eav"><label for="oph" class="eavl" aria-label="${o.photo?'Change photo':'Add a photo'}">${ring(me,96)}<span class="eavcam">${ic('camera',15)}</span><input id="oph" type="file" accept="image/*" data-photo></label></div>
+     <div class="eacts">${o.photo?'<button class="linkbtn" data-act="clearPhoto">Remove photo</button>':''}${o.banner?'<button class="linkbtn" data-act="pickBanner" data-val="">Remove banner</button>':''}</div>
+     <div class="bannerpick" role="group" aria-label="Banner colours">${Object.keys(BANNERS).map(k=>`<button class="bsw ${o.banner===k?'on':''}" style="background:${BANNERS[k]}" data-act="pickBanner" data-val="${k}" aria-label="Banner ${k}" aria-pressed="${o.banner===k}"></button>`).join('')}</div>
+   </div>`:''}
+   ${edit?'':`<div class="photopick">${ring(me,76)}<div class="stack gap8">
+     <label class="upload" for="oph">${ic('camera',16)} ${o.photo?'Change photo':'Add a photo'}<input id="oph" type="file" accept="image/*" data-photo></label>
+     ${o.photo?'<button class="linkbtn" style="align-self:flex-start;padding:0" data-act="clearPhoto">Remove photo</button>':''}</div></div>`}
    <div class="stack gap8"><label class="formlabel" for="onm">Full name</label>
      <input id="onm" class="inp" maxlength="60" autocomplete="name" value="${esc(o.name)}" data-bind="onb.name"></div>
    <div class="stack gap8"><span class="formlabel" id="yl">Year</span>
      <div class="chips" role="group" aria-labelledby="yl">${YEARS.map(y=>`<button class="chip ${o.year===y?'on':''}" data-onb="year" data-val="${y}" aria-pressed="${o.year===y}">${y}</button>`).join('')}</div></div>
    <div class="stack gap8"><label class="formlabel" for="obr">Branch</label>
      <input id="obr" class="inp" maxlength="24" placeholder="CSE, ECE, BDes…" value="${esc(o.branch)}" data-bind="onb.branch" autocomplete="off"></div>
-   <div class="stack gap8"><label class="formlabel" for="odo">Good at <span class="muted">(optional)</span></label>
-     <input id="odo" class="inp" maxlength="60" placeholder="photo, notes, rides" value="${esc(o.does)}" data-bind="onb.does" autocomplete="off"></div>
+   <div class="stack gap8"><label class="formlabel" for="odo">${edit?'Bio':'What are you good at?'} <span class="muted">(optional${edit?'':', shows as your bio'})</span></label>
+     <textarea id="odo" class="inp" rows="3" maxlength="${BIO_MAX}" style="resize:none;line-height:1.45" placeholder="Photography, quick notes, I have a scooter for rides…" data-bind="onb.does">${esc(o.does)}</textarea></div>
    <div class="stack gap8"><span class="formlabel" id="rl">Your ring colour</span>
      <div class="chips" role="group" aria-labelledby="rl">${RINGS.map(r=>`<button class="swatch ${o.ring===r?'on':''}" style="background:${r}" data-onb="ring" data-val="${r}" aria-label="Ring colour ${r}" aria-pressed="${o.ring===r}"></button>`).join('')}</div></div>
    ${edit?'':`<label class="check" for="oad"><input type="checkbox" id="oad" data-bind="onb.adult" ${o.adult?'checked':''}> I'm 18 or older.</label>
@@ -650,7 +679,7 @@ function openShare(k){const j=derive().jobByKey[k];if(!j)return;S.sheet={type:'s
   if(j.pics&&picsOf('j:'+k)===null)setTimeout(go2,700);else go2()}
 function saveImg(){if(!S.shareImg)return;const a=document.createElement('a');a.href=S.shareImg.url;a.download='tack-job.png';document.body.appendChild(a);a.click();a.remove()}
 function viewSaved(D){const keys=Array.isArray(S.priv.saved)?S.priv.saved:[],list=keys.map(k=>D.jobByKey[k]).filter(j=>j&&j.status!=='removed'),gone=keys.length-list.length;
-  return`<div class="pad narrow">${back('me','Profile')}<h1 class="pageh">Saved jobs</h1>${list.length?'':`<div class="empty" style="margin:8px 0"><b>Nothing saved yet</b><p>Hold a note on the board, or tap the bookmark on a job, to keep it here.</p></div>`}</div>
+  return`<div class="pad narrow"><h1 class="pageh">Saved jobs</h1>${list.length?'':`<div class="empty" style="margin:8px 0"><b>Nothing saved yet</b><p>Hold a note on the board, or tap the bookmark on a job, to keep it here.</p><button class="btn2" style="width:auto;padding:10px 20px;margin-top:6px" data-go="board">Browse the board</button></div>`}</div>
   ${list.length?`<div class="wallzone">${wallHTML(list,D)}</div>`:''}${gone?`<p class="note" style="padding:0 16px 24px">${gone} saved ${gone===1?'job is':'jobs are'} no longer on the board.</p>`:''}`}
 const NOTES=['#A18CFF','#4FE3E0','#FF7AD1','#FFC53D','#FF9F45','#6CB6FF'];
 const PRICE_STOPS=[[0,'#3CC9FF'],[150,'#3CC9FF'],[300,'#45D982'],[500,'#FFC32F']];
@@ -907,25 +936,23 @@ function viewChat(D){
 }
 function viewPerson(uid,D){
   const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,free=num(d.freeUntil)>Date.now();
-  const does=str(d.does,60).split(',').map(s=>s.trim()).filter(Boolean).slice(0,6);
+  const bio=str(d.bio,BIO_MAX)||str(d.does,60),bn=bannerOk(d.banner)?d.banner:'';
   const tints=[['rgba(79,227,224,.16)','var(--cyan-ink)'],['rgba(255,122,209,.16)','var(--pink-ink)'],['rgba(255,197,61,.16)','var(--amber-ink)'],['rgba(29,125,252,.18)','var(--violet-ink)']];
   return`<div class="pad">${isMe?'':back('board','Back to the board')}
   <div class="stack narrow" style="margin:6px auto 0;gap:18px">
-   <div class="prof">
+   <div class="prof ${bn?'hasbanner':''}">${bn?`<div class="pbanner" style="${bannerStyle(bn)}"></div>`:''}${isMe?`<button class="editpen" data-go="edit" aria-label="Edit profile">${ic('edit',17)}</button>`:''}
      <span class="ring" style="border-color:${ringOf(uid)};width:108px;height:108px;box-shadow:0 0 34px ${GLOW[ringOf(uid)]}">${face(uid,94)}</span>
      <span class="pname">${esc(shortName(uid))}</span>
      <div class="chips" style="justify-content:center">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campus())}</span>
        ${uid===ownerId()?'<span class="chip vio">Organiser</span>':''}${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${free?'<span class="chip on">Free right now</span>':''}</div>
+     ${bio?`<p class="pbio">${esc(bio)}</p>`:''}
    </div>
    <div class="stats"><div><b style="color:var(--cyan)">${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b style="color:var(--amber)">${st.avg??'New'}</b><span>rating</span></div>${isMe?`<div><b style="color:var(--accent)">${fmt(st.earned)}</b><span>₹ earned · only you</span></div>`:`<div><b style="color:var(--violet)">${st.poster.n?st.poster.avg.toFixed(1):'–'}</b><span>as a poster</span></div>`}</div>
    ${st.doer.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a doer · from ${st.doer.n} ${st.doer.n===1?'rating':'ratings'}</span>${st.doer.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
    ${reviewList(uid)}
    ${st.poster.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a poster · from ${st.poster.n} ${st.poster.n===1?'rating':'ratings'}</span>${st.poster.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
-   ${isMe?`<button class="card" data-go="saved">${ic('bookmark',20)}<span class="rowtext"><span class="t1">Saved jobs${(S.priv.saved||[]).length?' · '+S.priv.saved.length:''}</span><span class="t2">Jobs you kept for later</span></span><span class="chev">${ic('chev',18)}</span></button>`:''}
    ${isMe?`<button class="card" data-sheet="free">${ic('clock',20)}<span class="rowtext"><span class="t1">${free?'You’re free until '+clock(num(d.freeUntil)):'Free right now?'}</span><span class="t2">${free?'Anyone can message you until then. Tap to change.':'Show you’re around and open to quick requests'}</span></span><span class="chev">${ic('chev',18)}</span></button>`:''}
-   ${does.length?`<div class="chips">${does.map((x,i)=>`<span class="chip" style="background:${tints[i%4][0]};color:${tints[i%4][1]};font-weight:700">${esc(x)}</span>`).join('')}</div>`:''}
    ${isMe?`<div class="menu">
-       <button data-go="edit">${ic('edit',18)} Edit profile<span class="chev">${ic('chev',16)}</span></button>
        ${S.me.isOwner?`<button data-go="invites">${ic('users',18)} Invites and members<span class="chev">${ic('chev',16)}</span></button>`:''}
        <button data-act="replayIntro">${ic('board',18)} How tack works<span class="chev">${ic('chev',16)}</span></button>
        <button data-go="settings">${ic('shield',18)} Settings and privacy<span class="chev">${ic('chev',16)}</span></button>
@@ -1127,6 +1154,12 @@ function sheetHTML(D){
     <div class="sharepreview">${img?`<img src="${img}" alt="Share image: ₹${fmt(sj.price)}, ${esc(sj.text)}">`:'<span class="pic wait"></span>'}</div>
     <div class="slogos">${slogo('wa','WhatsApp','data-act="shareTo" data-to="wa"')}${slogo('ig','Instagram','data-act="shareTo" data-to="ig"')}${navigator.share?slogo('share','More','data-act="shareTo" data-to="sys"'):''}${slogo('download','Save image','data-act="shareTo" data-to="save"')}${slogo('link','Copy link','data-act="shareTo" data-to="copy"')}</div>
     <p class="note">The image shows the price, the job and where. Never your name or photo. Only invited members can open the link.</p>`;break}
+  case'crop':{const c=S.crop;if(!c){b='';break}
+    b=`<h2 id="sheetT">${c.target==='banner'?'Crop your banner':'Crop your photo'}</h2>
+    <div id="cropBox" class="cropbox ${c.target==='banner'?'wide':'round'}"><img id="cropImg" src="${c.url}" alt="" draggable="false"></div>
+    <p class="note">Drag to move. Pinch or use the slider to zoom.</p>
+    <input id="cropZoom" class="cropzoom" type="range" min="1" max="4" step="0.01" value="${c.z}" aria-label="Zoom">
+    <button class="cta" data-act="cropUse">${c.target==='banner'?'Use banner':'Use photo'}</button><button class="linkbtn" data-act="cropCancel">Cancel</button>`;break}
   case'paysafe':{if(!j||!upiOf(j)){b='<h2 id="sheetT">Payment</h2><p>This job has no UPI ID to pay yet.</p>';break}const dn=esc(firstName(j.accepted)),full=esc(shortName(j.accepted));
     b=`<h2 id="sheetT">Pay ${dn} ₹${fmt(j.agreed)}</h2>
     <ul class="safelist">
@@ -1252,18 +1285,18 @@ function render(){
     if(lastView!==S.view&&S.view==='chat')requestAnimationFrame(()=>{main.scrollTop=main.scrollHeight});
     lastView=S.view;
     $('rail').innerHTML=railHTML(D);
-    const navOn=v=>S.view===v||(v==='board'&&['job','person'].includes(S.view))||(v==='chats'&&S.view==='chat')||(v==='me'&&['privacy','edit','saved'].includes(S.view))||(v==='invites'&&S.view==='invites');
+    const navOn=v=>S.view===v||(v==='board'&&['job','person'].includes(S.view))||(v==='chats'&&S.view==='chat')||(v==='me'&&['privacy','edit','settings','help'].includes(S.view))||(v==='invites'&&S.view==='invites');
     $('sidebar').innerHTML=`<div style="padding:0 6px"><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${esc(campus())} · ${boardJobs(D).length} pinned</span></div></div>
       <button class="cta" data-go="post" style="padding:13px 10px;font-size:var(--t-16)">+ Pin a job</button>
-      <nav style="display:flex;flex-direction:column;gap:3px" aria-label="Sections">${[['board','Board','board'],['bids','Activity','bids'],['chats','Chats','chat'],['me','Profile','me']].concat(S.me.isOwner?[['invites','Invites','users']]:[])
+      <nav style="display:flex;flex-direction:column;gap:3px" aria-label="Sections">${[['board','Board','board'],['bids','Activity','bids'],['chats','Chats','chat'],['saved','Saved','bookmark']].concat(S.me.isOwner?[['invites','Invites','users']]:[])
         .map(([v,l,i])=>`<button class="navitem ${navOn(v)?'on':''}" data-go="${v}" ${navOn(v)?'aria-current="page"':''}>${ic(i,18)} ${l}${v==='chats'&&D.unread?'<span class="udot" aria-label="Unread"></span>':''}${v==='bids'&&(D.toConfirm||D.offersWaiting||D.newNotes)?'<span class="udot" aria-label="New activity"></span>':''}</button>`).join('')}</nav>
       <button class="card" style="margin-top:auto;padding:10px 12px;border-radius:var(--r-sm)" data-go="me">${ring(S.me.id,38)}<span class="rowtext"><span style="font-size:var(--t-12);font-weight:700">${esc(shortName(S.me.id))}</span>
         <span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc(metaOf(S.me.id)||campus())}</span></span></button>`;
-    $('tabbar').innerHTML=[['board','Board','board'],['bids','Activity','bids'],['post','','plus'],['chats','Chats','chat'],['me','Me','me']].map(([v,l,i])=>v==='post'
+    $('tabbar').innerHTML=[['board','Board','board'],['bids','Activity','bids'],['post','','plus'],['chats','Chats','chat'],['saved','Saved','bookmark']].map(([v,l,i])=>v==='post'
       ?`<button class="tab" data-go="post" aria-label="Pin a job"><span class="fab">${ic('plus',24,3,'#fff')}</span></button>`
-      :`<button class="tab ${navOn(v)||(v==='me'&&S.view==='invites')?'on':''}" data-go="${v}">${ic(i,20)}<span>${l}</span>${(v==='chats'&&D.unread)||(v==='bids'&&(D.toConfirm||D.offersWaiting||D.newNotes))?'<span class="udot"></span>':''}</button>`).join('');
+      :`<button class="tab ${navOn(v)?'on':''}" data-go="${v}">${ic(i,20)}<span>${l}</span>${(v==='chats'&&D.unread)||(v==='bids'&&(D.toConfirm||D.offersWaiting||D.newNotes))?'<span class="udot"></span>':''}</button>`).join('');
     const attn=D.unread+D.offersWaiting+D.toConfirm+D.newNotes;document.title=attn?`(${attn}) tack`:'tack';
-    const st=S.sheet?S.sheet.type:null;$('sheetRoot').innerHTML=sheetHTML(D);
+    const st=S.sheet?S.sheet.type:null;$('sheetRoot').innerHTML=sheetHTML(D);if(S.sheet?.type==='crop')requestAnimationFrame(cropApply);
     if(st&&st!==lastSheet)$('sheetRoot').classList.add('enter');else if(!st)$('sheetRoot').classList.remove('enter');
     if(st!==lastSheet&&st)requestAnimationFrame(()=>requestAnimationFrame(()=>$('sheetRoot').classList.remove('enter')));
     lastSheet=st;
@@ -1272,7 +1305,7 @@ function render(){
 }
 let toastT;
 function toast(msg){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},2800)}
-const DEPTH={board:0,bids:0,chats:0,me:0,saved:1,invites:1,post:1,job:1,person:1,chat:1,privacy:1,settings:1,help:2,edit:2};
+const DEPTH={board:0,bids:0,chats:0,me:0,saved:0,invites:1,post:1,job:1,person:1,chat:1,privacy:1,settings:1,help:2,edit:2};
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
 function go(v,keepThread){
   const from=S.view;
@@ -1301,14 +1334,17 @@ const ACT={
   checkVerified(){checkVerified().then(()=>{if(S.phase==='verify')toast('Not confirmed yet. Open the link in the email first.')})},
   async resendVerify(){try{await sendVerify(S.auth.currentUser);toast('Sent. Check your inbox and spam.')}catch(e){toast(authMsg(e))}},
   clearPhoto(){S.onb.photo='';render()},
+  cropUse(){cropDone()},
+  cropCancel(){if(S.crop)URL.revokeObjectURL(S.crop.url);S.crop=null;S.cropImg=null;S.sheet=null;render()},
+  pickBanner(el){S.onb.banner=el.dataset.val||'';render()},
   join(){const o=S.onb;
     if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.')||!need(o.adult,'onb','tack is for students who are 18 or older.')||!need(o.rules,'onb','Agree to the Terms of Use and Privacy Policy to continue.'))return;
     savePriv({terms:{v:TERMS_V,at:Date.now()}});
-    saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),does:o.does.trim().slice(0,60),ring:o.ring,adult:true,joinedAt:d.joinedAt||Date.now(),jobs:d.jobs||{}}));
+    saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),bio:o.does.trim().slice(0,BIO_MAX),does:o.does.trim().slice(0,60),ring:o.ring,adult:true,joinedAt:d.joinedAt||Date.now(),jobs:d.jobs||{}}));
     S.err={};S.view='board';S.joining=true;computePhase();render();
     moment(`You\u2019re on the board, ${o.name.trim().split(/\s+/)[0]}.`,'Give us a second to show you around.',1600).then(()=>{S.joining=false;if(!S.priv.introSeen)openIntro()})},
   saveProfile(){const o=S.onb;if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.'))return;
-    saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),does:o.does.trim().slice(0,60),ring:o.ring}));go('me');toast('Profile saved')},
+    saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),bio:o.does.trim().slice(0,BIO_MAX),does:o.does.trim().slice(0,60),banner:bannerOk(o.banner)?o.banner:'',ring:o.ring}));go('me');toast('Profile saved')},
   post(){const d=S.draft,text=d.text.trim(),price=digits(d.price);
     if(!need(words(text)<=NOTE_WORDS,'post','Keep the note to '+NOTE_WORDS+' words. Put the rest in the details.')||!need(text.length>=8,'post','Say what you need in a few more words.')||!need(price>=10&&price<=20000,'post','Set a price between ₹10 and ₹20,000.'))return;
     const id=rid(),at=Date.now(),where=(d.whereText.trim()||d.where).slice(0,40);
@@ -1533,7 +1569,7 @@ document.addEventListener('submit',e=>{
   if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
-document.addEventListener('input',e=>{bind(e);if(e.target.id==='q')render();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){w.textContent=noteCount(e.target.value);w.classList.toggle('over',words(e.target.value)>NOTE_WORDS)}}if(e.target.id==='jp')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
+document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='q')render();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){w.textContent=noteCount(e.target.value);w.classList.toggle('over',words(e.target.value)>NOTE_WORDS)}}if(e.target.id==='jp')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
 document.addEventListener('change',async e=>{
   bind(e);syncNeed();
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}
@@ -1541,10 +1577,7 @@ document.addEventListener('change',async e=>{
     const files=[...e.target.files].slice(0,Math.max(0,MAX_PICS-(o.pics||[]).length));e.target.value='';let bad=0;
     for(const f of files){try{o.pics=[...(o.pics||[]),await readPic(f)]}catch{bad++}}
     S.err=bad?{[ek]:'One photo didn\u2019t work. Use a JPG or PNG.'}:{};render();return}
-  if(e.target.matches('[data-photo]')){
-    try{S.onb.photo=await readPhoto(e.target.files[0]);S.err={}}catch{S.err={onb:'That photo didn’t work. Use a JPG or PNG.'}}
-    render();
-  }
+  if(e.target.matches('[data-photo]')||e.target.matches('[data-bannerfile]')){const f=e.target.files&&e.target.files[0];e.target.value='';openCrop(f,e.target.matches('[data-bannerfile]')?'banner':'photo');return}
 });
 document.addEventListener('keydown',e=>{
   if($('docRoot')){if(e.key==='Escape')closeDoc();return}
