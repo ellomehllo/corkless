@@ -1,4 +1,5 @@
 import firebaseConfig from './firebase-config.js';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
@@ -71,7 +72,7 @@ const S={
   offer:{to:null,prevJob:null,text:'',price:'',when:'Next hour',where:''}, invites:{}, reports:[], myInvite:null,
   myDoc:null, pendingMine:0,
   view:'board', openJob:null, personOf:null, sort:'high', find:{q:''}, near:false,
-  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, actTab:'all', actSeenAt:0, intro:{on:false,i:0}, fresh:null, chatDraft:{text:''},
+  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, pw:{cur:'',nw:''}, pwOpen:false, help:{kind:null,job:null,why:'',note:'',sent:null}, actTab:'all', actSeenAt:0, intro:{on:false,i:0}, fresh:null, chatDraft:{text:''},
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',adult:false,rules:false},
   inv:{email:'',campus:''}, lastInvite:null,
   picks:{}, repDocs:{},
@@ -185,7 +186,10 @@ function sortJobs(l){
   else l.sort((a,b)=>b.at-a.at);
   return l;
 }
-function freePeople(D){const now=Date.now();return D.members.filter(u=>num(pdoc(u).freeUntil)>now&&!D.blocked.has(u))}
+const pref=(k,d=true)=>{const v=(S.priv.prefs||{})[k];return typeof v==='boolean'?v:d};
+const asksOf=u=>{const a=pdoc(u).asks;return a==='past'||a==='none'?a:'all'};
+const needTerms=()=>S.phase==='app'&&!!S.ready?.priv&&!S.joining&&(S.priv.terms||{}).v!==TERMS_V;
+function freePeople(D){const now=Date.now();return D.members.filter(u=>num(pdoc(u).freeUntil)>now&&!D.blocked.has(u)&&(u===S.me.id||asksOf(u)==='all'||(asksOf(u)==='past'&&workedWith(u,D).length)))}
 function payOf(j){const x=j.pick&&j.pick.paid;return x&&typeof x==='object'&&typeof x.ok==='boolean'?{ok:x.ok,at:num(x.at)}:null}
 const PAY_GRACE=3*864e5;
 function repOf(uid,side){const r=S.repDocs[uid],x=r&&r[side]&&typeof r[side]==='object'?r[side]:{},n=Math.max(0,Math.round(num(x.n)));
@@ -367,7 +371,7 @@ function afterData(){
     if(S.myDoc&&S.myDoc.removed)saveMine(d=>{delete d.removed;return d});
   }
   computePhase();render();
-  if(S.phase==='app'&&!S.introChecked&&!S.joining){S.introChecked=true;if(!S.priv.introSeen)setTimeout(()=>{if(!S.intro.on&&S.phase==='app'&&!S.priv.introSeen)openIntro()},700)}
+  if(S.phase==='app'&&!S.introChecked&&!S.joining&&!needTerms()){S.introChecked=true;if(!S.priv.introSeen)setTimeout(()=>{if(!S.intro.on&&S.phase==='app'&&!S.priv.introSeen)openIntro()},700)}
 }
 function computePhase(){
   if(!S.me)return;
@@ -456,6 +460,7 @@ function markSeen(){
   const c=S.chat;if(!c.key||S.view!=='chat')return;
   const last=Math.max(0,...c.msgs.filter(m=>m.by!==S.me.id).map(m=>m.at));
   if(last>num((S.priv.seen||{})[c.key]))savePriv({seen:{[c.key]:last}});
+  if(pref('receipts')&&threadOpen(c.key)&&last>num(((S.threadDocs[c.key]||{}).read||{})[S.me.id]))S.fb.setDoc(S.fb.doc(S.db,'threads',c.key),{read:{[S.me.id]:last}},{merge:true}).catch(()=>{});
 }
 function sendMsg(){
   const c=S.chat,t=S.chatDraft.text.trim();if(!c.key||!t)return;
@@ -575,7 +580,7 @@ function onboardHTML(edit){
    <div class="stack gap8"><span class="formlabel" id="rl">Your ring colour</span>
      <div class="chips" role="group" aria-labelledby="rl">${RINGS.map(r=>`<button class="swatch ${o.ring===r?'on':''}" style="background:${r}" data-onb="ring" data-val="${r}" aria-label="Ring colour ${r}" aria-pressed="${o.ring===r}"></button>`).join('')}</div></div>
    ${edit?'':`<label class="check" for="oad"><input type="checkbox" id="oad" data-bind="onb.adult" ${o.adult?'checked':''}> I'm 18 or older.</label>
-   <label class="check" for="oru"><input type="checkbox" id="oru" data-bind="onb.rules" ${o.rules?'checked':''}> I won't post assignment or exam work, anything illegal, or anything that puts someone at risk.</label>`}
+   <label class="check" for="oru"><input type="checkbox" id="oru" data-bind="onb.rules" ${o.rules?'checked':''}> <span>I agree to the <button type="button" class="inlink" data-doc="terms">Terms of Use</button> and <button type="button" class="inlink" data-doc="privacy">Privacy Policy</button>, including no assignment or exam work and nothing illegal or unsafe.</span></label>`}
    ${S.err.onb?`<p class="err" role="alert">${esc(S.err.onb)}</p>`:''}
    <button class="cta" data-act="${edit?'saveProfile':'join'}" data-need="${edit?'profile':'join'}">${edit?'Save profile':'Join the board'}</button>
    ${edit?'<button class="linkbtn" data-go="me">Cancel</button>':'<button class="linkbtn" data-act="logout">Log out</button>'}
@@ -593,16 +598,16 @@ const isSaved=k=>Array.isArray(S.priv.saved)&&S.priv.saved.includes(k);
 function wrapLines(x,t,w,max){const out=[];let line='';for(const word of String(t).split(/\s+/)){const tryL=line?line+' '+word:word;if(x.measureText(tryL).width>w&&line){out.push(line);line=word}else line=tryL;if(out.length===max)break}
   if(out.length<max&&line)out.push(line);if(out.length===max&&out.join(' ').length<String(t).trim().length){let l=out[max-1];while(l&&x.measureText(l+'…').width>w)l=l.slice(0,-1);out[max-1]=l.trimEnd()+'…'}return out}
 function rrect(x,X,Y,W,H,R){x.beginPath();x.moveTo(X+R,Y);x.arcTo(X+W,Y,X+W,Y+H,R);x.arcTo(X+W,Y+H,X,Y+H,R);x.arcTo(X,Y+H,X,Y,R);x.arcTo(X,Y,X+W,Y,R);x.closePath()}
-function drawPin(x,cx,cy,r,col){x.fillStyle=col;x.beginPath();x.arc(cx,cy,r,0,7);x.fill();x.fillStyle='rgba(11,14,23,.28)';x.beginPath();x.arc(cx-r*.35,cy-r*.32,r*.28,0,7);x.fill();x.fillStyle=col;rrect(x,cx-r*.17,cy+r*.75,r*.35,r*1.5,r*.17);x.fill()}
+function drawPin(x,cx,cy,r,col){x.fillStyle=col;x.beginPath();x.arc(cx,cy,r,0,7);x.fill();x.fillStyle='rgba(5,10,28,.28)';x.beginPath();x.arc(cx-r*.35,cy-r*.32,r*.28,0,7);x.fill();x.fillStyle=col;rrect(x,cx-r*.17,cy+r*.75,r*.35,r*1.5,r*.17);x.fill()}
 async function noteCard(j){
   try{await Promise.all(['800 180px Gabarito','700 60px Figtree','600 40px Figtree'].map(f=>document.fonts.load(f)))}catch{}
   const W=1080,H=1920,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),gn=gradNote(j),nc=noteOf(j),left=j.deadline-Date.now();
-  x.fillStyle='#0B0E17';x.fillRect(0,0,W,H);
+  x.fillStyle='#050A1C';x.fillRect(0,0,W,H);
   const ph=j.pics?(S.pics['j:'+j.key]||[])[0]:'';
-  if(ph){const im=new Image();im.src=ph;try{await im.decode()}catch{}const sc=Math.max(W/im.width,H/im.height)*1.25;x.filter='blur(70px) saturate(1.3) brightness(.62)';x.drawImage(im,(W-im.width*sc)/2,(H-im.height*sc)/2,im.width*sc,im.height*sc);x.filter='none';x.fillStyle='rgba(11,14,23,.35)';x.fillRect(0,0,W,H)}
+  if(ph){const im=new Image();im.src=ph;try{await im.decode()}catch{}const sc=Math.max(W/im.width,H/im.height)*1.25;x.filter='blur(70px) saturate(1.3) brightness(.62)';x.drawImage(im,(W-im.width*sc)/2,(H-im.height*sc)/2,im.width*sc,im.height*sc);x.filter='none';x.fillStyle='rgba(5,10,28,.35)';x.fillRect(0,0,W,H)}
   else{for(const[cx,cy,r,a,bc]of[[180,1560,1100,'70',gn?'#1D3FD8':nc],[980,260,820,'40',gn?'#0E9C84':nc],[560,980,700,'22',nc]]){const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,bc+a);g.addColorStop(1,bc+'00');x.fillStyle=g;x.fillRect(0,0,W,H)}}
   x.fillStyle='rgba(244,241,250,.06)';for(let gy=40;gy<H;gy+=44)for(let gx=40;gx<W;gx+=44){x.beginPath();x.arc(gx,gy,2.2,0,7);x.fill()}
-  {const pg=x.createLinearGradient(88,124,136,212);pg.addColorStop(0,'#7BF5D8');pg.addColorStop(.55,'#46E3BF');pg.addColorStop(1,'#14B894');x.shadowColor='rgba(70,227,191,.7)';x.shadowBlur=28;drawPin(x,112,150,26,pg)}x.fillStyle='#46E3BF';x.font='800 76px Gabarito';x.textBaseline='middle';x.fillText('tack',152,154);x.shadowColor='transparent';x.shadowBlur=0;
+  {const pg=x.createLinearGradient(90,128,134,172);pg.addColorStop(0,'#2F5BFF');pg.addColorStop(.5,'#1C7FD6');pg.addColorStop(1,'#14C29C');x.shadowColor='rgba(20,194,156,.4)';x.shadowBlur=24;drawPin(x,112,150,26,pg);x.fillStyle='#F4F6FB';x.font='800 76px Gabarito';x.textBaseline='middle';x.fillText('tack',152,154);x.shadowColor='transparent';x.shadowBlur=0;drawPin(x,112,150,26,pg);x.fillStyle='#F4F6FB';x.fillText('tack',152,154)}
   const camp=campus();x.font='700 34px Figtree';const cw=x.measureText(camp).width+56;x.fillStyle='rgba(244,241,250,.1)';rrect(x,W-80-cw,124,cw,64,32);x.fill();x.fillStyle='#DFDAEC';x.fillText(camp,W-80-cw+28,157);
   x.font='700 60px Figtree';const lines=wrapLines(x,j.text,760,7);
   const meta=[j.where,left<36e5?'':j.when].filter(Boolean).join(' · '),urgent=left>0&&left<36e5;
@@ -813,17 +818,17 @@ function viewBids(D){
       const jobsNow=myJobs.filter(j=>!pastJob(j)),active=all.filter(y=>y.j.accepted===me&&!pastBid(y)),waiting=all.filter(y=>y.j.accepted!==me&&!pastBid(y));
       const hist=[...D.jobs.filter(j=>j.owner===me&&pastJob(j)).map(j=>({j,mine:true,amt:j.agreed||j.price,at:Math.max(j.doneAt||0,j.at)})),...all.filter(pastBid).map(y=>({...y,at:Math.max(y.j.doneAt||0,y.at||0,y.j.at)}))].sort((a,b)=>b.at-a.at);
       const tabs=[['all','All',0],['jobs','Your jobs',jobsNow.length],['bids','Your bids',active.length+waiting.length],['history','History',hist.length]];
-      const grp=(t,l)=>l.length?`<div class="sect"><h2 class="h2">${t}</h2></div><div class="stack gap8">${l.map(y=>row(y.j,bidLine(y.x||{j:y.j}),y.amt)).join('')}</div>`:'';
+      const grp=(t,l)=>l.length?`<section class="igroup"><h2 class="ihead">${t}</h2>${l.map(y=>row(y.j,bidLine(y.x||{j:y.j}),y.amt)).join('')}</section>`:'';
       const empty=t=>`<p class="note" style="text-align:left">${t}</p>`;
       return`<div class="pills" style="padding:4px 0 0" role="group" aria-label="Show">${tabs.map(([k,l,n])=>`<button class="pill ${S.actTab===k?'on':''}" data-acttab="${k}" aria-pressed="${S.actTab===k}">${l}${n?' · '+n:''}</button>`).join('')}</div>
       ${S.actTab==='all'?(()=>{const feed=[...D.notes.map(n=>({...n,kind:'n'})),...jobsNow.map(j=>({kind:'j',j,at:j.at})),...[...active,...waiting].map(y=>({kind:'b',y,at:y.at||y.j.at}))].sort((a,b)=>b.at-a.at);
         const one=f=>f.kind==='j'?row(f.j,jobLine(f.j),f.j.price,me):f.kind==='b'?row(f.y.j,bidLine(f.y.x||{j:f.y.j}),f.y.amt)
           :`<button class="item notif ${f.at>S.actSeenAt?'new':''}" ${f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span></span>${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`;
         return feed.length?`<div class="ifeed">${dateGroups(feed,f=>f.at).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(one).join('')}</section>`).join('')}</div>`:empty('Bids, picks and payments show up here.')})()
-      :S.actTab==='jobs'?`${jobsNow.length?`<div class="stack gap8">${jobsNow.map(j=>row(j,jobLine(j),j.price,me)).join('')}</div>`:empty('Nothing pinned right now.')}
+      :S.actTab==='jobs'?`${jobsNow.length?`<div class="ifeed"><section class="igroup">${jobsNow.map(j=>row(j,jobLine(j),j.price,me)).join('')}</section></div>`:empty('Nothing pinned right now.')}
         <button class="linkbtn" data-go="post" style="align-self:flex-start;padding:0">Pin a job</button>`
-      :S.actTab==='bids'?(active.length||waiting.length?grp('Active',active)+grp('Waiting',waiting):empty('Bids you place on the board show up here.'))
-      :hist.length?`<div class="stack gap8">${hist.map(y=>y.mine?row(y.j,jobLine(y.j),y.amt,me):row(y.j,bidLine(y.x||{j:y.j}),y.amt)).join('')}</div>`:empty('Finished and closed jobs and bids show up here.')}`})()}
+      :S.actTab==='bids'?(active.length||waiting.length?`<div class="ifeed">${grp('Active',active)+grp('Waiting',waiting)}</div>`:empty('Bids you place on the board show up here.'))
+      :hist.length?`<div class="ifeed">${dateGroups(hist,y=>y.at).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(y=>y.mine?row(y.j,jobLine(y.j),y.amt,me):row(y.j,bidLine(y.x||{j:y.j}),y.amt)).join('')}</section>`).join('')}</div>`:empty('Finished and closed jobs and bids show up here.')}`})()}
    </div></div><div style="height:24px"></div>`;
 }
 const codeLink=c=>`${SITE}?code=${c}`;
@@ -862,7 +867,8 @@ function viewChat(D){
    ${accepted?`<div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${payOf(j)?.ok?`Paid ✓ · ₹${fmt(j.agreed)}`:`Bid accepted · ₹${fmt(j.agreed)} · pay on UPI after`}</div>`:''}
    ${j&&!accepted?`<button class="banner" style="background:color-mix(in srgb,${noteOf(j)} 14%,var(--surface2));color:${noteOf(j)}" data-job="${esc(j.key)}">About: ${esc(j.text.slice(0,40))}${j.text.length>40?'…':''}</button>`:''}
    ${!c.msgs.length?`<p class="note" style="margin:10px 0">${c.loaded?'Say hi. Sort out the time and place here.':'Loading messages…'}</p>`:''}
-   ${c.msgs.map(m=>`<div class="${m.by===me?'out':'in'}">${esc(m.t)}<span class="time">${stamp(m.at)}</span></div>`).join('')}
+   ${(()=>{const lastOut=[...c.msgs].reverse().find(m=>m.by===me),readAt=num(((S.threadDocs[c.key]||{}).read||{})[c.other]),seen=pref('receipts')&&lastOut&&readAt>=lastOut.at;
+     return c.msgs.map(m=>`<div class="${m.by===me?'out':'in'}">${esc(m.t)}<span class="time">${stamp(m.at)}</span></div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`).join('')})()}
    <p class="note" style="margin-top:4px">Keep it here. If you report someone, we can see this chat.</p>
   </div>
   ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats now happen inside jobs: ask ${esc(firstName(c.other))} for a favour when they're free, or hire them again from their profile.`}</p></div>`:`
@@ -894,42 +900,102 @@ function viewPerson(uid,D){
        <button data-go="edit">${ic('edit',18)} Edit profile<span class="chev">${ic('chev',16)}</span></button>
        ${S.me.isOwner?`<button data-go="invites">${ic('users',18)} Invites and members<span class="chev">${ic('chev',16)}</span></button>`:''}
        <button data-act="replayIntro">${ic('board',18)} How tack works<span class="chev">${ic('chev',16)}</span></button>
-       <button data-go="privacy">${ic('shield',18)} Privacy<span class="chev">${ic('chev',16)}</span></button>
-       <button data-act="logout">${ic('out',18)} Log out</button>
-       <button data-sheet="erase" class="danger">${ic('trash',18)} Delete my account</button></div>
+       <button data-go="settings">${ic('shield',18)} Settings and privacy<span class="chev">${ic('chev',16)}</span></button>
+       <button data-go="help">${ic('flag',18)} Report or feedback<span class="chev">${ic('chev',16)}</span></button>
+       <button data-act="logout">${ic('out',18)} Log out</button></div>
        <p class="note">Logged in as ${esc(S.me.email)}</p>`
      :`${(()=>{const fn=esc(firstName(uid)),freeNow=num(d.freeUntil)>Date.now(),prev=lastJobFor(uid,D);
-        return (freeNow?`<button class="cta" data-ask="${esc(uid)}">Ask ${fn} for a favour</button>`:'')
+        const asks=asksOf(uid),canAsk=freeNow&&(asks==='all'||(asks==='past'&&prev));
+        if(asks==='none')return`<p class="note">${fn} isn\u2019t taking favour requests right now.</p>`;
+        return (canAsk?`<button class="cta" data-ask="${esc(uid)}">Ask ${fn} for a favour</button>`:'')
           +(prev?`<button class="${freeNow?'btn2':'cta'}" data-ask="${esc(uid)}" data-prev="${esc(prev.id)}">Hire ${fn} again</button>`:'')
-          +(!freeNow&&!prev?`<p class="note">You can ask ${fn} for a favour when they're marked Free right now.</p>`:'')})()}
+          +(!canAsk&&!prev?`<p class="note">You can ask ${fn} for a favour when they're marked Free right now.</p>`:'')})()}
        <button class="linkbtn" data-sheet="report" data-about="${esc(uid)}">Report or block</button>`}
   </div></div><div style="height:24px"></div>`;
 }
-function viewPrivacy(){
-  return`<div class="pad">${back('me','Back')}<div class="prose" style="margin-top:6px">
-   <h1 class="pageh" style="margin-bottom:6px">Privacy</h1>
-   <p>tack is private to people ${esc(organiser())} invited. Nothing on the board is public.</p>
-   <h2>What tack keeps</h2>
-   <p>Your email address and a password to log in. Your name, photo, year, branch, what you're good at and your ring colour. The jobs you pin, the bids you place, any photos you add to them, the ratings and reviews you give and your messages. Photos are shrunk on your phone first, which also strips their location data. When you mark yourself free, the time it ends. If you tag a job with your location, that spot rounded to about 100 m.</p>
-   <h2>Location</h2>
-   <p>Near you works on your phone: your location is used there to sort out which jobs are close, and is never saved. A job only has a location if its poster tagged it, rounded to about 100 m and never shown on a map. When you bid, tack saves only whether you were near the job, not where you were.</p>
-   <h2>What other members see</h2>
-   <p>Your name, photo, year and branch, the jobs you post, your ratings and reviews. They never see your email address. Your bids are private: only the poster of that job sees your bid, pitch and bid photos. Other members can't see who bid on a job or who took it.</p>
-   <h2>Ratings</h2>
-   <p>After a job, the poster and the doer rate each other from 1 to 5 on four things. Profiles show only the averages and how many ratings there are, never who gave them or for which job. A note you write goes only to the person you rated.</p>
-   <p>A poster can also write a short public review, with photos, of the person who did the job. It shows on that person's profile with the month, never the poster's name or the job. The poster can delete it later, and the organiser can remove reviews that break the rules.</p>
-   <h2>Invite links</h2>
-   <p>Invite links are personal: whoever joins with yours is recorded as invited by you.</p>
-   <h2>Chats</h2>
-   <p>Chats only happen inside a job: between a poster and their bidders, or between two people working on a job together, including favours you ask for and accept. There are no direct messages. Only the two people in a chat can read it in the app. ${esc(organiser())} runs this board and can read chats to handle a report.</p>
-   <h2>Money</h2>
-   <p>tack never touches money. You pay each other directly in cash or UPI.</p>
-   <h2>Deleting your account</h2>
-   <p>Go to Me, then Delete my account. It erases your profile, jobs, bids and messages and removes your login straight away.</p>
-   <h2>Questions or complaints</h2>
-   <p>Message ${esc(organiser())}${ownerId()&&ownerId()!==S.me.id?' from their profile':''}.</p>
-  </div></div><div style="height:24px"></div>`;
+function viewSettings(D){const me=S.me.id,asks=asksOf(me),blocked=arr(S.priv.blocked).filter(u=>typeof u==='string'),t=S.priv.terms||{};
+  const row=(t1,t2,attrs,end='')=>`<button class="setrow" ${attrs}><span class="rowtext"><span class="t1">${t1}</span>${t2?`<span class="t2">${t2}</span>`:''}</span>${end||`<span class="chev">${ic('chev',16)}</span>`}</button>`;
+  const tog=(on,t1,t2,attrs)=>`<button class="setrow" role="switch" aria-checked="${on}" ${attrs}><span class="rowtext"><span class="t1">${t1}</span><span class="t2">${t2}</span></span><span class="switch ${on?'on':''}" aria-hidden="true"></span></button>`;
+  return`<div class="pad">${back('me','Back')}<div class="stack narrow" style="margin-top:6px;gap:24px">
+   <h1 class="pageh">Settings</h1>
+   <section class="setsec"><h2 class="seth">Account</h2><div class="setcard">
+     <div class="setrow static"><span class="rowtext"><span class="t1">Email</span><span class="t2">${esc(S.me.email)}</span></span></div>
+     ${row('Change password','You’ll need your current password.',`data-act="togglePwForm" aria-expanded="${S.pwOpen}"`,`<span class="chev" style="transform:rotate(${S.pwOpen?90:0}deg)">${ic('chev',16)}</span>`)}
+     ${S.pwOpen?`<div class="setform">
+       <label class="formlabel" for="pwCur">Current password</label><input id="pwCur" class="inp" type="password" autocomplete="current-password" value="${esc(S.pw.cur)}" data-bind="pw.cur">
+       <label class="formlabel" for="pwNew">New password</label><input id="pwNew" class="inp" type="password" autocomplete="new-password" placeholder="At least 8 characters" value="${esc(S.pw.nw)}" data-bind="pw.nw">
+       ${S.err.pw?`<p class="err" role="alert">${esc(S.err.pw)}</p>`:''}
+       <button class="cta" data-act="changePw" data-need="pw" ${S.busy?'disabled':''}>${S.busy?'Saving…':'Save new password'}</button></div>`:''}
+     ${row('Edit profile','Name, photo, year, branch, what you’re good at and ring colour.','data-go="edit"')}
+   </div></section>
+   <section class="setsec"><h2 class="seth">Privacy</h2><div class="setcard">
+     <div class="setrow static"><span class="rowtext"><span class="t1">Who can see your bids</span><span class="t2">Only the poster of that job. Other members never see who bid or how much.</span></span><span class="setval">${ic('shield',14,2.2)} Poster only</span></div>
+     ${tog(pref('near'),'Show Near you on my bids','Tells the poster you were close to the job when you bid. Never your location.','data-pref="near"')}
+     ${tog(pref('receipts'),'Read receipts','Let people see when you’ve read their messages. If you turn this off, you won’t see theirs either.','data-pref="receipts"')}
+     ${tog(locOptIn(),'Use my location','Shows jobs near you and lets you tag jobs. Your location stays on this device.','data-act="toggleLocPref"')}
+     <div class="setrow static col"><span class="rowtext"><span class="t1">Who can ask you for a favour</span><span class="t2">Favour requests are private offers sent to you directly.</span></span>
+       <div class="chips">${[['all','Anyone, when I’m free'],['past','People I’ve worked with'],['none','No one']].map(([k,l])=>`<button class="chip ${asks===k?'on':''}" data-asks="${k}" aria-pressed="${asks===k}">${l}</button>`).join('')}</div></div>
+   </div></section>
+   <section class="setsec"><h2 class="seth">Blocked people</h2><div class="setcard">
+     ${blocked.length?blocked.map(u=>`<div class="setrow static">${ring(u,34)}<span class="rowtext"><span class="t1">${esc(shortName(u))}</span><span class="t2">You don’t see their jobs, bids or messages.</span></span><button class="btn2 setbtn" data-act="unblock" data-uid="${esc(u)}">Unblock</button></div>`).join('')
+       :`<div class="setrow static"><span class="rowtext"><span class="t2">You haven’t blocked anyone.</span></span></div>`}
+   </div></section>
+   <section class="setsec"><h2 class="seth">Help</h2><div class="setcard">
+     ${row('Report or feedback','Report a problem with a job or a person, or tell us what to improve.','data-go="help"')}
+     ${row('How tack works','Replay the introduction.','data-act="replayIntro"')}
+   </div></section>
+   <section class="setsec"><h2 class="seth">Legal</h2><div class="setcard">
+     ${row('Privacy Policy','','data-doc="privacy"')}
+     ${row('Terms of Use','','data-doc="terms"')}
+     <div class="setrow static"><span class="rowtext"><span class="t2">${t.at?`You accepted the current Terms on ${new Date(num(t.at)).toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}.`:`Effective ${EFFECTIVE}.`}</span></span></div>
+   </div></section>
+   <section class="setsec"><h2 class="seth">Your data</h2><div class="setcard">
+     ${row('Download my data','A copy of your profile, jobs, bids, offers, picks, settings and the messages you sent.','data-act="exportData"',`<span class="chev">${ic('chev',16)}</span>`)}
+     <button class="setrow danger" data-sheet="erase"><span class="rowtext"><span class="t1">Delete my account</span><span class="t2">Erases your profile, jobs, bids, photos and messages for good.</span></span></button>
+   </div></section>
+  </div></div><div style="height:28px"></div>`;
 }
+const HELP_KINDS=[['past','Report a problem with a past job','Something went wrong on a job you posted or did.','flag'],['board','Report something on the board','A job that breaks the rules, or someone acting unsafely.','board'],
+  ['feedback','Send feedback or an idea','Tell us what to fix, or what you’d like next.','chat'],['data','Account, privacy or data request','Ask about your data, correct something, or raise a complaint.','shield']];
+const HELP_WHY={past:['No-show','Didn’t pay or paid less','Work not as agreed','Unsafe or harassing','Something else'],board:['Breaks the posting rules','Assignment or exam work','Scam or spam','Unsafe or harassing','Something else']};
+function viewHelp(D){const h=S.help,me=S.me.id;
+  const head=(t,sub,backAct)=>`<div class="pad">${backAct?`<button class="back" data-act="${backAct}">${ic('back',16)} Back</button>`:back('settings','Back')}<div class="stack narrow" style="margin-top:6px;gap:18px"><div class="stack gap8"><h1 class="pageh">${t}</h1>${sub?`<p class="note" style="text-align:left;margin:0">${sub}</p>`:''}</div>`;
+  const tail=`</div></div><div style="height:28px"></div>`;
+  if(h.sent)return head(h.sent==='feedback'?'Thank you.':'We’ve got it.','',null)+`<div class="sentcard"><span class="bigpin"></span><p>${h.sent==='feedback'?'Your feedback goes straight to the organiser. Ideas like yours shape what tack does next.':'Your report has been sent to the organiser. You’ll get an acknowledgement within 24 hours, and we aim to resolve it within 15 days. Nobody else can see what you sent.'}</p>
+    <button class="cta" data-act="helpDone">Done</button></div>`+tail;
+  if(!h.kind)return head('Report or feedback','Tell us what happened or what could be better. Only the organiser sees what you send.')+`<div class="setcard">${HELP_KINDS.map(([k,t,sub,icn])=>`<button class="setrow" data-helpkind="${k}"><span class="seticon">${ic(icn,18)}</span><span class="rowtext"><span class="t1">${t}</span><span class="t2">${sub}</span></span><span class="chev">${ic('chev',16)}</span></button>`).join('')}</div>`+tail;
+  const kt=HELP_KINDS.find(x=>x[0]===h.kind);
+  if((h.kind==='past'||h.kind==='board')&&!h.job){
+    const list=h.kind==='past'?D.jobs.filter(j=>(j.owner===me&&j.accepted)||j.accepted===me).sort((a,b)=>Math.max(b.doneAt||0,b.at)-Math.max(a.doneAt||0,a.at))
+      :boardJobs(D).filter(j=>j.owner!==me);
+    return head(kt[1],h.kind==='past'?'Which job was it?':'Which job is it about?','helpBack')+(list.length?`<div class="stack gap8">${list.map(j=>{const other=j.owner===me?j.accepted:j.owner;
+      return`<button class="item" data-helpjob="${esc(j.key)}">${ring(other,38)}<span class="itext"><span class="t1" style="font-weight:600;color:var(--fg)">${esc(j.text)}</span><span class="t2">${esc(j.owner===me?'You posted · '+shortName(other)+' did it':shortName(j.owner)+' posted')} · ${since(Math.max(j.doneAt||0,j.at))}</span></span><span class="amt" style="font-size:var(--t-16);color:var(--fg2)">₹${fmt(j.agreed||j.price)}</span></button>`}).join('')}</div>`
+      :`<p class="note" style="text-align:left">${h.kind==='past'?'You don’t have any jobs with someone yet.':'Nothing else is on the board right now.'}</p>`)+tail}
+  const j=h.job?D.jobByKey[h.job]:null,other=j?(j.owner===me?j.accepted:j.owner):null;
+  return head(kt[1],'',h.job?'helpUnjob':'helpBack')+`${j?`<div class="card">${ring(other,38)}<span class="rowtext"><span class="t1">${esc(j.text)}</span><span class="t2">${esc(j.owner===me?'With '+shortName(other):'Posted by '+shortName(j.owner))}</span></span></div>`:''}
+    ${HELP_WHY[h.kind]?`<div class="stack gap8"><span class="formlabel" id="hw">What happened?</span><div class="chips" role="group" aria-labelledby="hw">${HELP_WHY[h.kind].map(w=>`<button class="chip ${h.why===w?'on':''}" data-helpwhy="${esc(w)}" aria-pressed="${h.why===w}">${esc(w)}</button>`).join('')}</div></div>`:''}
+    <div class="stack gap8"><label class="formlabel" for="helpN">${h.kind==='feedback'?'Your feedback':h.kind==='data'?'Your request':'Details'} ${HELP_WHY[h.kind]?'<span class="muted">(optional)</span>':''}</label>
+      <textarea id="helpN" class="inp" rows="5" maxlength="1000" style="resize:vertical" placeholder="${h.kind==='feedback'?'What would make tack better for you?':h.kind==='data'?'Tell us what you need. For example: a copy of my data, correcting my details, or a complaint.':'What happened, and when? Include anything that helps us understand.'}" data-bind="help.note">${esc(h.note)}</textarea></div>
+    ${S.err.help?`<p class="err">${esc(S.err.help)}</p>`:''}
+    <button class="cta" data-act="sendHelp" data-need="help">${h.kind==='feedback'?'Send feedback':h.kind==='data'?'Send request':'Send report'}</button>
+    <p class="note">Only the organiser sees this. ${h.kind==='past'||h.kind==='board'?'The person you report isn’t told who reported them.':''}</p>`+tail;
+}
+function openDoc(k){let r=$('docRoot');if(!r){r=document.createElement('div');r.id='docRoot';document.body.appendChild(r)}
+  r.innerHTML=`<div class="docview" role="dialog" aria-modal="true" aria-labelledby="docT"><div class="dochead"><span class="mark">tack</span><button class="iconbtn" data-act="closeDoc" aria-label="Close">${ic('x',18,2.4)}</button></div>
+    <div class="docscroll"><article class="prose legal"><h1 id="docT" class="pageh">${k==='terms'?'Terms of Use':'Privacy Policy'}</h1><p class="effective">Effective ${EFFECTIVE}</p>${k==='terms'?TERMS:PRIVACY}</article></div></div>`;
+  requestAnimationFrame(()=>r.querySelector('.iconbtn')?.focus({preventScroll:true}))}
+function closeDoc(){$('docRoot')?.remove()}
+function renderTermsGate(){let r=$('termsRoot');
+  if(!needTerms()){if(r)r.remove();return}
+  if(r)return;r=document.createElement('div');r.id='termsRoot';document.body.appendChild(r);
+  r.innerHTML=`<div class="termsgate" role="dialog" aria-modal="true" aria-labelledby="tgT"><div class="tgbox"><span class="mark">tack</span>
+    <h1 id="tgT">We’ve updated our terms.</h1>
+    <p>To keep using tack, please read and accept the Terms of Use and Privacy Policy. In short:</p>
+    <ul><li>tack is a noticeboard. Jobs and payments are agreed directly between members, at their own risk.</li><li>tack never handles money and isn’t responsible for disputes between members.</li>
+      <li>No academic work, nothing illegal or unsafe. Breaking the rules can get your account removed.</li><li>New controls in Settings: read receipts, who can ask you for favours, blocked people and downloading your data.</li></ul>
+    <div class="tglinks"><button class="btn2" data-doc="terms">Read Terms of Use</button><button class="btn2" data-doc="privacy">Read Privacy Policy</button></div>
+    <button class="cta" data-act="acceptTerms">I agree</button><button class="linkbtn" data-act="logout">Log out</button></div></div>`}
+const NEED_EXTRA={pw:()=>!!S.pw.cur&&S.pw.nw.length>=8,help:()=>{const h=S.help;return h.kind==='past'||h.kind==='board'?!!(h.job&&h.why):h.note.trim().length>=10}};
 const inviteLink=e=>`${SITE}?invite=${encodeURIComponent(e)}`;
 const inviteText=e=>`You're invited to tack, the ${campus()} noticeboard for small jobs. Post something you need done, or bid on a classmate's job.\n\nSign up with this email address (${e}):\n${inviteLink(e)}`;
 function shareButtons(e){
@@ -1060,7 +1126,7 @@ function sheetHTML(D){
   return`<div class="scrim" data-act="closeSheet"></div><div class="sheet sheet-${s.type}" role="dialog" aria-modal="true" aria-labelledby="sheetT">${b}</div>`;
 }
 
-const VIEWS={board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewPrivacy,invites:viewInvites,saved:viewSaved,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
+const VIEWS={board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewSettings,settings:viewSettings,help:viewHelp,invites:viewInvites,saved:viewSaved,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
 let lastView=null,lastSheet=null;const scrollMem={};
 const INTRO=[
   {k:'board',t:'This is the board.',b:'Classmates pin small jobs here. A print run, a lift down four floors, an hour of help before a deadline.'},
@@ -1129,9 +1195,10 @@ const NEED={
   erase:()=>!!S.erase.pw,
   invite:()=>validEmail(S.inv.email.trim().toLowerCase()),
 };
+Object.assign(NEED,NEED_EXTRA);
 function syncNeed(){document.querySelectorAll('[data-need]').forEach(b=>{let ok=true;try{ok=!!NEED[b.dataset.need]?.()}catch{}b.classList.toggle('wait',!ok);if(ok)b.removeAttribute('aria-disabled');else b.setAttribute('aria-disabled','true')})}
 function render(){
-  queueMicrotask(syncNeed);
+  queueMicrotask(syncNeed);queueMicrotask(renderTermsGate);
   const a=document.activeElement,fid=a&&a.id;let s0=null,s1=null;try{s0=a.selectionStart;s1=a.selectionEnd}catch{}
   const gate=$('gate'),app=$('app');
   if(S.phase!=='app'){
@@ -1164,12 +1231,12 @@ function render(){
 }
 let toastT;
 function toast(msg){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},2800)}
-const DEPTH={board:0,bids:0,chats:0,me:0,saved:1,invites:1,post:1,job:1,person:1,chat:1,privacy:1,edit:1};
+const DEPTH={board:0,bids:0,chats:0,me:0,saved:1,invites:1,post:1,job:1,person:1,chat:1,privacy:1,settings:1,help:2,edit:2};
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
 function go(v,keepThread){
   const from=S.view;
   if(v!=='chat'&&!keepThread)closeThread();
-  const apply=()=>{if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}S.view=v;S.sheet=null;S.err={};if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit')seedOnb();if(v==='invites')S.inv.campus='';render();
+  const apply=()=>{if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}S.view=v;S.sheet=null;S.err={};if(v==='help'&&from!=='help')S.help={kind:null,job:null,why:'',note:'',sent:null};if(v==='settings'){S.pwOpen=false}if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit')seedOnb();if(v==='invites')S.inv.campus='';render();
     if(v==='board'&&from==='job'&&S.openJob){const p=document.querySelector(`.tile[data-job="${CSS.escape(S.openJob)}"] .price`);if(p)p.style.viewTransitionName='jp'}};
   if(from===v||S.phase!=='app'||!document.startViewTransition||reduceMotion.matches){apply();return}
   const d=(DEPTH[v]??1)-(DEPTH[from]??1),root=document.documentElement;
@@ -1194,7 +1261,8 @@ const ACT={
   async resendVerify(){try{await sendVerify(S.auth.currentUser);toast('Sent. Check your inbox and spam.')}catch(e){toast(authMsg(e))}},
   clearPhoto(){S.onb.photo='';render()},
   join(){const o=S.onb;
-    if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.')||!need(o.adult,'onb','tack is for students who are 18 or older.')||!need(o.rules,'onb','Tick the posting rule to continue.'))return;
+    if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.')||!need(o.adult,'onb','tack is for students who are 18 or older.')||!need(o.rules,'onb','Agree to the Terms of Use and Privacy Policy to continue.'))return;
+    savePriv({terms:{v:TERMS_V,at:Date.now()}});
     saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),does:o.does.trim().slice(0,60),ring:o.ring,adult:true,joinedAt:d.joinedAt||Date.now(),jobs:d.jobs||{}}));
     S.err={};S.view='board';S.joining=true;computePhase();render();
     moment(`You\u2019re on the board, ${o.name.trim().split(/\s+/)[0]}.`,'Give us a second to show you around.',1600).then(()=>{S.joining=false;if(!S.priv.introSeen)openIntro()})},
@@ -1212,7 +1280,7 @@ const ACT={
   bid(){const j=derive().jobByKey[S.openJob];if(!j)return;const amt=digits(S.bid.amt);
     if(!need(amt>=1&&amt<=50000,'bid','Enter a bid in rupees.'))return;if(!need(!sayOver(S.bid.say),'bid',SAY_MAX<1000?'Keep your pitch under '+SAY_MAX+' characters.':'Keep your pitch under '+SAY_WORDS+' words.'))return;const had=!!myBidOn(j.key);
     const id=j.key+'~'+S.me.id,old=num(myBidOn(j.key)?.pics),pics=S.bid.pics?cleanPics(S.bid.pics):null,n=pics?pics.length:old;
-    savePitch(j.key,S.bid.say.trim(),amt,n,!!(j.geo&&LOC.pos&&distM(LOC.pos,j.geo)<=NEAR_M));render();S.err={};toast(had?'Bid updated':'Bid placed');
+    savePitch(j.key,S.bid.say.trim(),amt,n,!!(pref('near')&&j.geo&&LOC.pos&&distM(LOC.pos,j.geo)<=NEAR_M));render();S.err={};toast(had?'Bid updated':'Bid placed');
     if(pics){const {doc,setDoc,deleteDoc}=S.fb;S.pics['b:'+id]=pics;
       if(pics.length)setDoc(doc(S.db,'bidpics',id),{owner:j.owner,by:S.me.id,job:j.key,pics,at:Date.now()}).catch(e=>{console.warn(e);toast('Your bid is in, but the photos didn\u2019t upload.')});
       else if(old)deleteDoc(doc(S.db,'bidpics',id)).catch(()=>{})}},
@@ -1235,6 +1303,33 @@ const ACT={
   introPost(){closeIntro('post')},
   replayIntro(){openIntro(S.view)},
   hideSteps(){savePriv({stepsHidden:true})},
+  acceptTerms(){savePriv({terms:{v:TERMS_V,at:Date.now()}});$('termsRoot')?.remove();
+    if(!S.introChecked){S.introChecked=true;if(!S.priv.introSeen)setTimeout(()=>{if(!S.intro.on)openIntro()},400)}},
+  closeDoc(){closeDoc()},
+  togglePwForm(){S.pwOpen=!S.pwOpen;S.pw={cur:'',nw:''};S.err={};render();if(S.pwOpen)$('pwCur')?.focus()},
+  async changePw(){const {EmailAuthProvider,reauthenticateWithCredential,updatePassword}=S.fb,u=S.auth.currentUser;
+    if(!need(S.pw.cur,'pw','Enter your current password.')||!need(S.pw.nw.length>=8,'pw','Use a new password of at least 8 characters.'))return;
+    S.busy=true;render();
+    try{await reauthenticateWithCredential(u,EmailAuthProvider.credential(u.email,S.pw.cur))}catch(e){S.busy=false;S.err={pw:e.code==='auth/too-many-requests'?authMsg(e):'That isn\u2019t your current password.'};render();return}
+    try{await updatePassword(u,S.pw.nw);S.pwOpen=false;S.pw={cur:'',nw:''};S.err={};toast('Password changed')}catch(e){S.err={pw:authMsg(e)}}
+    S.busy=false;render()},
+  unblock(el){savePriv({blocked:arr(S.priv.blocked).filter(u=>u!==el.dataset.uid)});toast('Unblocked')},
+  toggleLocPref(){if(locOptIn()){try{localStorage.removeItem('tack.loc')}catch{}LOC.pos=null;S.near=false;if(S.draft)S.draft.useLoc=false;render();toast('Location off')}
+    else getLoc().then(p=>{render();toast(p?'Location on':'Couldn\u2019t get your location. Allow location for this site in your browser settings.')})},
+  async exportData(){const {collection,query,where,getDocs}=S.fb,me=S.me.id;toast('Preparing your data…');
+    const msgs={};for(const k of Object.keys(S.threadDocs)){try{const q=await getDocs(query(collection(S.db,'threads',k,'msgs'),where('by','==',me)));msgs[k]=q.docs.map(d=>d.data())}catch{}}
+    const data={exportedAt:new Date().toISOString(),account:{uid:me,email:S.me.email},profile:S.myDoc,settings:S.priv,bids:S.pitchMine,picks:S.picks,offersSent:S.offersOut,offersReceived:S.offersIn,messagesSent:msgs};
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download=`tack-my-data-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)},
+  helpBack(){S.help={kind:null,job:null,why:'',note:'',sent:null};S.err={};render()},
+  helpUnjob(){S.help.job=null;S.help.why='';S.err={};render()},
+  helpDone(){S.help={kind:null,job:null,why:'',note:'',sent:null};go('settings')},
+  sendHelp(){const h=S.help,D=derive(),j=h.job?D.jobByKey[h.job]:null,me=S.me.id;
+    if(h.kind==='past'||h.kind==='board'){if(!need(j,'help','Pick the job first.')||!need(h.why,'help','Pick what happened.'))return}
+    else if(!need(h.note.trim().length>=10,'help','Write a little more so we can help.'))return;
+    const about=j?(j.owner===me?j.accepted:j.owner):null;
+    S.fb.addDoc(S.fb.collection(S.db,'reports'),{by:me,kind:h.kind,...(about?{about}:{}),...(j?{job:j.key}:{}),...(h.why?{why:h.why}:{}),note:h.note.trim().slice(0,1000),at:Date.now()}).catch(writeErr);
+    S.help={kind:null,job:null,why:'',note:'',sent:h.kind};S.err={};render()},
   toggleNear(){if(S.near){S.near=false;render();return}
     if(LOC.pos){S.near=true;render();return}
     toast('Finding where you are…');getLoc().then(p=>{if(p){S.near=true;render()}else toast('Couldn\u2019t get your location. Allow location for this site in your browser settings.')})},
@@ -1341,7 +1436,7 @@ const ACT={
 };
 
 document.addEventListener('click',e=>{
-  const el=e.target.closest('[data-acttab],[data-pic],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
+  const el=e.target.closest('[data-doc],[data-pref],[data-asks],[data-helpkind],[data-helpjob],[data-helpwhy],[data-acttab],[data-pic],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
   if(!el)return;const ds=el.dataset;
   if(ds.ask!==undefined){if(ds.ask===S.me?.id)return;S.offer={to:ds.ask,prevJob:ds.prev||null,text:'',price:'',when:'Next hour',where:''};S.err={};S.sheet={type:'offer'};render();return}
   if(ds.ofwhen!==undefined){S.offer.when=ds.ofwhen;render();return}
@@ -1349,6 +1444,12 @@ document.addEventListener('click',e=>{
   if(ds.act!==undefined){const f=ACT[ds.act];if(f){e.preventDefault();f(el)}return}
   if(ds.go!==undefined){go(ds.go);return}
   if(ds.job!==undefined){const pr=el.classList.contains('tile')&&el.querySelector('.price');if(pr&&document.startViewTransition&&!reduceMotion.matches)pr.style.viewTransitionName='jp';S.openJob=ds.job;S.bid={key:null};for(const k of Object.keys(S.pics))if(k.startsWith('b:'+ds.job+'~'))delete S.pics[k];go('job');return}
+  if(ds.doc!==undefined){e.preventDefault();openDoc(ds.doc);return}
+  if(ds.pref!==undefined){savePriv({prefs:{...(S.priv.prefs||{}),[ds.pref]:!pref(ds.pref)}});return}
+  if(ds.asks!==undefined){saveMine(d=>{d.asks=ds.asks;return d});render();return}
+  if(ds.helpkind!==undefined){S.help={kind:ds.helpkind,job:null,why:'',note:'',sent:null};S.err={};render();return}
+  if(ds.helpjob!==undefined){S.help.job=ds.helpjob;S.err={};render();return}
+  if(ds.helpwhy!==undefined){S.help.why=ds.helpwhy;render();return}
   if(ds.acttab!==undefined){S.actTab=ds.acttab;render();return}
   if(ds.sort!==undefined){S.sort=ds.sort;render();return}
   if(ds.set!==undefined){S.draft[ds.set]=ds.val;if(ds.set==='where')S.draft.whereText='';render();return}
@@ -1395,6 +1496,7 @@ document.addEventListener('change',async e=>{
   }
 });
 document.addEventListener('keydown',e=>{
+  if($('docRoot')){if(e.key==='Escape')closeDoc();return}
   if(S.intro.on){if(e.key==='ArrowRight'){e.preventDefault();introStep(1)}else if(e.key==='ArrowLeft'){e.preventDefault();introStep(-1)}else if(e.key==='Escape')closeIntro();return}
   if(e.key==='Escape'&&S.sheet){closeSheet();return}
   if(e.key==='Enter'&&e.target.id==='msg'){e.preventDefault();sendMsg();return}
