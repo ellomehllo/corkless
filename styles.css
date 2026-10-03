@@ -314,3 +314,7 @@ html[data-nav="tab"]::view-transition-new(main){animation:fadeIn .2s ease both}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (prefers-reduced-motion:reduce){.pic.wait{animation:none}}
 .picx::before{content:"";position:absolute;inset:-8px}
+.revhead{display:flex;align-items:baseline;gap:8px;font-size:var(--t-12);font-weight:600;color:var(--muted)}
+.revhead b{font-family:var(--display);font-size:var(--t-14);font-weight:800;color:var(--accent)}
+.revtext{margin:0;font-size:var(--t-14);line-height:1.5;color:var(--fg);overflow-wrap:anywhere;white-space:pre-wrap}
+.pics.flush .pic{width:64px;height:64px}

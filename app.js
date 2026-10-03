@@ -55,11 +55,11 @@ const S={
   offer:{to:null,prevJob:null,text:'',price:'',when:'Next hour',where:''}, invites:{}, reports:[], myInvite:null,
   myDoc:null, pendingMine:0,
   view:'board', openJob:null, personOf:null, sort:'high',
-  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, chatDraft:{text:''},
+  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, chatDraft:{text:''},
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',adult:false,rules:false},
   inv:{email:'',campus:''}, lastInvite:null,
   picks:{}, repDocs:{},
-  sheet:null, rate:{a:0,b:0,c:0,d:0,text:''}, rep:{why:'',note:'',block:false}, erase:{pw:''},
+  sheet:null, rate:{a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]}, rep:{why:'',note:'',block:false}, erase:{pw:''},
   chat:{key:null}, err:{}
 };
 
@@ -190,6 +190,31 @@ async function rateBatch(pickKey,about,side,vals,pickPatch){
   b.set(doc(S.db,'rep',about),repDoc);
   await b.commit();
 }
+async function reviewBatch(pickKey,about,text,pics,stars){
+  const {doc,writeBatch}=S.fb,me=S.me.id,rid=Array.from(crypto.getRandomValues(new Uint8Array(12)),x=>x.toString(16).padStart(2,'0')).join(''),now=new Date();
+  const b=writeBatch(S.db);
+  b.set(doc(S.db,'tokens',rid),{by:me,about,pick:pickKey,role:'r'});
+  b.set(doc(S.db,'reviews',rid),{about,text,at:new Date(now.getFullYear(),now.getMonth(),1).getTime(),...(stars?{stars:Math.round(stars*10)/10}:{}),...(pics.length?{pics:pics.length}:{})});
+  if(pics.length)b.set(doc(S.db,'reviewpics',rid),{pics});
+  b.update(doc(S.db,'picks',pickKey),{review:rid});
+  await b.commit();
+  S.picks={...S.picks,[pickKey]:{...S.picks[pickKey],review:rid}};if(pics.length)S.pics['r:'+rid]=pics;delete S.revs[about];
+}
+function reviewsOf(uid){const v=S.revs[uid];if(v!==undefined)return v;S.revs[uid]=null;const {collection,query,where,limit,getDocs}=S.fb;
+  getDocs(query(collection(S.db,'reviews'),where('about','==',uid),limit(60))).then(q=>{const l=[];q.forEach(d=>{const r=d.data();if(r&&typeof r.text==='string'&&r.text.trim())
+    l.push({id:d.id,text:str(r.text,400),at:num(r.at),stars:num(r.stars)>=1&&num(r.stars)<=5?num(r.stars):0,pics:Math.min(MAX_PICS,num(r.pics))})});S.revs[uid]=l.sort((a,b)=>b.at-a.at)})
+    .catch(e=>{console.warn(e);S.revs[uid]=[]}).finally(()=>{if(S.phase==='app')render()});
+  return null}
+function reviewList(uid){const l=reviewsOf(uid);if(!l||!l.length)return'';const shown=S.allRevs===uid?l:l.slice(0,5),fn=esc(firstName(uid));
+  return`<div class="stack gap8"><div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">Reviews</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--muted)">${l.length} from posters ${fn} worked for</span></div>
+    ${shown.map(r=>`<div class="box stack" style="gap:8px"><span class="revhead">${r.stars?`<b>★${r.stars.toFixed(1)}</b>`:''}<span>${new Date(r.at).toLocaleDateString('en-IN',{month:'short',year:'numeric'})}</span></span>
+      <p class="revtext">${esc(r.text)}</p>${picStrip('r:'+r.id,r.pics,'flush')}
+      ${S.me.isOwner&&uid!==S.me.id?`<button class="linkbtn" style="align-self:flex-start;padding:0" data-sheet="delReview" data-rid="${esc(r.id)}" data-about="${esc(uid)}">Remove review</button>`:''}</div>`).join('')}
+    ${l.length>shown.length?`<button class="btn2" data-act="allReviews" data-uid="${esc(uid)}">Show all ${l.length} reviews</button>`:''}</div>`}
+function reviewFields(fn){return`<div class="stack gap8"><label class="formlabel" for="revT">Public review <span class="muted">(optional)</span></label>
+    <textarea id="revT" class="inp" rows="3" maxlength="400" style="resize:vertical" placeholder="How did it go? Other posters will read this on ${fn}'s profile." data-bind="rate.rev">${esc(S.rate.rev)}</textarea>
+    ${picEdit('rev',S.rate.pics)}
+    <p class="note" style="text-align:left">Shows on ${fn}'s profile with the month. Never your name or the job.</p></div>`}
 const converting=new Set();
 function convertOffers(){
   for(const o of offerList(S.offersOut)){
@@ -420,7 +445,7 @@ function readPic(file){
 }
 const cleanPics=l=>Array.isArray(l)?l.filter(x=>typeof x==='string'&&x.length<=PIC_MAX&&PIC_RE.test(x)).slice(0,MAX_PICS):[];
 function picsOf(k){const v=S.pics[k];if(v!==undefined)return v;S.pics[k]=null;
-  const [col,id]=k.split(':');S.fb.getDoc(S.fb.doc(S.db,col==='j'?'jobpics':'bidpics',id)).then(d=>{S.pics[k]=d.exists()?cleanPics(d.data().pics):[]}).catch(()=>{S.pics[k]=[]}).finally(()=>{if(S.phase==='app')render()});
+  const [col,id]=k.split(':');S.fb.getDoc(S.fb.doc(S.db,{j:'jobpics',b:'bidpics',r:'reviewpics'}[col],id)).then(d=>{S.pics[k]=d.exists()?cleanPics(d.data().pics):[]}).catch(()=>{S.pics[k]=[]}).finally(()=>{if(S.phase==='app')render()});
   return null}
 function picStrip(k,n,cls=''){if(!n)return'';const l=picsOf(k);
   return`<div class="pics ${cls}">${l?l.map((src,i)=>`<button class="pic" data-pic="${esc(k)}" data-i="${i}" aria-label="Open photo ${i+1} of ${l.length}"><img src="${src}" alt=""></button>`).join('')
@@ -562,6 +587,8 @@ function viewJob(D){
         :pay?`<div class="banner warnbanner">${dn} hasn’t got your payment yet</div><p class="note">Pay ₹${fmt(j.agreed)} on UPI or cash, then they’ll confirm it here.</p>`
         :`<div class="banner mutedbanner">Waiting for ${dn} to confirm they got ₹${fmt(j.agreed)}</div>`}
         ${j.pick?.ratedDoer?`<p class="note">You rated ${dn}${(S.priv.gave||{})[j.key]?' ★'+num(S.priv.gave[j.key]).toFixed(1):''}.</p>`:`<button class="btn2" data-sheet="done">Rate ${dn}</button>`}
+        ${j.pick?.review?`<p class="note">Your review is on ${dn}'s profile, without your name. <button class="linkbtn" style="padding:0" data-sheet="delReview" data-rid="${esc(j.pick.review)}" data-about="${esc(j.accepted)}">Delete it</button></p>`
+          :j.pick?.ratedDoer?`<button class="btn2" data-sheet="review">Write a public review of ${dn}</button>`:''}
         ${j.pick?.noteToPoster?`<div class="box stack" style="gap:4px"><span class="formlabel">${dn}'s private note to you</span><span class="t2" style="color:var(--fg)">${esc(str(j.pick.noteToPoster,200))}</span></div>`:''}</div>`}
     else if(st==='expired')foot=`<div class="foot"><button class="btn2" data-act="repost">Pin it again</button></div>`;
   }else{
@@ -731,6 +758,7 @@ function viewPerson(uid,D){
    </div>
    <div class="stats"><div><b>${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b style="color:var(--accent)">${st.avg??'New'}</b><span>rating</span></div>${isMe?`<div><b>${fmt(st.earned)}</b><span>₹ earned · only you</span></div>`:`<div><b>${st.poster.n?st.poster.avg.toFixed(1):'–'}</b><span>as a poster</span></div>`}</div>
    ${st.doer.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a doer · from ${st.doer.n} ${st.doer.n===1?'rating':'ratings'}</span>${st.doer.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
+   ${reviewList(uid)}
    ${st.poster.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a poster · from ${st.poster.n} ${st.poster.n===1?'rating':'ratings'}</span>${st.poster.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
    ${isMe?`<button class="card" data-sheet="free">${ic('clock',20)}<span class="rowtext"><span class="t1">${free?'You’re free until '+clock(num(d.freeUntil)):'Free right now?'}</span><span class="t2">${free?'Anyone can message you until then. Tap to change.':'Show you’re around and open to quick requests'}</span></span><span class="chev">${ic('chev',18)}</span></button>`:''}
    ${does.length?`<div class="chips">${does.map((x,i)=>`<span class="chip" style="background:${tints[i%4][0]};color:${tints[i%4][1]};font-weight:700">${esc(x)}</span>`).join('')}</div>`:''}
@@ -753,11 +781,12 @@ function viewPrivacy(){
    <h1 class="pageh" style="margin-bottom:6px">Privacy</h1>
    <p>tack is private to people ${esc(organiser())} invited. Nothing on the board is public.</p>
    <h2>What tack keeps</h2>
-   <p>Your email address and a password to log in. Your name, photo, year, branch, what you're good at and your ring colour. The jobs you pin, the bids you place, any photos you add to them, the ratings you give and your messages. Photos are shrunk on your phone first, which also strips their location data. When you mark yourself free, the time it ends.</p>
+   <p>Your email address and a password to log in. Your name, photo, year, branch, what you're good at and your ring colour. The jobs you pin, the bids you place, any photos you add to them, the ratings and reviews you give and your messages. Photos are shrunk on your phone first, which also strips their location data. When you mark yourself free, the time it ends.</p>
    <h2>What other members see</h2>
    <p>Your name, photo, year and branch, the jobs you post, your ratings and reviews. They never see your email address. Your bids are private: only the poster of that job sees your bid, pitch and bid photos. Other members can't see who bid on a job or who took it.</p>
    <h2>Ratings</h2>
    <p>After a job, the poster and the doer rate each other from 1 to 5 on four things. Profiles show only the averages and how many ratings there are, never who gave them or for which job. A note you write goes only to the person you rated.</p>
+   <p>A poster can also write a short public review, with photos, of the person who did the job. It shows on that person's profile with the month, never the poster's name or the job. The poster can delete it later, and the organiser can remove reviews that break the rules.</p>
    <h2>Invite links</h2>
    <p>Invite links are personal: whoever joins with yours is recorded as invited by you.</p>
    <h2>Chats</h2>
@@ -844,11 +873,17 @@ function sheetHTML(D){
     <div class="stack" style="gap:12px">${CRIT[side].map(([k,l,h],i)=>{const x='abcd'[i];return`<div class="critpick"><span class="rowtext"><span class="t1">${l}</span><span class="t2">${h}</span></span>
       <span class="stars sm" role="group" aria-label="${l}">${[1,2,3,4,5].map(n=>`<button class="star ${S.rate[x]>=n?'on':''}" data-star="${x}${n}" aria-label="${l}: ${n} of 5" aria-pressed="${S.rate[x]>=n}">${ic('star',16,2,'currentColor',S.rate[x]>=n?'currentColor':'none')}</button>`).join('')}</span></div>`}).join('')}</div>
     <div class="overall"><span>Overall</span><b>${avg?'★'+avg:'–'}</b></div>
+    ${side==='d'&&!j?.pick?.review?reviewFields(fn):''}
     <input id="rateT" class="inp" maxlength="200" placeholder="Private note to ${fn} (optional)" value="${esc(S.rate.text)}" data-bind="rate.text" aria-label="Private note">
     <p class="note" style="text-align:left">Only ${fn} sees your note. Something felt unsafe? <button class="linkbtn" style="padding:0" data-sheet="report" data-about="${esc(who||'')}">Report it</button> instead.</p>
     ${S.err.rate?`<p class="err">${esc(S.err.rate)}</p>`:''}<button class="cta" data-act="${side==='d'?'confirmDone':'confirmRatePoster'}" ${S.busy?'disabled':''}>${side==='d'?(j&&j.status==='done'?'Save rating':'Mark as done'):'Save rating'}</button>`;break}
   case'close':b=`<h2 id="sheetT">Close this job?</h2><p>It comes off the board. Bids on it are kept so people can see it closed.</p>
     <button class="cta" data-act="confirmClose">Close job</button><button class="linkbtn" data-act="closeSheet">Keep it open</button>`;break;
+  case'review':{const fn=esc(j?firstName(j.accepted):'them');
+    b=`<h2 id="sheetT">Review ${fn}</h2>${reviewFields(fn)}${S.err.rate?`<p class="err">${esc(S.err.rate)}</p>`:''}
+    <button class="cta" data-act="postReview" ${S.busy?'disabled':''}>${S.busy?'Posting…':'Post review'}</button><button class="linkbtn" data-act="closeSheet">Not now</button>`;break}
+  case'delReview':b=`<h2 id="sheetT">Delete this review?</h2><p>It comes off ${esc(firstName(s.about))}'s profile for good. It can't be written again for this job.</p>
+    <button class="cta destructive" data-act="confirmDelReview">Delete review</button><button class="linkbtn" data-act="closeSheet">Keep it</button>`;break;
   case'pic':{const l=S.pics[s.k]||[],src=l[s.i];
     b=`<h2 id="sheetT" class="sr">Photo ${s.i+1} of ${l.length}</h2>${src?`<img class="bigpic" src="${src}" alt="Photo ${s.i+1} of ${l.length}">`:''}
     ${l.length>1?`<button class="btn2" data-act="nextPic">Show photo ${(s.i+1)%l.length+1} of ${l.length}</button>`:''}<button class="linkbtn" data-act="closeSheet">Close</button>`;break}
@@ -926,7 +961,7 @@ const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
 function go(v,keepThread){
   const from=S.view;
   if(v!=='chat'&&!keepThread)closeThread();
-  const apply=()=>{S.view=v;S.sheet=null;S.err={};if(v==='edit')seedOnb();if(v==='invites')S.inv.campus='';render();
+  const apply=()=>{S.view=v;S.sheet=null;S.err={};if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit')seedOnb();if(v==='invites')S.inv.campus='';render();
     if(v==='board'&&from==='job'&&S.openJob){const p=document.querySelector(`.tile[data-job="${CSS.escape(S.openJob)}"] .price`);if(p)p.style.viewTransitionName='jp'}};
   if(from===v||S.phase!=='app'||!document.startViewTransition||reduceMotion.matches){apply();return}
   const d=(DEPTH[v]??1)-(DEPTH[from]??1),root=document.documentElement;
@@ -975,6 +1010,16 @@ const ACT={
   withdraw(){const k=S.openJob,id=k+'~'+S.me.id,had=num(myBidOn(k)?.pics);savePitch(k,'',0);
     if(had){delete S.pics['b:'+id];S.fb.deleteDoc(S.fb.doc(S.db,'bidpics',id)).catch(()=>{})}
     render();S.bid={key:null};toast('Bid withdrawn')},
+  async postReview(){const j=derive().jobByKey[S.openJob];if(!j||!j.pick||j.pick.review||j.owner!==S.me.id||jobState(j)!=='done')return;
+    const text=S.rate.rev.trim().slice(0,400);if(!need(text.length>=3,'rate','Write a few words first.'))return;
+    S.busy=true;render();
+    try{await reviewBatch(j.key,j.accepted,text,cleanPics(S.rate.pics),num((S.priv.gave||{})[j.key]));S.sheet=null;toast('Review posted')}
+    catch(e){console.warn(e);S.err={rate:'Couldn\u2019t post your review. Try again.'}}
+    S.busy=false;render()},
+  confirmDelReview(){const s=S.sheet;if(!s?.rid)return;const {doc,deleteDoc}=S.fb;
+    deleteDoc(doc(S.db,'reviewpics',s.rid)).catch(()=>{});deleteDoc(doc(S.db,'reviews',s.rid)).then(()=>{delete S.revs[s.about];toast('Review deleted');render()}).catch(writeErr);
+    S.sheet=null;render()},
+  allReviews(el){S.allRevs=el.dataset.uid;render()},
   nextPic(){const s=S.sheet,l=S.pics[s?.k];if(!l||!l.length)return;S.sheet={...s,i:(s.i+1)%l.length};render()},
   confirmPick(){const j=derive().jobByKey[S.openJob],s=S.sheet;if(!j||!s)return;
     saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.status='assigned'}return x});
@@ -987,7 +1032,8 @@ const ACT={
     if(j.status!=='done')saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.status='done';o.doneAt=at}return x});
     S.busy=true;render();
     try{await rateBatch(j.key,j.accepted,'d',vals,{status:'done',doneAt:num(j.pick.doneAt)||at,ratedDoer:true,...(note?{noteToDoer:note}:{})});
-      savePriv({gave:{...(S.priv.gave||{}),[j.key]:(r.a+r.b+r.c+r.d)/4}});S.sheet=null;toast('Marked done. Thanks for rating.')}
+      savePriv({gave:{...(S.priv.gave||{}),[j.key]:(r.a+r.b+r.c+r.d)/4}});S.sheet=null;toast('Marked done. Thanks for rating.');
+      const rev=r.rev.trim().slice(0,400);if(rev){try{await reviewBatch(j.key,j.accepted,rev,cleanPics(r.pics),(r.a+r.b+r.c+r.d)/4)}catch(e){console.warn(e);toast('Rating saved, but the review didn\u2019t post. Try again from the job.')}}}
     catch(e){console.warn(e);S.err={rate:'Couldn\u2019t save your rating. Try again.'}}
     S.busy=false;render()},
   async confirmRatePoster(){const j=derive().jobByKey[S.openJob];if(!j||!j.pick||j.pick.ratedPoster||j.accepted!==S.me.id)return;const r=S.rate;
@@ -1017,6 +1063,7 @@ const ACT={
       for(const[k,t]of Object.entries(S.threadDocs)){const q=await getDocs(query(collection(S.db,'threads',k,'msgs'),where('by','==',me)));for(const m of q.docs)await deleteDoc(m.ref);
         if(t&&t.lastBy===me)await S.fb.setDoc(doc(S.db,'threads',k),{lastText:'Message deleted'},{merge:true}).catch(()=>{})}
       for(const[id,p]of Object.entries(S.pitchMine)){if(num(p?.pics))await deleteDoc(doc(S.db,'bidpics',id)).catch(()=>{});await deleteDoc(doc(S.db,'pitches',id))}
+      for(const pk of Object.values(S.picks))if(pk&&pk.owner===me&&typeof pk.review==='string'){await deleteDoc(doc(S.db,'reviewpics',pk.review)).catch(()=>{});await deleteDoc(doc(S.db,'reviews',pk.review)).catch(()=>{})}
       for(const[id,j]of Object.entries(S.myDoc?.jobs||{}))if(num(j?.pics))await deleteDoc(doc(S.db,'jobpics',me+'~'+id)).catch(()=>{});
       for(const id of Object.keys(S.offersOut))await deleteDoc(doc(S.db,'offers',id)).catch(()=>{});
       for(const[id,c]of Object.entries(S.myCodes))if(!c.usedBy)await deleteDoc(doc(S.db,'invcodes',id)).catch(()=>{});
@@ -1027,7 +1074,7 @@ const ACT={
   paid(el){const j=derive().jobByKey[S.openJob];if(!j||j.accepted!==S.me.id)return;const ok=el.dataset.val==='yes';
     S.picks={...S.picks,[j.key]:{...S.picks[j.key],paid:{ok,at:Date.now()}}};render();
     S.fb.updateDoc(S.fb.doc(S.db,'picks',j.key),{paid:{ok,at:Date.now()}}).catch(e=>{console.warn(e);toast('Couldn\u2019t save that. Try again.')});
-    if(ok&&!j.pick?.ratedPoster){S.rate={a:0,b:0,c:0,d:0,text:''};S.err={};S.sheet={type:'ratePoster'};render()}else toast(ok?'Marked as paid. Thanks!':'Noted. '+firstName(j.owner)+' will see it.')},
+    if(ok&&!j.pick?.ratedPoster){S.rate={a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]};S.err={};S.sheet={type:'ratePoster'};render()}else toast(ok?'Marked as paid. Thanks!':'Noted. '+firstName(j.owner)+' will see it.')},
   send(){sendMsg()},
   invite(){const e=S.inv.email.trim().toLowerCase();
     if(!need(validEmail(e),'inv','That doesn’t look like an email address.'))return;
@@ -1077,11 +1124,11 @@ document.addEventListener('click',e=>{
   if(ds.person!==undefined){if(ds.person===S.me?.id){go('me');return}S.personOf=ds.person;go('person');return}
   if(ds.onb!==undefined){S.onb[ds.onb]=ds.val;render();return}
   if(ds.pick!==undefined){const b=bidsFor(derive(),S.openJob).find(x=>x.by===ds.pick);if(b){S.sheet={type:'pick',uid:b.by,amt:b.amt};render()}return}
-  if(ds.sheet!==undefined){if(ds.sheet==='invitefriend')S.lastCode=null;S.err={};S.erase={pw:''};if(ds.sheet==='done'||ds.sheet==='ratePoster')S.rate={a:0,b:0,c:0,d:0,text:''};if(ds.sheet==='report')S.rep={why:ds.prewhy||'',note:'',block:false};S.sheet={type:ds.sheet,about:ds.about};render();return}
+  if(ds.sheet!==undefined){if(ds.sheet==='invitefriend')S.lastCode=null;S.err={};S.erase={pw:''};if(ds.sheet==='done'||ds.sheet==='ratePoster'||ds.sheet==='review')S.rate={a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]};if(ds.sheet==='report')S.rep={why:ds.prewhy||'',note:'',block:false};S.sheet={type:ds.sheet,about:ds.about,rid:ds.rid};render();return}
   if(ds.free!==undefined){const now=new Date(),t={'1h':+now+36e5,'3h':+now+3*36e5,day:new Date(now).setHours(23,59,0,0),off:0}[ds.free];
     saveMine(d=>{d.freeUntil=t;return d});S.sheet=null;toast(t?'You’re on the Free right now row':'Marked not free');return}
   if(ds.pic!==undefined){S.sheet={type:'pic',k:ds.pic,i:+ds.i||0};render();return}
-  if(ds.unpic!==undefined){const o=ds.unpic==='draft'?S.draft:S.bid;o.pics=(o.pics||[]).filter((_,i)=>i!==+ds.i);render();return}
+  if(ds.unpic!==undefined){const o=ds.unpic==='draft'?S.draft:ds.unpic==='rev'?S.rate:S.bid;o.pics=(o.pics||[]).filter((_,i)=>i!==+ds.i);render();return}
   if(ds.star!==undefined){S.rate[ds.star[0]]=+ds.star.slice(1);render();return}
   if(ds.why!==undefined){S.rep.why=ds.why;render();return}
   const D=derive(),me=S.me.id;
@@ -1098,7 +1145,7 @@ document.addEventListener('input',bind);
 document.addEventListener('change',async e=>{
   bind(e);
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}
-  if(e.target.matches('[data-pics]')){const t=e.target.dataset.pics,o=t==='draft'?S.draft:S.bid,ek=t==='draft'?'post':'bid';
+  if(e.target.matches('[data-pics]')){const t=e.target.dataset.pics,o=t==='draft'?S.draft:t==='rev'?S.rate:S.bid,ek=t==='draft'?'post':t==='rev'?'rate':'bid';
     const files=[...e.target.files].slice(0,Math.max(0,MAX_PICS-(o.pics||[]).length));e.target.value='';let bad=0;
     for(const f of files){try{o.pics=[...(o.pics||[]),await readPic(f)]}catch{bad++}}
     S.err=bad?{[ek]:'One photo didn\u2019t work. Use a JPG or PNG.'}:{};render();return}
