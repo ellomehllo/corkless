@@ -695,8 +695,10 @@ function viewBids(D){
     <div class="pills" style="padding:4px 0 0" role="group" aria-label="Show">${[['jobs','Your jobs',myJobs.length],['bids','Your bids',myBids.length+doing.length]].map(([k,l,n])=>`<button class="pill ${S.actTab===k?'on':''}" data-acttab="${k}" aria-pressed="${S.actTab===k}">${l}${n?' · '+n:''}</button>`).join('')}</div>
     ${S.actTab==='jobs'?`${myJobs.length?`<div class="stack gap8">${myJobs.map(j=>row(j,jobLine(j),j.price)).join('')}</div>`:'<p class="note" style="text-align:left">You haven’t pinned anything yet.</p>'}
     <button class="linkbtn" data-go="post" style="align-self:flex-start;padding:0">Pin a job</button>`
-    :`${doing.length?`<div class="sect"><h2 class="h2">Jobs you're doing</h2></div><div class="stack gap8">${doing.map(j=>row(j,bidLine({j}),j.agreed||j.price)).join('')}</div>`:''}
-    ${myBids.length?`${doing.length?'<div class="sect"><h2 class="h2">Bids</h2></div>':''}<div class="stack gap8">${myBids.map(x=>row(x.j,bidLine(x),num(x.b.amt))).join('')}</div>`:doing.length?'':'<p class="note" style="text-align:left">Bids you place on the board show up here.</p>'}`}
+    :(()=>{const all=[...doing.map(j=>({j,amt:j.agreed||j.price})),...myBids.map(x=>({j:x.j,amt:num(x.b.amt),x}))];
+      const active=all.filter(({j})=>j.accepted===me),waiting=all.filter(({j})=>j.accepted!==me&&!j.accepted&&jobState(j)==='open'),past=all.filter(y=>!active.includes(y)&&!waiting.includes(y));
+      const grp=(t,l)=>l.length?`<div class="sect"><h2 class="h2">${t}</h2></div><div class="stack gap8">${l.map(y=>row(y.j,bidLine(y.x||{j:y.j}),y.amt)).join('')}</div>`:'';
+      return all.length?grp('Active',active)+grp('Waiting',waiting)+grp('Past',past):'<p class="note" style="text-align:left">Bids you place on the board show up here.</p>'})()}
    </div></div><div style="height:24px"></div>`;
 }
 const codeLink=c=>`${SITE}?code=${c}`;
