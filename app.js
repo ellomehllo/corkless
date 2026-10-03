@@ -508,19 +508,19 @@ function authHTML(){
      ${field('fEmail','Email','email','email',codeParam?'you@college.edu.in':'The address you were invited on','email')}
      ${field('fPw','Password','password','pw','At least 8 characters','new-password')}
      ${S.authErr?`<p class="err" role="alert">${esc(S.authErr)}</p>`:''}
-     <button class="cta" type="submit" ${S.busy?'disabled':''}>${S.busy?'Creating your account…':'Create account'}</button>
+     <button class="cta" type="submit" data-need="signup" ${S.busy?'disabled':''}>${S.busy?'Creating your account…':'Create account'}</button>
      <p class="note">Only invited emails can join. We'll email you a link to confirm your address.</p></form>`;
   else if(m==='login')body=`<form class="stack" id="authForm" data-form="login" novalidate style="gap:14px">
      ${field('fEmail','Email','email','email','you@college.edu.in','email')}
      ${field('fPw','Password','password','pw','Your password','current-password')}
      ${S.authErr?`<p class="err" role="alert">${esc(S.authErr)}</p>`:''}
-     <button class="cta" type="submit" ${S.busy?'disabled':''}>${S.busy?'Logging in…':'Log in'}</button>
+     <button class="cta" type="submit" data-need="login" ${S.busy?'disabled':''}>${S.busy?'Logging in…':'Log in'}</button>
      <button type="button" class="linkbtn" data-auth="reset">Forgot your password?</button></form>`;
   else body=`<form class="stack" id="authForm" data-form="reset" novalidate style="gap:14px">
      <p>Enter the email you signed up with and we'll send a link to set a new password.</p>
      ${field('fEmail','Email','email','email','you@college.edu.in','email')}
      ${S.authErr?`<p class="err" role="alert">${esc(S.authErr)}</p>`:''}${S.authMsg?`<p class="okmsg" role="status">${esc(S.authMsg)}</p>`:''}
-     <button class="cta" type="submit" ${S.busy?'disabled':''}>Send reset link</button>
+     <button class="cta" type="submit" data-need="reset" ${S.busy?'disabled':''}>Send reset link</button>
      <button type="button" class="linkbtn" data-auth="login">Back to log in</button></form>`;
   return`<div class="gatebox"><div class="mark">tack</div>
     <h1>${m==='signup'?'Create your account':m==='reset'?'Reset your password':'The campus noticeboard'}</h1>
@@ -570,7 +570,7 @@ function onboardHTML(edit){
    ${edit?'':`<label class="check" for="oad"><input type="checkbox" id="oad" data-bind="onb.adult" ${o.adult?'checked':''}> I'm 18 or older.</label>
    <label class="check" for="oru"><input type="checkbox" id="oru" data-bind="onb.rules" ${o.rules?'checked':''}> I won't post assignment or exam work, anything illegal, or anything that puts someone at risk.</label>`}
    ${S.err.onb?`<p class="err" role="alert">${esc(S.err.onb)}</p>`:''}
-   <button class="cta" data-act="${edit?'saveProfile':'join'}">${edit?'Save profile':'Join the board'}</button>
+   <button class="cta" data-act="${edit?'saveProfile':'join'}" data-need="${edit?'profile':'join'}">${edit?'Save profile':'Join the board'}</button>
    ${edit?'<button class="linkbtn" data-go="me">Cancel</button>':'<button class="linkbtn" data-act="logout">Log out</button>'}
   </div>`;
 }
@@ -642,7 +642,7 @@ function viewJob(D){
       <label class="field" for="bidSay"><input id="bidSay" maxlength="90" placeholder="Pitch yourself in one line (only ${esc(firstName(j.owner))} sees it)" value="${esc(S.bid.say)}" data-bind="bid.say"></label>
       ${S.bid.pics?picEdit('bid',S.bid.pics):'<div class="pics"><span class="pic wait" aria-hidden="true"></span></div>'}
       ${S.err.bid?`<p class="err">${esc(S.err.bid)}</p>`:''}
-      <button class="cta" data-act="bid">${myBid?'Update my bid':'Place bid'}</button>
+      <button class="cta" data-act="bid" data-need="bid">${myBid?'Update my bid':'Place bid'}</button>
       ${myBid?'<button class="linkbtn" data-act="withdraw">Withdraw my bid</button>':''}
       <p class="note">${threadOpen(jobThreadKey(j.key,me))?`${esc(firstName(j.owner))} messaged you about this job.`:`You can message ${esc(firstName(j.owner))} once they pick you.`} You pay each other on UPI.</p></div>`;
     else if(j.accepted===me&&st==='done'){const pay=payOf(j),pn=esc(firstName(j.owner)),late=pay&&!pay.ok&&Date.now()-(j.doneAt||pay.at)>PAY_GRACE;
@@ -710,7 +710,7 @@ function viewPost(){
    <button class="locbtn" data-act="toggleJobLoc" aria-pressed="${!!d.useLoc}">${ic(d.useLoc?'tick':'place',16,2.4)}<span class="rowtext"><span class="t1">${d.useLoc?'Tagged with where you are now':'Tag this job with where you are'}</span><span class="t2">${d.useLoc?'Members nearby see a Near you tag. Turn off if the job is somewhere else.':'Helps people close by find it. Rounded to about 100 m, never shown on a map.'}</span></span></button>
    <div class="card">${ring(S.me.id,38)}<span style="font-size:var(--t-12);font-weight:500;color:var(--fg2)">Posting as <b style="color:var(--fg)">${esc(shortName(S.me.id))}${metaOf(S.me.id)?' · '+esc(metaOf(S.me.id)):''}</b>. Your photo and name show on the board.</span></div>
   </div></div>
-  <div class="foot">${S.err.post?`<p class="err">${esc(S.err.post)}</p>`:''}<button class="cta" data-act="post">Put it on the board</button>
+  <div class="foot">${S.err.post?`<p class="err">${esc(S.err.post)}</p>`:''}<button class="cta" data-act="post" data-need="post">Put it on the board</button>
    <p class="note">No assignment or exam work. Nothing illegal, nothing that puts someone at risk.</p></div>`;
 }
 function viewBids(D){
@@ -872,7 +872,7 @@ function viewInvites(D){
    <p style="margin:0;font-size:var(--t-14);line-height:1.55;color:var(--fg2)">Only emails on this list can sign up. Add someone, then send them the invite. They create an account with that email and confirm it.</p></div>
    <div class="stack gap8"><label class="formlabel" for="invE">Invite by email</label>
      <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="invE" class="inp" style="flex:1;min-width:200px" type="email" inputmode="email" autocapitalize="off" spellcheck="false" autocomplete="off" placeholder="name@college.edu.in" value="${esc(S.inv.email)}" data-bind="inv.email">
-     <button class="pick" style="padding:12px 18px;font-size:var(--t-14)" data-act="invite">Add invite</button></div>
+     <button class="pick" style="padding:12px 18px;font-size:var(--t-14)" data-act="invite" data-need="invite">Add invite</button></div>
      ${S.err.inv?`<p class="err">${esc(S.err.inv)}</p>`:''}</div>
    ${li?`<div class="box stack" style="gap:10px;border:1px solid rgba(198,242,78,.35)">
      <span class="t1" style="font-size:var(--t-14)">${esc(li)} can sign up now. Send them the invite:</span>${shareButtons(li)}
@@ -932,12 +932,12 @@ function sheetHTML(D){
     ${side==='d'&&!j?.pick?.review?reviewFields(fn):''}
     <input id="rateT" class="inp" maxlength="200" placeholder="Private note to ${fn} (optional)" value="${esc(S.rate.text)}" data-bind="rate.text" aria-label="Private note">
     <p class="note" style="text-align:left">Only ${fn} sees your note. Something felt unsafe? <button class="linkbtn" style="padding:0" data-sheet="report" data-about="${esc(who||'')}">Report it</button> instead.</p>
-    ${S.err.rate?`<p class="err">${esc(S.err.rate)}</p>`:''}<button class="cta" data-act="${side==='d'?'confirmDone':'confirmRatePoster'}" ${S.busy?'disabled':''}>${side==='d'?(j&&j.status==='done'?'Save rating':'Mark as done'):'Save rating'}</button>`;break}
+    ${S.err.rate?`<p class="err">${esc(S.err.rate)}</p>`:''}<button class="cta" data-act="${side==='d'?'confirmDone':'confirmRatePoster'}" data-need="rate" ${S.busy?'disabled':''}>${side==='d'?(j&&j.status==='done'?'Save rating':'Mark as done'):'Save rating'}</button>`;break}
   case'close':b=`<h2 id="sheetT">Close this job?</h2><p>It comes off the board. Bids on it are kept so people can see it closed.</p>
     <button class="cta" data-act="confirmClose">Close job</button><button class="linkbtn" data-act="closeSheet">Keep it open</button>`;break;
   case'review':{const fn=esc(j?firstName(j.accepted):'them');
     b=`<h2 id="sheetT">Review ${fn}</h2>${reviewFields(fn)}${S.err.rate?`<p class="err">${esc(S.err.rate)}</p>`:''}
-    <button class="cta" data-act="postReview" ${S.busy?'disabled':''}>${S.busy?'Posting…':'Post review'}</button><button class="linkbtn" data-act="closeSheet">Not now</button>`;break}
+    <button class="cta" data-act="postReview" data-need="review" ${S.busy?'disabled':''}>${S.busy?'Posting…':'Post review'}</button><button class="linkbtn" data-act="closeSheet">Not now</button>`;break}
   case'delReview':b=`<h2 id="sheetT">Delete this review?</h2><p>It comes off ${esc(firstName(s.about))}'s profile for good. It can't be written again for this job.</p>
     <button class="cta destructive" data-act="confirmDelReview">Delete review</button><button class="linkbtn" data-act="closeSheet">Keep it</button>`;break;
   case'pic':{const l=S.pics[s.k]||[],src=l[s.i];
@@ -955,7 +955,7 @@ function sheetHTML(D){
       <input id="ofw" class="inp" style="flex:1 1 140px;border-radius:999px" maxlength="40" placeholder="Where? Gate 1" value="${esc(o.where)}" data-bind="offer.where" aria-label="Where"></div>
     <div class="chips" role="group" aria-label="By when">${WHENS.map(w=>`<button class="chip ${o.when===w?'on':''}" data-ofwhen="${w}" aria-pressed="${o.when===w}">${w}</button>`).join('')}</div>
     ${S.err.offer?`<p class="err">${esc(S.err.offer)}</p>`:''}
-    <button class="cta" data-act="sendOffer">Send to ${fn}</button>`;break}
+    <button class="cta" data-act="sendOffer" data-need="offer">Send to ${fn}</button>`;break}
   case'invitefriend':{const off=S.config.memberInvites===false&&!S.me.isOwner,c=S.lastCode;
     b=off?`<h2 id="sheetT">Invites are off</h2><p>${esc(Organiser())} has turned off member invites for now.</p><button class="linkbtn" data-act="closeSheet">OK</button>`
      :`<h2 id="sheetT">Invite a friend</h2><p>Each link works for one person. They sign up with any email. You're vouching for them, so only invite people you know.</p>
@@ -966,20 +966,37 @@ function sheetHTML(D){
     <div class="chips" role="group" aria-label="Reason">${REASONS.map(r=>`<button class="chip ${S.rep.why===r?'on':''}" data-why="${esc(r)}" aria-pressed="${S.rep.why===r}">${esc(r)}</button>`).join('')}</div>
     <input id="repN" class="inp" maxlength="200" placeholder="What happened? (optional)" value="${esc(S.rep.note)}" data-bind="rep.note" aria-label="What happened">
     <label class="check" for="repB"><input type="checkbox" id="repB" data-bind="rep.block" ${S.rep.block?'checked':''}> Also block them. You won't see their jobs, bids or messages.</label>
-    ${S.err.rep?`<p class="err">${esc(S.err.rep)}</p>`:''}<button class="cta" data-act="confirmReport">Send report</button>
+    ${S.err.rep?`<p class="err">${esc(S.err.rep)}</p>`:''}<button class="cta" data-act="confirmReport" data-need="report">Send report</button>
     <button class="linkbtn" data-act="blockOnly">Just block them</button>`;break;
   case'erase':b=`<h2 id="sheetT">Delete your account?</h2><p>This erases your profile, the jobs you pinned, your bids, ratings you gave and your messages, and removes your login. It can't be undone.</p>
     <div class="stack gap8"><label class="formlabel" for="erPw">Your password</label>
     <input id="erPw" class="inp" type="password" autocomplete="current-password" value="${esc(S.erase.pw)}" data-bind="erase.pw"></div>
     ${S.err.erase?`<p class="err" role="alert">${esc(S.err.erase)}</p>`:''}
-    <button class="cta destructive" data-act="confirmErase" ${S.busy?'disabled':''}>${S.busy?'Deleting…':'Delete everything'}</button><button class="linkbtn" data-act="closeSheet">Keep my account</button>`;break;
+    <button class="cta destructive" data-act="confirmErase" data-need="erase" ${S.busy?'disabled':''}>${S.busy?'Deleting…':'Delete everything'}</button><button class="linkbtn" data-act="closeSheet">Keep my account</button>`;break;
   }
   return`<div class="scrim" data-act="closeSheet"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetT">${b}</div>`;
 }
 
 const VIEWS={board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewPrivacy,invites:viewInvites,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
 let lastView=null,lastSheet=null;const scrollMem={};
+const NEED={
+  signup:()=>S.form.name.trim().length>=2&&validEmail(S.form.email.trim())&&S.form.pw.length>=8,
+  login:()=>validEmail(S.form.email.trim())&&!!S.form.pw,
+  reset:()=>validEmail(S.form.email.trim()),
+  join:()=>S.onb.name.trim().length>=2&&!!S.onb.year&&!!S.onb.branch.trim()&&!!S.onb.adult&&!!S.onb.rules,
+  profile:()=>S.onb.name.trim().length>=2&&!!S.onb.year&&!!S.onb.branch.trim(),
+  bid:()=>{const a=digits(S.bid.amt);return a>=1&&a<=50000},
+  post:()=>{const p=digits(S.draft.price);return S.draft.text.trim().length>=8&&p>=10&&p<=20000},
+  rate:()=>!!(S.rate.a&&S.rate.b&&S.rate.c&&S.rate.d),
+  review:()=>S.rate.rev.trim().length>=3,
+  offer:()=>{const p=digits(S.offer.price);return S.offer.text.trim().length>=6&&p>=10&&p<=20000},
+  report:()=>!!S.rep.why,
+  erase:()=>!!S.erase.pw,
+  invite:()=>validEmail(S.inv.email.trim().toLowerCase()),
+};
+function syncNeed(){document.querySelectorAll('[data-need]').forEach(b=>{let ok=true;try{ok=!!NEED[b.dataset.need]?.()}catch{}b.classList.toggle('wait',!ok);if(ok)b.removeAttribute('aria-disabled');else b.setAttribute('aria-disabled','true')})}
 function render(){
+  queueMicrotask(syncNeed);
   const a=document.activeElement,fid=a&&a.id;let s0=null,s1=null;try{s0=a.selectionStart;s1=a.selectionEnd}catch{}
   const gate=$('gate'),app=$('app');
   if(S.phase!=='app'){
@@ -1204,9 +1221,9 @@ document.addEventListener('submit',e=>{
   if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
-document.addEventListener('input',e=>{bind(e);if(e.target.id==='q')render()});
+document.addEventListener('input',e=>{bind(e);if(e.target.id==='q')render();else syncNeed()});
 document.addEventListener('change',async e=>{
-  bind(e);
+  bind(e);syncNeed();
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}
   if(e.target.matches('[data-pics]')){const t=e.target.dataset.pics,o=t==='draft'?S.draft:t==='rev'?S.rate:S.bid,ek=t==='draft'?'post':t==='rev'?'rate':'bid';
     const files=[...e.target.files].slice(0,Math.max(0,MAX_PICS-(o.pics||[]).length));e.target.value='';let bad=0;

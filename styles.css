@@ -340,3 +340,5 @@ html[data-nav="tab"]::view-transition-new(main){animation:fadeIn .2s ease both}
 .notif .t2{margin-top:2px}
 .notif.new{box-shadow:inset 0 0 0 1px rgba(198,242,78,.28)}
 .notif .udot{flex-shrink:0}
+.cta.wait,.pick.wait{background:var(--surface2);color:var(--muted);box-shadow:none}
+.cta.destructive.wait{background:transparent;color:var(--muted);box-shadow:inset 0 0 0 1.5px var(--edge)}
