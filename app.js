@@ -72,7 +72,7 @@ const S={
   offer:{to:null,prevJob:null,text:'',price:'',when:'Next hour',where:''}, invites:{}, reports:[], myInvite:null,
   myDoc:null, pendingMine:0,
   view:'board', openJob:null, personOf:null, sort:'high', find:{q:''}, near:false,
-  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, pw:{cur:'',nw:''}, pwOpen:false, help:{kind:null,job:null,why:'',note:'',sent:null}, actTab:'all', actSeenAt:0, intro:{on:false,i:0}, fresh:null, chatDraft:{text:''},
+  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, pw:{cur:'',nw:''}, pwOpen:false, help:{kind:null,job:null,why:'',note:'',sent:null}, actTab:'all', actSeenAt:0, intro:{on:false,i:0}, fresh:null, chatDraft:{text:''}, pay:{upi:null,ref:''},
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',adult:false,rules:false},
   inv:{email:'',campus:''}, lastInvite:null,
   picks:{}, repDocs:{},
@@ -191,7 +191,26 @@ const asksOf=u=>{const a=pdoc(u).asks;return a==='past'||a==='none'?a:'all'};
 const needTerms=()=>S.phase==='app'&&!!S.ready?.priv&&!S.joining&&(S.priv.terms||{}).v!==TERMS_V;
 function freePeople(D){const now=Date.now();return D.members.filter(u=>num(pdoc(u).freeUntil)>now&&!D.blocked.has(u)&&(u===S.me.id||asksOf(u)==='all'||(asksOf(u)==='past'&&workedWith(u,D).length)))}
 function payOf(j){const x=j.pick&&j.pick.paid;return x&&typeof x==='object'&&typeof x.ok==='boolean'?{ok:x.ok,at:num(x.at)}:null}
-const PAY_GRACE=3*864e5;
+const PAY_GRACE=864e5;
+const UPI_RE=/^[a-zA-Z0-9._-]{2,64}@[a-zA-Z][a-zA-Z0-9.-]{1,48}$/;
+const upiOf=j=>{const u=j.pick&&j.pick.upi;return typeof u==='string'&&UPI_RE.test(u)?u:''};
+const sentOf=j=>{const x=j.pick&&j.pick.sent;return x&&typeof x==='object'&&num(x.at)>0?{at:num(x.at),ref:typeof x.ref==='string'?x.ref.slice(0,40):''}:null};
+const upiLink=j=>`upi://pay?pa=${encodeURIComponent(upiOf(j))}&pn=${encodeURIComponent(shortName(j.accepted))}&am=${num(j.agreed)}&cu=INR&tn=${encodeURIComponent('tack: '+j.text.slice(0,40))}`;
+function payLine(uid){const r=repOf(uid,'p');if(!r.n)return'';const v=r.per.find(c=>c.k==='payment')?.v||0;return v?` · Pays on time ★${v.toFixed(1)}`:''}
+function posterPay(j){const dn=esc(firstName(j.accepted)),u=upiOf(j),sent=sentOf(j),pay=payOf(j),done=jobState(j)==='done',over=done&&!pay?.ok&&!sent&&Date.now()-(j.doneAt||0)>PAY_GRACE;
+  if(pay?.ok)return'';
+  const btn=u?`<button class="${done?'cta':'btn2'}" data-sheet="paysafe">${ic('shield',16)} Pay ₹${fmt(j.agreed)} with UPI</button>`:'';
+  return`<div class="paycard${over?' over':''}">
+    <div class="payhead">${ic('shield',18)}<span class="rowtext"><span class="t1">${over?`Payment overdue. ${dn} is still waiting for ₹${fmt(j.agreed)}`:sent?`You marked ₹${fmt(j.agreed)} as sent ${since(sent.at)}`:done?`Pay ${dn} ₹${fmt(j.agreed)}`:'Pay safely, after the work is done'}</span>
+      <span class="t2">${sent?`${sent.ref&&sent.ref!=='cash'?'UPI ref '+esc(sent.ref)+'. ':sent.ref==='cash'?'Paid in cash. ':''}Waiting for ${dn} to confirm it reached them.`:u?`${dn} shared their UPI ID for this job. Pay inside tack so there’s a record.`:`${dn} hasn’t shared a UPI ID yet. Ask them in chat, or pay in cash.`}</span></span></div>
+    ${sent?'':btn}${sent||!done?'':`<button class="linkbtn" data-act="markSent" data-val="cash">I paid in cash</button>`}</div>`}
+function doerPay(j){const pn=esc(firstName(j.owner)),u=upiOf(j);
+  if(payOf(j)?.ok)return'';
+  if(u&&!S.upiEdit)return`<div class="paycard"><div class="payhead">${ic('shield',18)}<span class="rowtext"><span class="t1">${pn} can pay you in tack</span><span class="t2">Your UPI ID <b>${esc(u)}</b> is shared with ${pn} for this job only.</span></span></div><button class="linkbtn" data-act="editUpi">Change</button></div>`;
+  return`<div class="paycard"><div class="payhead">${ic('shield',18)}<span class="rowtext"><span class="t1">Get paid safely</span><span class="t2">Share your UPI ID so ${pn} can pay you the exact amount inside tack. Only ${pn} sees it, for this job.</span></span></div>
+    <label class="field" for="upiIn"><input id="upiIn" type="text" inputmode="email" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="113" placeholder="yourname@okaxis" value="${esc(S.pay.upi??(S.priv.upi||''))}" data-bind="pay.upi" aria-label="Your UPI ID"></label>
+    ${S.err.upi?`<p class="err">${esc(S.err.upi)}</p>`:''}<button class="btn2" data-act="shareUpi">Share my UPI ID</button></div>`}
+
 function repOf(uid,side){const r=S.repDocs[uid],x=r&&r[side]&&typeof r[side]==='object'?r[side]:{},n=Math.max(0,Math.round(num(x.n)));
   const per=CRIT[side].map(([k,l])=>({k,l,v:n?num(x[k])/n:0}));return{n,per,avg:n?(per.reduce((a,c)=>a+c.v,0)/per.length):0}}
 function stats(uid,D){
@@ -690,12 +709,11 @@ function viewJob(D){
   let foot='';
   if(mine){
     if(st==='open')foot=`<div class="foot"><button class="btn2" data-sheet="close">Close this job</button><p class="note">Pick someone from the bids to take it off the board.</p></div>`;
-    else if(st==='assigned')foot=`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} You picked ${esc(firstName(j.accepted))} for ₹${fmt(j.agreed)}. Pay on UPI after.</div>
-      <button class="cta" data-sheet="done">Mark as done</button><button class="btn2" data-thread-with="${esc(j.accepted)}">Message ${esc(firstName(j.accepted))}</button></div>`;
+    else if(st==='assigned')foot=`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} You picked ${esc(firstName(j.accepted))} for ₹${fmt(j.agreed)}</div>
+      <button class="cta" data-sheet="done">Mark as done</button>${posterPay(j)}<button class="btn2" data-thread-with="${esc(j.accepted)}">Message ${esc(firstName(j.accepted))}</button></div>`;
     else if(st==='done'){const pay=payOf(j),dn=esc(firstName(j.accepted));
       foot=`<div class="foot">${pay?.ok?`<div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${dn} confirmed they got ₹${fmt(j.agreed)}</div>`
-        :pay?`<div class="banner warnbanner">${dn} hasn’t got your payment yet</div><p class="note">Pay ₹${fmt(j.agreed)} on UPI or cash, then they’ll confirm it here.</p>`
-        :`<div class="banner mutedbanner">Waiting for ${dn} to confirm they got ₹${fmt(j.agreed)}</div>`}
+        :pay?`<div class="banner warnbanner">${dn} hasn’t got your payment yet</div>`:''}${posterPay(j)}
         ${j.pick?.ratedDoer?`<p class="note">You rated ${dn}${(S.priv.gave||{})[j.key]?' ★'+num(S.priv.gave[j.key]).toFixed(1):''}.</p>`:`<button class="btn2" data-sheet="done">Rate ${dn}</button>`}
         ${j.pick?.review?`<p class="note">Your review is on ${dn}'s profile, without your name. <button class="linkbtn" style="padding:0" data-sheet="delReview" data-rid="${esc(j.pick.review)}" data-about="${esc(j.accepted)}">Delete it</button></p>`
           :j.pick?.ratedDoer?`<button class="btn2" data-sheet="review">Write a public review of ${dn}</button>`:''}
@@ -715,20 +733,20 @@ function viewJob(D){
       <button class="cta" data-act="bid" data-need="bid">${myBid?'Update my bid':'Place bid'}</button>
       ${myBid?'<button class="linkbtn" data-act="withdraw">Withdraw my bid</button>':''}
       <p class="note">${threadOpen(jobThreadKey(j.key,me))?`${esc(firstName(j.owner))} messaged you about this job.`:`You can message ${esc(firstName(j.owner))} once they pick you.`} You pay each other on UPI.</p></div>`;
-    else if(j.accepted===me&&st==='done'){const pay=payOf(j),pn=esc(firstName(j.owner)),late=pay&&!pay.ok&&Date.now()-(j.doneAt||pay.at)>PAY_GRACE;
+    else if(j.accepted===me&&st==='done'){const pay=payOf(j),pn=esc(firstName(j.owner)),late=!pay?.ok&&Date.now()-(j.doneAt||pay?.at||Date.now())>PAY_GRACE;
       foot=pay?.ok?`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} Paid · you confirmed ₹${fmt(j.agreed)} ${since(pay.at)}</div>
           ${j.pick?.ratedPoster?`<p class="note">You rated ${pn}${(S.priv.gave||{})[j.key]?' ★'+num(S.priv.gave[j.key]).toFixed(1):''}.</p>`:`<button class="cta" data-sheet="ratePoster">Rate ${pn}</button>`}
           ${j.pick?.noteToDoer?`<div class="box stack" style="gap:4px"><span class="formlabel">${pn}'s private note to you</span><span class="t2" style="color:var(--fg)">${esc(str(j.pick.noteToDoer,200))}</span></div>`:''}
           <button class="linkbtn" data-act="paid" data-val="no">I marked this by mistake</button></div>`
         :`<div class="foot"><div class="stack gap8 box" style="border:1px solid rgba(14,159,134,.3)">
           <span class="t1" style="font-size:var(--t-16)">Did ${pn} pay you ₹${fmt(j.agreed)}?</span>
-          <span class="t2">${pay?'You said not yet. Tap Yes once the money reaches you.':`${pn} marked this job done. Confirm once the money reaches you.`}</span></div>
+          <span class="t2">${sentOf(j)?`${pn} says they sent it ${since(sentOf(j).at)}${sentOf(j).ref==='cash'?' in cash':sentOf(j).ref?' (UPI ref '+esc(sentOf(j).ref)+')':''}. `:''}${pay?'You said not yet. Tap Yes once the money reaches you.':`${pn} marked this job done. Confirm once the money reaches you.`}</span></div>${doerPay(j)}
           <button class="cta" data-act="paid" data-val="yes">Yes, I got it</button>
           ${pay?'':'<button class="btn2" data-act="paid" data-val="no">Not yet</button>'}
           ${late?`<button class="linkbtn" data-sheet="report" data-about="${esc(j.owner)}" data-prewhy="No-show or didn’t pay">Still not paid? Report it</button>`:''}
-          <p class="note">tack never holds your money. This only records what you tell us.</p></div>`}
+          <p class="note">tack never holds your money. This only records what you both tell us.</p></div>`}
     else if(j.accepted===me)foot=`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${esc(firstName(j.owner))} picked you for ₹${fmt(j.agreed)}</div>
-      <button class="cta" data-thread-job>Message ${esc(firstName(j.owner))}</button><p class="note">You pay each other on UPI. tack never holds your money.</p></div>`;
+      <button class="cta" data-thread-job>Message ${esc(firstName(j.owner))}</button>${doerPay(j)}<p class="note">You’re paid directly on UPI or in cash. tack never holds your money.</p></div>`;
     else foot=`<div class="foot"><p class="note">${st==='assigned'||st==='done'?'This job went to someone else.':'This job is closed.'}</p></div>`;
   }
   const mod=!mine&&S.me.isOwner&&st!=='removed'?`<button class="linkbtn" data-sheet="remove">Take this job off the board</button>`:'';
@@ -757,7 +775,7 @@ function viewJob(D){
     <div class="jhead"><h1 class="h1">${esc(j.text)}</h1><span class="jhint">${hint}</span></div></div>
   <button class="jposter" data-person="${esc(j.owner)}"><span class="javwrap"><span class="ring" style="border-color:${noteOf(j)};width:108px;height:108px">${face(j.owner,94)}</span>${online?'<span class="onl"><i></i>Online</span>':''}</span>
     <span class="pname">${esc(shortName(j.owner))}${mine?' <span class="muted">(you)</span>':''}</span>
-    <span class="jmeta">${esc(metaOf(j.owner)||campus())}${esc(posterLine(j.owner))} · posted ${since(j.at)}</span></button>
+    <span class="jmeta">${esc(metaOf(j.owner)||campus())}${esc(posterLine(j.owner))} · posted ${since(j.at)}${esc(payLine(j.owner))}</span></button>
   <div class="jcard stack">
     <span class="big" style="view-transition-name:jp">₹${fmt(j.price)}</span>
     <div class="chips">${[j.when,online?'':j.where].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${nearMe(j)?nearTag():''}${stTag}</div>
@@ -1109,6 +1127,19 @@ function sheetHTML(D){
     <div class="sharepreview">${img?`<img src="${img}" alt="Share image: ₹${fmt(sj.price)}, ${esc(sj.text)}">`:'<span class="pic wait"></span>'}</div>
     <div class="slogos">${slogo('wa','WhatsApp','data-act="shareTo" data-to="wa"')}${slogo('ig','Instagram','data-act="shareTo" data-to="ig"')}${navigator.share?slogo('share','More','data-act="shareTo" data-to="sys"'):''}${slogo('download','Save image','data-act="shareTo" data-to="save"')}${slogo('link','Copy link','data-act="shareTo" data-to="copy"')}</div>
     <p class="note">The image shows the price, the job and where. Never your name or photo. Only invited members can open the link.</p>`;break}
+  case'paysafe':{if(!j||!upiOf(j)){b='<h2 id="sheetT">Payment</h2><p>This job has no UPI ID to pay yet.</p>';break}const dn=esc(firstName(j.accepted)),full=esc(shortName(j.accepted));
+    b=`<h2 id="sheetT">Pay ${dn} ₹${fmt(j.agreed)}</h2>
+    <ul class="safelist">
+      <li>${ic('tick',14,3)}<span>Only pay once the work is done and you’ve checked it.</span></li>
+      <li>${ic('tick',14,3)}<span>Your UPI app shows the name on the account. Check it says <b>${full}</b> before you pay.</span></li>
+      <li>${ic('tick',14,3)}<span>Pay exactly ₹${fmt(j.agreed)}, the amount you agreed. Never send extra or a “refundable” deposit.</span></li>
+      <li>${ic('tick',14,3)}<span>You never need your UPI PIN to receive money. Don’t approve requests you didn’t start.</span></li></ul>
+    <div class="copyrow"><span>${esc(upiOf(j))}</span><button data-act="copy" data-text="${esc(upiOf(j))}">Copy</button></div>
+    <a class="cta" href="${esc(upiLink(j))}">Open UPI app · ₹${fmt(j.agreed)}</a>
+    <p class="note">On a computer? Pay to this UPI ID from any UPI app on your phone.</p>
+    <div class="stack gap8"><label class="formlabel" for="payRef">UPI reference, after you pay <span class="labelhint">(optional, 12 digits)</span></label>
+      <input id="payRef" class="inp" inputmode="numeric" maxlength="22" placeholder="e.g. 412345678901" value="${esc(S.pay.ref||'')}" data-bind="pay.ref"></div>
+    <button class="btn2" data-act="markSent">I’ve paid ${dn}</button>`;break}
   case'jobmenu':{const mj=D.jobByKey[s.key];if(!mj){b='<h2 id="sheetT">This job is gone</h2>';break}const own=mj.owner===S.me.id,sv=isSaved(mj.key);
     b=`<div class="jmhead${gcls(mj)}" style="--nc:${noteOf(mj)}"><span class="jmprice">₹${fmt(mj.price)}</span><h2 id="sheetT">${esc(mj.text.length>70?mj.text.slice(0,70)+'…':mj.text)}</h2></div>
     <div class="menu"><button data-act="openShare" data-key="${esc(mj.key)}">${ic('share',18)} Share</button>
@@ -1441,6 +1472,15 @@ const ACT={
       else if(to==='save'){if(img){saveImg();toast('Image saved')}else toast('Making the image, try again in a second.')}
       else if(to==='copy')navigator.clipboard.writeText(jobLink(j)).then(()=>toast('Link copied'),()=>toast('Couldn’t copy'))}catch{}},
   async igText(el){const t=el.dataset.text||'';if(navigator.share){try{await navigator.share({text:t})}catch{}return}try{await navigator.clipboard.writeText(t);toast('Copied. Paste it in an Instagram DM or story.')}catch{toast('Couldn’t copy.')}},
+  markSent(el){const j=derive().jobByKey[S.openJob];if(!j||j.owner!==S.me.id)return;const cash=el.dataset.val==='cash',ref=cash?'cash':String(S.pay.ref||'').replace(/\s+/g,'').slice(0,22);
+    if(ref&&!cash&&!/^[0-9A-Za-z]{6,22}$/.test(ref)){toast('That reference doesn’t look right. Leave it empty if unsure.');return}
+    const sent={at:Date.now(),...(ref?{ref}:{})};S.picks={...S.picks,[j.key]:{...S.picks[j.key],sent}};S.sheet=null;S.pay.ref='';render();
+    S.fb.updateDoc(S.fb.doc(S.db,'picks',j.key),{sent}).then(()=>toast(firstName(j.accepted)+' will be asked to confirm')).catch(e=>{console.warn(e);toast('Couldn’t save that. Try again in a bit.')})},
+  shareUpi(){const j=derive().jobByKey[S.openJob];if(!j||j.accepted!==S.me.id)return;const u=String(S.pay.upi??(S.priv.upi||'')).trim();
+    if(!UPI_RE.test(u)){S.err={...S.err,upi:'Enter a UPI ID like name@okaxis'};render();return}
+    S.err={};S.upiEdit=false;S.pay.upi=null;if(S.priv.upi!==u)savePriv({upi:u});S.picks={...S.picks,[j.key]:{...S.picks[j.key],upi:u}};render();
+    S.fb.updateDoc(S.fb.doc(S.db,'picks',j.key),{upi:u}).then(()=>toast('Shared with '+firstName(j.owner))).catch(e=>{console.warn(e);toast('Couldn’t share it yet. Try again in a bit.')})},
+  editUpi(){S.upiEdit=true;S.pay.upi=null;render()},
   clearSearch(){S.find.q='';render();setTimeout(()=>$('q')?.focus(),0)},
   copy(el){const t=el.dataset.text||'';
     try{navigator.clipboard.writeText(t).then(()=>toast('Copied'),()=>toast('Couldn’t copy. Select the text and copy it.'))}catch{toast('Couldn’t copy.')}}

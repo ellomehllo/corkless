@@ -630,3 +630,18 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{outline:none}
 @keyframes bndrop{0%{opacity:0;translate:0 -44px;rotate:-5deg;scale:1.03}65%{opacity:1;translate:0 5px}100%{translate:0 0;rotate:0deg;scale:1}}
 @keyframes bnpin{from{opacity:0;scale:2.2;translate:0 -12px}to{opacity:1;scale:1;translate:0 0}}
 @media (prefers-reduced-motion:reduce){.bignote,.bignote .pin{animation:none}.bignote{transition:none}}
+.paycard{display:flex;flex-direction:column;gap:12px;background:var(--surface);border-radius:var(--r-md);padding:14px 16px;box-shadow:inset 0 0 0 1px var(--line)}
+.paycard.over{box-shadow:inset 0 0 0 1px rgba(255,91,110,.45)}
+.paycard.over .payhead>svg{color:var(--coral-ink)}
+.payhead{display:flex;align-items:flex-start;gap:12px}
+.payhead>svg{flex-shrink:0;margin-top:2px;color:var(--accent)}
+.payhead .t2{line-height:1.45}
+.payhead b{color:var(--fg)}
+.paycard .linkbtn{align-self:flex-start;padding:0}
+.paycard .cta,.paycard .btn2{display:flex;align-items:center;justify-content:center;gap:8px}
+.safelist{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+.safelist li{display:flex;gap:10px;font-size:var(--t-14);line-height:1.45;color:var(--fg2)}
+.safelist li svg{flex-shrink:0;margin-top:3px;color:var(--accent)}
+.safelist b{color:var(--fg)}
+a.cta{text-decoration:none}
+.paycard .field{background:var(--surface2)}
