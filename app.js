@@ -5,7 +5,7 @@ const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
 
 const RINGS=['#C6F24E','#A18CFF','#FF5B6E','#4FE3E0','#FF7AD1','#FFC53D'];
-const GLOW={'#A18CFF':'rgba(161,140,255,.45)','#FF5B6E':'rgba(255,91,110,.5)','#FFC53D':'rgba(255,197,61,.35)','#4FE3E0':'rgba(79,227,224,.4)','#FF7AD1':'rgba(255,122,209,.38)','#C6F24E':'rgba(14,159,134,.32)'};
+const GLOW={'#A18CFF':'rgba(161,140,255,.45)','#FF5B6E':'rgba(255,91,110,.5)','#FFC53D':'rgba(255,197,61,.35)','#4FE3E0':'rgba(79,227,224,.4)','#FF7AD1':'rgba(255,122,209,.38)','#C6F24E':'rgba(29,125,252,.32)'};
 const KINDS=['Errand','Lifting','Ride','Print','Teach','Photo','Notes','Music','Other'];
 const WHENS=['Next hour','Today','Tomorrow','This week','No rush'];
 const WHERES=['Gate 1','Hostel B','Canteen','Library','Off campus'];
@@ -621,12 +621,12 @@ function drawPin(x,cx,cy,r,col){x.fillStyle=col;x.beginPath();x.arc(cx,cy,r,0,7)
 async function noteCard(j){
   try{await Promise.all(['800 180px Gabarito','700 60px Figtree','600 40px Figtree'].map(f=>document.fonts.load(f)))}catch{}
   const W=1080,H=1920,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),gn=gradNote(j),nc=noteOf(j),left=j.deadline-Date.now();
-  x.fillStyle='#050A1C';x.fillRect(0,0,W,H);
+  x.fillStyle='#030817';x.fillRect(0,0,W,H);
   const ph=j.pics?(S.pics['j:'+j.key]||[])[0]:'';
   if(ph){const im=new Image();im.src=ph;try{await im.decode()}catch{}const sc=Math.max(W/im.width,H/im.height)*1.25;x.filter='blur(70px) saturate(1.3) brightness(.62)';x.drawImage(im,(W-im.width*sc)/2,(H-im.height*sc)/2,im.width*sc,im.height*sc);x.filter='none';x.fillStyle='rgba(5,10,28,.35)';x.fillRect(0,0,W,H)}
-  else{for(const[cx,cy,r,a,bc]of[[180,1560,1100,'70',gn?'#1D3FD8':nc],[980,260,820,'40',gn?'#0E9C84':nc],[560,980,700,'22',nc]]){const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,bc+a);g.addColorStop(1,bc+'00');x.fillStyle=g;x.fillRect(0,0,W,H)}}
+  else{for(const[cx,cy,r,a,bc]of[[180,1560,1100,'70',gn?'#0A5CF5':nc],[980,260,820,'40',gn?'#46B2FD':nc],[560,980,700,'22',nc]]){const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,bc+a);g.addColorStop(1,bc+'00');x.fillStyle=g;x.fillRect(0,0,W,H)}}
   x.fillStyle='rgba(244,241,250,.06)';for(let gy=40;gy<H;gy+=44)for(let gx=40;gx<W;gx+=44){x.beginPath();x.arc(gx,gy,2.2,0,7);x.fill()}
-  {const pg=x.createLinearGradient(90,128,134,172);pg.addColorStop(0,'#2F5BFF');pg.addColorStop(.5,'#1C7FD6');pg.addColorStop(1,'#14C29C');x.shadowColor='rgba(20,194,156,.4)';x.shadowBlur=24;drawPin(x,112,150,26,pg);x.fillStyle='#F4F6FB';x.font='800 76px Gabarito';x.textBaseline='middle';x.fillText('tack',152,154);x.shadowColor='transparent';x.shadowBlur=0;drawPin(x,112,150,26,pg);x.fillStyle='#F4F6FB';x.fillText('tack',152,154)}
+  {const pg=x.createLinearGradient(90,128,134,172);pg.addColorStop(0,'#2180F4');pg.addColorStop(.5,'#3399FD');pg.addColorStop(1,'#64B6EF');x.shadowColor='rgba(51,153,253,.4)';x.shadowBlur=24;drawPin(x,112,150,26,pg);x.fillStyle='#F4F6FB';x.font='800 76px Gabarito';x.textBaseline='middle';x.fillText('tack',152,154);x.shadowColor='transparent';x.shadowBlur=0;drawPin(x,112,150,26,pg);x.fillStyle='#F4F6FB';x.fillText('tack',152,154)}
   const camp=campus();x.font='700 34px Figtree';const cw=x.measureText(camp).width+56;x.fillStyle='rgba(244,241,250,.1)';rrect(x,W-80-cw,124,cw,64,32);x.fill();x.fillStyle='#DFDAEC';x.fillText(camp,W-80-cw+28,157);
   x.font='700 60px Figtree';const lines=wrapLines(x,j.text,760,7);
   const meta=[j.where,left<36e5?'':j.when].filter(Boolean).join(' · '),urgent=left>0&&left<36e5;
@@ -635,7 +635,7 @@ async function noteCard(j){
   x.shadowColor='rgba(0,0,0,.6)';x.shadowBlur=80;x.shadowOffsetY=40;x.fillStyle='rgba(25,22,36,.94)';rrect(x,100,cy,880,ch,56);x.fill();x.shadowColor='transparent';
   x.strokeStyle='rgba(244,241,250,.1)';x.lineWidth=2;x.stroke();
   const gl=x.createRadialGradient(980,cy,0,980,cy,700);gl.addColorStop(0,nc+'38');gl.addColorStop(1,nc+'00');x.fillStyle=gl;rrect(x,100,cy,880,ch,56);x.fill();
-  const ag=(x0,x1)=>{const g=x.createLinearGradient(x0,0,x1,0);g.addColorStop(0,'#1D3FD8');g.addColorStop(.3,'#1F5BD0');g.addColorStop(.68,'#0F8C9C');g.addColorStop(1,'#0E9C84');return g};x.shadowColor=gn?'#0E9C84':nc;x.shadowBlur=30;x.fillStyle=gn?ag(W/2-20,W/2+20):nc;x.beginPath();x.arc(W/2,cy,20,0,7);x.fill();x.shadowColor='transparent';
+  const ag=(x0,x1)=>{const g=x.createLinearGradient(x0,0,x1,0);g.addColorStop(0,'#0A5CF5');g.addColorStop(.3,'#1774F7');g.addColorStop(.68,'#2B93FA');g.addColorStop(1,'#46B2FD');return g};x.shadowColor=gn?'#46B2FD':nc;x.shadowBlur=30;x.fillStyle=gn?ag(W/2-20,W/2+20):nc;x.beginPath();x.arc(W/2,cy,20,0,7);x.fill();x.shadowColor='transparent';
   let y=cy+110;x.textBaseline='alphabetic';x.font='800 170px Gabarito';x.fillStyle='#F4F1FA';x.fillText('₹'+fmt(j.price),160,y+120);y+=170;
   if(urgent){y+=20;const t=Math.max(1,Math.round(left/6e4))+' min left';x.font='700 34px Figtree';const tw=x.measureText(t).width+44;x.fillStyle='rgba(255,91,110,.2)';rrect(x,160,y,tw,58,29);x.fill();x.fillStyle='#FF8C9B';x.fillText(t,182,y+41);y+=70}else y+=30;
   x.fillStyle='#F4F1FA';x.font='700 60px Figtree';for(const l of lines){y+=78;x.fillText(l,160,y-14)}
@@ -653,12 +653,12 @@ function viewSaved(D){const keys=Array.isArray(S.priv.saved)?S.priv.saved:[],lis
   return`<div class="pad narrow">${back('me','Profile')}<h1 class="pageh">Saved jobs</h1>${list.length?'':`<div class="empty" style="margin:8px 0"><b>Nothing saved yet</b><p>Hold a note on the board, or tap the bookmark on a job, to keep it here.</p></div>`}</div>
   ${list.length?`<div class="wallzone">${wallHTML(list,D)}</div>`:''}${gone?`<p class="note" style="padding:0 16px 24px">${gone} saved ${gone===1?'job is':'jobs are'} no longer on the board.</p>`:''}`}
 const NOTES=['#A18CFF','#4FE3E0','#FF7AD1','#FFC53D','#FF9F45','#6CB6FF'];
-const PRICE_STOPS=[[0,'#6B8CFF'],[100,'#45BBF7'],[200,'#45D982'],[500,'#F5C033']];
+const PRICE_STOPS=[[0,'#3CC9FF'],[150,'#3CC9FF'],[300,'#45D982'],[500,'#FFC32F']];
 function priceHue(p){p=Math.max(0,num(p));let i=0;while(i<PRICE_STOPS.length-2&&p>PRICE_STOPS[i+1][0])i++;const[a,b]=[PRICE_STOPS[i],PRICE_STOPS[i+1]],t=Math.min(1,(p-a[0])/(b[0]-a[0]));
   const c=(h,k)=>parseInt(h.slice(1+k*2,3+k*2),16);return'#'+[0,1,2].map(k=>Math.round(c(a[1],k)+(c(b[1],k)-c(a[1],k))*t).toString(16).padStart(2,'0')).join('')}
 const gradNote=j=>num(j&&j.price)>500;
 const gcls=j=>gradNote(j)?' gnote':'',gvars=j=>gradNote(j)?';--nc1:var(--g1);--nc2:var(--g2)':'';
-function noteOf(j){return gradNote(j)?'#5FD3BC':priceHue(j&&typeof j==='object'?j.price:0)}
+function noteOf(j){return gradNote(j)?'#5CB8FF':priceHue(j&&typeof j==='object'?j.price:0)}
 function tile(j,D,i=0){
   const c=noteOf(j),n=bidsFor(D,j.key).length,left=j.deadline-Date.now();
   const ph=j.pics?(picsOf('j:'+j.key)||[])[0]:'',d=-((Date.now()/1000+i*2.3)%32).toFixed(2);
@@ -738,7 +738,7 @@ function viewJob(D){
           ${j.pick?.ratedPoster?`<p class="note">You rated ${pn}${(S.priv.gave||{})[j.key]?' ★'+num(S.priv.gave[j.key]).toFixed(1):''}.</p>`:`<button class="cta" data-sheet="ratePoster">Rate ${pn}</button>`}
           ${j.pick?.noteToDoer?`<div class="box stack" style="gap:4px"><span class="formlabel">${pn}'s private note to you</span><span class="t2" style="color:var(--fg)">${esc(str(j.pick.noteToDoer,200))}</span></div>`:''}
           <button class="linkbtn" data-act="paid" data-val="no">I marked this by mistake</button></div>`
-        :`<div class="foot"><div class="stack gap8 box" style="border:1px solid rgba(14,159,134,.3)">
+        :`<div class="foot"><div class="stack gap8 box" style="border:1px solid rgba(29,125,252,.3)">
           <span class="t1" style="font-size:var(--t-16)">Did ${pn} pay you ₹${fmt(j.agreed)}?</span>
           <span class="t2">${sentOf(j)?`${pn} says they sent it ${since(sentOf(j).at)}${sentOf(j).ref==='cash'?' in cash':sentOf(j).ref?' (UPI ref '+esc(sentOf(j).ref)+')':''}. `:''}${pay?'You said not yet. Tap Yes once the money reaches you.':`${pn} marked this job done. Confirm once the money reaches you.`}</span></div>${doerPay(j)}
           <button class="cta" data-act="paid" data-val="yes">Yes, I got it</button>
@@ -830,7 +830,7 @@ function viewBids(D){
   const oin=offerList(S.offersIn).filter(o=>D.members.includes(o.owner)&&!D.blocked.has(o.owner)&&o.status!=='declined').sort((a,b)=>num(b.at)-num(a.at));
   const oout=offerList(S.offersOut).filter(o=>o.status!=='accepted').sort((a,b)=>num(b.at)-num(a.at));
   const doing=D.jobs.filter(j=>j.accepted===me&&!myBidOn(j.key)&&j.status!=='removed').sort((a,b)=>b.at-a.at);
-  const offerCard=o=>`<div class="box stack" style="gap:10px;border:1px solid rgba(14,159,134,.3)">
+  const offerCard=o=>`<div class="box stack" style="gap:10px;border:1px solid rgba(29,125,252,.3)">
     <div style="display:flex;align-items:center;gap:10px">${ring(o.owner,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.owner))} asked you</span><span class="t2">${esc([o.where,o.when].filter(Boolean).join(' · '))}</span></span><span class="amt" style="color:var(--accent)">₹${fmt(o.price)}</span></div>
     <span style="font-size:var(--t-14);line-height:1.4;color:var(--fg);overflow-wrap:anywhere">${esc(o.text)}</span>
     ${o.status==='pending'?`<div style="display:flex;gap:8px"><button class="pick" style="flex:1;padding:11px" data-act="acceptOffer" data-key="${esc(o.key)}">Accept</button><button class="btn2" style="flex:1;padding:11px" data-act="declineOffer" data-key="${esc(o.key)}">Can't do it</button></div>`
@@ -902,13 +902,13 @@ function viewChat(D){
   ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats now happen inside jobs: ask ${esc(firstName(c.other))} for a favour when they're free, or hire them again from their profile.`}</p></div>`:`
   <div class="foot" style="position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%)"><div style="display:flex;gap:9px">
     <label class="field" for="msg"><input id="msg" type="text" maxlength="1000" placeholder="Message…" value="${esc(S.chatDraft.text)}" data-bind="chatDraft.text" aria-label="Message ${esc(firstName(c.other))}" autocomplete="off"></label>
-    <button data-act="send" aria-label="Send" style="width:50px;height:50px;flex-shrink:0;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(14,159,134,.35)">${ic('send',19,2,'#fff')}</button>
+    <button data-act="send" aria-label="Send" style="width:50px;height:50px;flex-shrink:0;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(29,125,252,.35)">${ic('send',19,2,'#fff')}</button>
   </div></div>`}`;
 }
 function viewPerson(uid,D){
   const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,free=num(d.freeUntil)>Date.now();
   const does=str(d.does,60).split(',').map(s=>s.trim()).filter(Boolean).slice(0,6);
-  const tints=[['rgba(79,227,224,.16)','var(--cyan-ink)'],['rgba(255,122,209,.16)','var(--pink-ink)'],['rgba(255,197,61,.16)','var(--amber-ink)'],['rgba(14,159,134,.18)','var(--violet-ink)']];
+  const tints=[['rgba(79,227,224,.16)','var(--cyan-ink)'],['rgba(255,122,209,.16)','var(--pink-ink)'],['rgba(255,197,61,.16)','var(--amber-ink)'],['rgba(29,125,252,.18)','var(--violet-ink)']];
   return`<div class="pad">${isMe?'':back('board','Back to the board')}
   <div class="stack narrow" style="margin:6px auto 0;gap:18px">
    <div class="prof">
@@ -1040,7 +1040,7 @@ function viewInvites(D){
      <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="invE" class="inp" style="flex:1;min-width:200px" type="email" inputmode="email" autocapitalize="off" spellcheck="false" autocomplete="off" placeholder="name@college.edu.in" value="${esc(S.inv.email)}" data-bind="inv.email">
      <button class="pick" style="padding:12px 18px;font-size:var(--t-14)" data-act="invite" data-need="invite">Add invite</button></div>
      ${S.err.inv?`<p class="err">${esc(S.err.inv)}</p>`:''}</div>
-   ${li?`<div class="box stack" style="gap:10px;border:1px solid rgba(14,159,134,.35)">
+   ${li?`<div class="box stack" style="gap:10px;border:1px solid rgba(29,125,252,.35)">
      <span class="t1" style="font-size:var(--t-14)">${esc(li)} can sign up now. Send them the invite:</span>${shareButtons(li)}
      <p class="note" style="text-align:left">The invite has a link to the sign-up page with their email filled in.</p></div>`:''}
    <div class="stack gap8"><div class="sect"><h2 class="h2">Invited</h2><span class="time">${list.length}</span></div>
