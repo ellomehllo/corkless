@@ -53,6 +53,7 @@ const I={
  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/>',
  search:'<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
  x:'<path d="M6 6l12 12M18 6 6 18"/>',
+ bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
  camera:'<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.5" r="3.5"/>'
 };
 const SAY_MAX=3500,SAY_WORDS=500,words=t=>(String(t||'').trim().match(/\S+/g)||[]).length,sayOver=t=>SAY_MAX<1000?String(t||'').length>SAY_MAX:words(t)>SAY_WORDS,sayCount=t=>SAY_MAX<1000?`${String(t||'').length} / ${SAY_MAX} characters`:`${words(t)} / ${SAY_WORDS} words`;
@@ -281,6 +282,37 @@ function saveMine(mut){
   S.myDoc=prune(mut(clone(S.myDoc)));S.pendingMine++;render();
   return enqueue('me',()=>setDoc(doc(S.db,'people',S.me.id),S.myDoc)).catch(writeErr).finally(()=>{S.pendingMine--});
 }
+const PUSH_KEY='tack.push';
+const isIOS=()=>/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const pushReady=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+function pushOn(){try{return pushReady()&&Notification.permission==='granted'&&!!localStorage.getItem(PUSH_KEY)}catch{return false}}
+async function pushToken(){const reg=await navigator.serviceWorker.register('sw.js');await navigator.serviceWorker.ready;
+  const m=await import(FB+'firebase-messaging.js');S.msg=S.msg||m.getMessaging(S.fbApp);return{m,token:await m.getToken(S.msg,{serviceWorkerRegistration:reg})}}
+function dropPushField(t){const {doc,updateDoc,FieldPath,deleteField}=S.fb;return updateDoc(doc(S.db,'private',S.me.id),new FieldPath('push',t),deleteField()).catch(e=>console.warn(e))}
+async function enablePush(){
+  if(!pushReady()){if(isIOS()&&!standalone()){S.sheet={type:'iosPush'};render()}else toast('This browser can\u2019t show notifications.');return}
+  let perm=Notification.permission;if(perm==='default')perm=await Notification.requestPermission();
+  if(perm!=='granted'){toast('Notifications are blocked. Allow them for tack in your browser settings.');return}
+  S.busy=true;render();
+  try{const {token}=await pushToken();if(!token)throw new Error('no token');
+    try{localStorage.setItem(PUSH_KEY,token)}catch{}
+    await savePriv({push:{...(S.priv.push||{}),[token]:Date.now()}});toast('Notifications are on')}
+  catch(e){console.warn(e);toast('Couldn\u2019t turn on notifications. Try again.')}
+  S.busy=false;render()}
+async function disablePush(){
+  let t=null;try{t=localStorage.getItem(PUSH_KEY);localStorage.removeItem(PUSH_KEY)}catch{}
+  if(t){const p={...(S.priv.push||{})};delete p[t];S.priv={...S.priv,push:p};dropPushField(t);
+    try{const m=await import(FB+'firebase-messaging.js');S.msg=S.msg||m.getMessaging(S.fbApp);await m.deleteToken(S.msg)}catch{}}
+  toast('Notifications are off');render()}
+async function syncPush(){
+  if(!pushOn())return;
+  try{const old=localStorage.getItem(PUSH_KEY),{token}=await pushToken();if(!token||(token===old&&(S.priv.push||{})[token]))return;
+    localStorage.setItem(PUSH_KEY,token);const p={...(S.priv.push||{})};if(old&&old!==token){delete p[old];dropPushField(old)}
+    savePriv({push:{...p,[token]:Date.now()}})}catch(e){console.warn(e)}}
+function bannerHTML(){const b=S.config.banner;if(!b||!b.on||typeof b.text!=='string'||!b.text.trim())return'';const k='tack.banner.'+num(b.at);
+  try{if(localStorage.getItem(k))return''}catch{}
+  return`<div class="annc" role="status">${ic('bell',16)}<span>${b.title?`<b>${esc(str(b.title,60))}</b> `:''}${esc(str(b.text,200))}</span><button class="annx" data-act="hideBanner" data-k="${esc(k)}" aria-label="Close this announcement">${ic('x',14)}</button></div>`}
 function savePriv(patch){
   const {doc,setDoc}=S.fb;
   S.priv={...S.priv,...patch,seen:{...(S.priv.seen||{}),...(patch.seen||{})}};render();
@@ -293,7 +325,7 @@ async function boot(){
   try{
     const [app,auth,fs]=await Promise.all([import(FB+'firebase-app.js'),import(FB+'firebase-auth.js'),import(FB+'firebase-firestore.js')]);
     S.fb={...app,...auth,...fs};
-    const fbApp=app.initializeApp(firebaseConfig);
+    const fbApp=app.initializeApp(firebaseConfig);S.fbApp=fbApp;
     S.auth=auth.getAuth(fbApp);S.db=fs.getFirestore(fbApp);
   }catch(e){console.error(e);S.phase='offline';render();return}
   S.fb.onAuthStateChanged(S.auth,u=>{handleUser(u)});
@@ -361,7 +393,7 @@ function afterData(){
   if(!(S.ready.config&&S.ready.people&&S.ready.priv))return;
   const {doc,setDoc,updateDoc}=S.fb,me=S.me.id;
   if(!firstLoadDone){
-    firstLoadDone=true;
+    firstLoadDone=true;setTimeout(syncPush,1500);
     if(S.me.isOwner&&ownerId()!==me)setDoc(doc(S.db,'config','app'),{...S.config,adminUid:me,campus:str(S.config.campus,40)||DEFAULT_CAMPUS}).catch(writeErr);
     if(!S.me.isOwner&&S.myInvite&&S.myInvite.uid!==me)updateDoc(doc(S.db,'invites',S.me.email),{uid:me,joinedAt:Date.now()}).catch(()=>{});
     if(S.myDoc&&S.myDoc.removed)saveMine(d=>{delete d.removed;return d});
@@ -892,6 +924,7 @@ function viewPerson(uid,D){
    ${does.length?`<div class="chips">${does.map((x,i)=>`<span class="chip" style="background:${tints[i%4][0]};color:${tints[i%4][1]};font-weight:700">${esc(x)}</span>`).join('')}</div>`:''}
    ${isMe?`<div class="menu">
        <button data-go="edit">${ic('edit',18)} Edit profile<span class="chev">${ic('chev',16)}</span></button>
+       <button data-act="${pushOn()?'pushOff':'pushOn'}" ${S.busy?'disabled':''}>${ic('bell',18)} Notifications<span class="menuval">${pushOn()?'On':'Off'}</span></button>
        ${S.me.isOwner?`<button data-go="invites">${ic('users',18)} Invites and members<span class="chev">${ic('chev',16)}</span></button>`:''}
        <button data-act="replayIntro">${ic('board',18)} How tack works<span class="chev">${ic('chev',16)}</span></button>
        <button data-go="privacy">${ic('shield',18)} Privacy<span class="chev">${ic('chev',16)}</span></button>
@@ -922,6 +955,8 @@ function viewPrivacy(){
    <p>Invite links are personal: whoever joins with yours is recorded as invited by you.</p>
    <h2>Chats</h2>
    <p>Chats only happen inside a job: between a poster and their bidders, or between two people working on a job together, including favours you ask for and accept. There are no direct messages. Only the two people in a chat can read it in the app. ${esc(organiser())} runs this board and can read chats to handle a report.</p>
+   <h2>Notifications</h2>
+   <p>Notifications are off until you turn them on in Me. When they're on, tack saves a code for your device so ${esc(organiser())} can send announcements to it. Turn them off any time in the same place. tack never sends ads.</p>
    <h2>Money</h2>
    <p>tack never touches money. You pay each other directly in cash or UPI.</p>
    <h2>Deleting your account</h2>
@@ -1010,6 +1045,9 @@ function sheetHTML(D){
   case'review':{const fn=esc(j?firstName(j.accepted):'them');
     b=`<h2 id="sheetT">Review ${fn}</h2>${reviewFields(fn)}${S.err.rate?`<p class="err">${esc(S.err.rate)}</p>`:''}
     <button class="cta" data-act="postReview" data-need="review" ${S.busy?'disabled':''}>${S.busy?'Posting…':'Post review'}</button><button class="linkbtn" data-act="closeSheet">Not now</button>`;break}
+  case'iosPush':b=`<h2 id="sheetT">Add tack to your Home Screen</h2><p>On iPhone, notifications only work when tack is opened from your Home Screen.</p>
+    <ol class="howto"><li>In Safari, tap the Share button.</li><li>Choose Add to Home Screen.</li><li>Open tack from your Home Screen, go to Me and turn on Notifications.</li></ol>
+    <button class="cta" data-act="closeSheet">Got it</button>`;break;
   case'delReview':b=`<h2 id="sheetT">Delete this review?</h2><p>It comes off ${esc(firstName(s.about))}'s profile for good. It can't be written again for this job.</p>
     <button class="cta destructive" data-act="confirmDelReview">Delete review</button><button class="linkbtn" data-act="closeSheet">Keep it</button>`;break;
   case'pic':{const l=S.pics[s.k]||[],src=l[s.i];
@@ -1140,7 +1178,7 @@ function render(){
     gate.hidden=true;app.hidden=false;if(gate.innerHTML)gate.innerHTML='';
     const D=derive(),main=$('main');if(jobParam&&!S.deepDone&&D.jobByKey[jobParam]){S.deepDone=true;S.openJob=jobParam;S.bid={key:null};S.view='job'}if(lastView&&lastView!==S.view)scrollMem[lastView]=main.scrollTop;
     const keep=lastView===S.view?main.scrollTop:((DEPTH[S.view]??1)===0?scrollMem[S.view]||0:0);
-    main.innerHTML=(VIEWS[S.view]||viewBoard)(D);main.scrollTop=keep;
+    main.innerHTML=((DEPTH[S.view]??1)===0?bannerHTML():'')+(VIEWS[S.view]||viewBoard)(D);main.scrollTop=keep;
     if(lastView!==S.view&&S.view==='chat')requestAnimationFrame(()=>{main.scrollTop=main.scrollHeight});
     lastView=S.view;
     $('rail').innerHTML=railHTML(D);
@@ -1190,6 +1228,9 @@ const ACT={
   togglePw(){S.showPw=!S.showPw;render();$('fPw')?.focus()},
   logout(){logOut()},
   closeSheet(){closeSheet()},
+  pushOn(){enablePush()},
+  pushOff(){disablePush()},
+  hideBanner(el){try{localStorage.setItem(el.dataset.k,'1')}catch{}render()},
   checkVerified(){checkVerified().then(()=>{if(S.phase==='verify')toast('Not confirmed yet. Open the link in the email first.')})},
   async resendVerify(){try{await sendVerify(S.auth.currentUser);toast('Sent. Check your inbox and spam.')}catch(e){toast(authMsg(e))}},
   clearPhoto(){S.onb.photo='';render()},
