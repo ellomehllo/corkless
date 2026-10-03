@@ -577,10 +577,14 @@ function onboardHTML(edit){
 }
 
 function back(to,label){return`<button class="back" data-go="${to}">${ic('back',16)} ${label}</button>`}
+const NOTES=['#A18CFF','#4FE3E0','#FF7AD1','#FFC53D','#FF9F45','#6CB6FF'];
+function noteOf(k){let h=2166136261;for(const c of String(k)){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return NOTES[(h>>>0)%NOTES.length]}
 function tile(j,D,i=0){
-  const r=ringOf(j.owner),n=bidsFor(D,j.key).length,left=j.deadline-Date.now();
-  return`<button class="tile r${i%3} ${S.fresh===j.key?'fresh':''}" data-job="${esc(j.key)}" style="--glow:${GLOW[r]};--i:${i}">
-    <span class="pin" style="background:${r};box-shadow:0 0 10px ${r}"></span>
+  const c=noteOf(j.key),n=bidsFor(D,j.key).length,left=j.deadline-Date.now();
+  const ph=j.pics?(picsOf('j:'+j.key)||[])[0]:'',d=-((Date.now()/1000+i*2.3)%32).toFixed(2);
+  return`<button class="tile ntile r${i%3} ${S.fresh===j.key?'fresh':''}" data-job="${esc(j.key)}" style="--nc:${c};--i:${i};--d:${d}s">
+    <span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span>
+    <span class="pin"></span>
     <span class="price">₹${fmt(j.price)}</span>
     ${left<36e5?`<span class="flag">${Math.max(1,Math.round(left/6e4))} min left</span>`:''}${nearMe(j)?nearTag():''}
     <p>${esc(j.text)}</p>

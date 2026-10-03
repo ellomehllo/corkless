@@ -422,3 +422,20 @@ html[data-nav="tab"]::view-transition-new(main){animation:fadeIn .2s ease both}
 @media (prefers-reduced-motion:reduce){
   .intro,.ik,.ia,.ib,.inext,.inext2,.sct,.bubble,.lock,.sc-pick .who,.sc-pick .link,.bigpin,.momentroot,.moment h2,.moment p,.wallzone.dropin .tile,.tile.fresh{animation:none}
   .sc-rate .st{animation:none;color:var(--accent)}}
+.tile.ntile{--glow:color-mix(in srgb,var(--nc) 38%,transparent);background:var(--tile)}
+.tile.ntile>*:not(.tbg):not(.pin){position:relative}
+.tile.ntile .pin{background:var(--nc);box-shadow:0 0 10px var(--nc);z-index:1}
+.tile.ntile .price{color:var(--nc)}
+.tbg{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;isolation:isolate}
+.tbg::before,.tbg::after{content:"";position:absolute;border-radius:50%;width:150%;aspect-ratio:1;
+  animation:noteblob 16s var(--d,0s) ease-in-out infinite alternate}
+.tbg::before{left:-45%;bottom:-85%;background:radial-gradient(closest-side,color-mix(in srgb,var(--nc) 42%,transparent),transparent)}
+.tbg::after{right:-75%;top:-35%;background:radial-gradient(closest-side,color-mix(in srgb,var(--nc) 24%,transparent),transparent);animation-direction:alternate-reverse}
+@keyframes noteblob{0%{transform:translate(0,0) scale(1)}50%{transform:translate(16%,-14%) scale(1.18)}100%{transform:translate(-12%,-26%) scale(.92)}}
+.tbg img{position:absolute;left:-20%;top:-20%;width:140%;height:140%;max-width:none;object-fit:cover;
+  filter:blur(14px) saturate(1.3) brightness(.8);animation:notepan 16s var(--d,0s) ease-in-out infinite alternate}
+@keyframes notepan{from{transform:scale(1) translate(0,0)}to{transform:scale(1.18) translate(-7%,5%)}}
+.tbg.ph::before{display:none}
+.tbg.ph::after{inset:0;width:auto;aspect-ratio:auto;border-radius:0;animation:none;
+  background:linear-gradient(160deg,rgba(15,13,20,.74),rgba(15,13,20,.6) 45%,color-mix(in srgb,var(--nc) 20%,rgba(15,13,20,.8)))}
+@media (prefers-reduced-motion:reduce){.tbg::before,.tbg::after,.tbg img{animation:none}}
