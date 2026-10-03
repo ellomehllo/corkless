@@ -677,7 +677,7 @@ function viewBids(D){
   const jobLine=j=>{const st=jobState(j),n=bidsFor(D,j.key).length;
     return st==='open'?[`${n} ${n===1?'bid':'bids'} in`,'']:st==='assigned'?[`Picked ${shortName(j.accepted)} · ₹${fmt(j.agreed)}`,'ok']:st==='done'?(payOf(j)?.ok?[j.pick?.ratedDoer?'Done · Paid ✓':'Done · Paid ✓ · rate them','ok']:[`Done · ${payOf(j)?'they haven\u2019t got your payment':'waiting for them to confirm payment'}`,payOf(j)?'warn':'']):st==='expired'?['Time ran out','warn']:['Closed','']};
   const bidLine=({j})=>{const st=jobState(j);return j.accepted===me?(st==='done'?(payOf(j)?.ok?['Done · Paid ✓','ok']:['Done · confirm you got paid','warn']):[`Accepted · ₹${fmt(j.agreed)}`,'ok']):j.accepted?['Went to someone else','']:st==='open'?[`Waiting for ${firstName(j.owner)} to pick`,'']:['Closed','']};
-  const row=(j,[line,cls],amt)=>`<button class="item" data-job="${esc(j.key)}"><span class="itext"><span class="t1" style="font-weight:600;color:var(--fg)">${esc(j.text)}</span>
+  const row=(j,[line,cls],amt,who)=>`<button class="item" data-job="${esc(j.key)}">${ring(who||j.owner,38)}<span class="itext"><span class="t1" style="font-weight:600;color:var(--fg)">${esc(j.text)}</span>
     <span style="font-size:var(--t-11);font-weight:700;color:${cls==='ok'?'var(--accent)':cls==='warn'?'var(--coral-ink)':'var(--muted)'}">${esc(line)}</span></span><span class="amt" style="font-size:var(--t-16);color:var(--fg2)">₹${fmt(amt)}</span></button>`;
   const oin=offerList(S.offersIn).filter(o=>D.members.includes(o.owner)&&!D.blocked.has(o.owner)&&o.status!=='declined').sort((a,b)=>num(b.at)-num(a.at));
   const oout=offerList(S.offersOut).filter(o=>o.status!=='accepted').sort((a,b)=>num(b.at)-num(a.at));
@@ -692,13 +692,19 @@ function viewBids(D){
     ${oin.length?`<div class="sect"><h2 class="h2">Offers for you</h2></div><div class="stack gap8">${oin.map(offerCard).join('')}</div>`:''}
     ${oout.length?`<div class="sect"><h2 class="h2">Offers you sent</h2></div><div class="stack gap8">${oout.map(o=>`<div class="row">${ring(o.to,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.to))} · ₹${fmt(o.price)}</span><span class="t2">${o.status==='declined'?'Can\u2019t do it this time':'Waiting for them to answer'} · ${esc(o.text)}</span></span>
       <button class="btn2" style="width:auto;padding:8px 12px;font-size:var(--t-12)" data-act="withdrawOffer" data-key="${esc(o.key)}">${o.status==='declined'?'Dismiss':'Withdraw'}</button></div>`).join('')}</div>`:''}
-    <div class="pills" style="padding:4px 0 0" role="group" aria-label="Show">${[['jobs','Your jobs',myJobs.length],['bids','Your bids',myBids.length+doing.length]].map(([k,l,n])=>`<button class="pill ${S.actTab===k?'on':''}" data-acttab="${k}" aria-pressed="${S.actTab===k}">${l}${n?' · '+n:''}</button>`).join('')}</div>
-    ${S.actTab==='jobs'?`${myJobs.length?`<div class="stack gap8">${myJobs.map(j=>row(j,jobLine(j),j.price)).join('')}</div>`:'<p class="note" style="text-align:left">You haven’t pinned anything yet.</p>'}
-    <button class="linkbtn" data-go="post" style="align-self:flex-start;padding:0">Pin a job</button>`
-    :(()=>{const all=[...doing.map(j=>({j,amt:j.agreed||j.price})),...myBids.map(x=>({j:x.j,amt:num(x.b.amt),x}))];
-      const active=all.filter(({j})=>j.accepted===me),waiting=all.filter(({j})=>j.accepted!==me&&!j.accepted&&jobState(j)==='open'),past=all.filter(y=>!active.includes(y)&&!waiting.includes(y));
+    ${(()=>{const pastJob=j=>{const st=jobState(j);return st==='closed'||st==='expired'||st==='removed'||(st==='done'&&payOf(j)?.ok&&j.pick?.ratedDoer)};
+      const all=[...doing.map(j=>({j,amt:j.agreed||j.price,at:num(j.pick?.at)||j.at})),...myBids.map(x=>({j:x.j,amt:num(x.b.amt),at:x.b.at,x}))];
+      const pastBid=({j})=>j.accepted===me?(jobState(j)==='done'&&payOf(j)?.ok&&j.pick?.ratedPoster):jobState(j)!=='open'||!!j.accepted;
+      const jobsNow=myJobs.filter(j=>!pastJob(j)),active=all.filter(y=>y.j.accepted===me&&!pastBid(y)),waiting=all.filter(y=>y.j.accepted!==me&&!pastBid(y));
+      const hist=[...D.jobs.filter(j=>j.owner===me&&pastJob(j)).map(j=>({j,mine:true,amt:j.agreed||j.price,at:Math.max(j.doneAt||0,j.at)})),...all.filter(pastBid).map(y=>({...y,at:Math.max(y.j.doneAt||0,y.at||0,y.j.at)}))].sort((a,b)=>b.at-a.at);
+      const tabs=[['jobs','Your jobs',jobsNow.length],['bids','Your bids',active.length+waiting.length],['history','History',hist.length]];
       const grp=(t,l)=>l.length?`<div class="sect"><h2 class="h2">${t}</h2></div><div class="stack gap8">${l.map(y=>row(y.j,bidLine(y.x||{j:y.j}),y.amt)).join('')}</div>`:'';
-      return all.length?grp('Active',active)+grp('Waiting',waiting)+grp('Past',past):'<p class="note" style="text-align:left">Bids you place on the board show up here.</p>'})()}
+      const empty=t=>`<p class="note" style="text-align:left">${t}</p>`;
+      return`<div class="pills" style="padding:4px 0 0" role="group" aria-label="Show">${tabs.map(([k,l,n])=>`<button class="pill ${S.actTab===k?'on':''}" data-acttab="${k}" aria-pressed="${S.actTab===k}">${l}${n?' · '+n:''}</button>`).join('')}</div>
+      ${S.actTab==='jobs'?`${jobsNow.length?`<div class="stack gap8">${jobsNow.map(j=>row(j,jobLine(j),j.price,me)).join('')}</div>`:empty('Nothing pinned right now.')}
+        <button class="linkbtn" data-go="post" style="align-self:flex-start;padding:0">Pin a job</button>`
+      :S.actTab==='bids'?(active.length||waiting.length?grp('Active',active)+grp('Waiting',waiting):empty('Bids you place on the board show up here.'))
+      :hist.length?`<div class="stack gap8">${hist.map(y=>y.mine?row(y.j,jobLine(y.j),y.amt,me):row(y.j,bidLine(y.x||{j:y.j}),y.amt)).join('')}</div>`:empty('Finished and closed jobs and bids show up here.')}`})()}
    </div></div><div style="height:24px"></div>`;
 }
 const codeLink=c=>`${SITE}?code=${c}`;
