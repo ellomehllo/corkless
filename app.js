@@ -15,6 +15,15 @@ const DEFAULT_CAMPUS='MIT-WPU';
 const CRIT={d:[['timing','Timing','Showed up and finished when agreed'],['quality','Quality','Did the job well'],['comm','Communication','Replied and kept you updated'],['care','Care','Careful with your things, followed instructions']],
   p:[['payment','Payment','Paid what was agreed, on time'],['clarity','Clarity','The job was as described'],['comm','Communication','Easy to reach, replied on time'],['respect','Respect','Treated you well']]};
 const ID_RE=/^[A-Za-z0-9_-]{6,128}$/, JOB_RE=/^[a-z0-9]{4,24}$/;
+const NEAR_M=500,LOC={pos:null};
+const locOptIn=()=>{try{return localStorage.getItem('tack.loc')==='1'}catch{return false}};
+function getLoc(){if(!navigator.geolocation)return Promise.resolve(null);
+  return new Promise(res=>navigator.geolocation.getCurrentPosition(p=>{LOC.pos={lat:p.coords.latitude,lng:p.coords.longitude};try{localStorage.setItem('tack.loc','1')}catch{};res(LOC.pos);if(S.phase==='app')render()},
+    ()=>res(null),{enableHighAccuracy:true,maximumAge:3e5,timeout:12000}))}
+function distM(a,b){const r=Math.PI/180,x=(b.lng-a.lng)*r*Math.cos((a.lat+b.lat)/2*r),y=(b.lat-a.lat)*r;return Math.sqrt(x*x+y*y)*6371e3}
+const geoOk=g=>g&&typeof g==='object'&&Math.abs(num(g.lat))<=90&&Math.abs(num(g.lng))<=180&&(num(g.lat)||num(g.lng))?{lat:num(g.lat),lng:num(g.lng)}:null;
+const nearMe=j=>!!(LOC.pos&&j.geo&&j.owner!==S.me?.id&&distM(LOC.pos,j.geo)<=NEAR_M);
+const nearTag=()=>'<span class="neartag">'+ic('place',11,2.4)+' Near you</span>';
 const PIC_RE=/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/,PIC_MAX=200000,MAX_PICS=3;
 const PHOTO_RE=/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 
@@ -38,12 +47,13 @@ const I={
  clock:'<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
  out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/>',
+ search:'<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
  x:'<path d="M6 6l12 12M18 6 6 18"/>',
  camera:'<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.5" r="3.5"/>'
 };
 const ic=(n,s=20,w=2,c='currentColor',fill='none')=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="${fill}" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
 
-const blankDraft=()=>({text:'',price:'',kind:'Errand',when:'Today',where:'Gate 1',whereText:'',more:'',pics:[]});
+const blankDraft=()=>({text:'',price:'',kind:'Errand',when:'Today',where:'Gate 1',whereText:'',more:'',pics:[],useLoc:locOptIn()});
 const inviteParam=(new URLSearchParams(location.search).get('invite')||'').trim().toLowerCase();
 const codeParam=((new URLSearchParams(location.search).get('code')||'').trim().toLowerCase().match(/^[a-z0-9]{8,24}$/)||[''])[0];
 const S={
@@ -54,7 +64,7 @@ const S={
   config:{}, peopleDocs:{}, priv:{}, threadDocs:{}, pitchIn:{}, pitchMine:{}, offersIn:{}, offersOut:{}, myCodes:{}, lastCode:null,
   offer:{to:null,prevJob:null,text:'',price:'',when:'Next hour',where:''}, invites:{}, reports:[], myInvite:null,
   myDoc:null, pendingMine:0,
-  view:'board', openJob:null, personOf:null, sort:'high',
+  view:'board', openJob:null, personOf:null, sort:'high', find:{q:''}, near:false,
   draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, actTab:'jobs', chatDraft:{text:''},
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',adult:false,rules:false},
   inv:{email:'',campus:''}, lastInvite:null,
@@ -99,7 +109,7 @@ const isMember=uid=>{const d=pdoc(uid);return !!d.adult&&!d.removed};
 function normJob(id,j,uid){
   return{id,owner:uid,key:uid+'~'+id,text:str(j.text,200),more:str(j.more,600),price:num(j.price),kind:str(j.kind,20),
     when:str(j.when,20),where:str(j.where,40),at:num(j.at),deadline:num(j.deadline),
-    status:STATUSES.includes(j.status)?j.status:'open',doneAt:num(j.doneAt),pics:Math.min(MAX_PICS,Math.max(0,Math.floor(num(j.pics)))),accepted:null,agreed:0,pick:null};
+    status:STATUSES.includes(j.status)?j.status:'open',doneAt:num(j.doneAt),pics:Math.min(MAX_PICS,Math.max(0,Math.floor(num(j.pics)))),geo:geoOk(j.geo),accepted:null,agreed:0,pick:null};
 }
 function jobState(j){return j.status==='open'&&j.deadline<Date.now()?'expired':j.status}
 function derive(){
@@ -112,7 +122,7 @@ function derive(){
   }
   for(const p of [...Object.values(S.pitchIn),...Object.values(S.pitchMine)]){
     if(!p||typeof p.job!=='string'||typeof p.by!=='string'||!jobByKey[p.job]||!members.includes(p.by)||!(num(p.amt)>0))continue;
-    const l=(bidsByJob[p.job]=bidsByJob[p.job]||[]);if(!l.some(b=>b.by===p.by))l.push({by:p.by,amt:num(p.amt),say:str(p.say,90),at:num(p.at),pics:Math.min(MAX_PICS,num(p.pics))})}
+    const l=(bidsByJob[p.job]=bidsByJob[p.job]||[]);if(!l.some(b=>b.by===p.by))l.push({by:p.by,amt:num(p.amt),say:str(p.say,90),at:num(p.at),pics:Math.min(MAX_PICS,num(p.pics)),near:p.near===true})}
   for(const[k,pk]of Object.entries(S.picks)){const j=jobByKey[k];if(!j||!pk||typeof pk.doer!=='string')continue;
     j.accepted=pk.doer;j.agreed=num(pk.agreed);j.pick=pk;if(pk.doneAt)j.doneAt=num(pk.doneAt)}
   const D={members,jobs,jobByKey,bidsByJob,blocked};
@@ -133,6 +143,14 @@ function bidsFor(D,key){return (D.bidsByJob[key]||[]).filter(b=>!D.blocked.has(b
 function boardJobs(D){
   const now=Date.now();
   const l=D.jobs.filter(j=>j.status==='open'&&j.deadline>now&&!D.blocked.has(j.owner));
+  return sortJobs(l);
+}
+function findJobs(l){const q=S.find.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if(q.length)l=l.filter(j=>{const h=[j.text,j.more,j.kind,j.when,j.where,firstName(j.owner),'₹'+j.price].join(' ').toLowerCase();return q.every(w=>h.includes(w))});
+  if(S.near)l=l.filter(nearMe);
+  return l;
+}
+function sortJobs(l){
   if(S.sort==='high')l.sort((a,b)=>b.price-a.price||b.at-a.at);
   else if(S.sort==='closing')l.sort((a,b)=>a.deadline-b.deadline);
   else l.sort((a,b)=>b.at-a.at);
@@ -226,8 +244,8 @@ function convertOffers(){
       .then(()=>S.fb.deleteDoc(S.fb.doc(S.db,'offers',o.key))).catch(e=>console.warn(e));
   }
 }
-function savePitch(jobKey,say,amt,pics){const {doc,setDoc,deleteDoc}=S.fb,me=S.me.id,id=jobKey+'~'+me,owner=jobKey.split('~')[0];
-  if(amt){const p={owner,by:me,job:jobKey,amt,say:(say||'').slice(0,90),at:Date.now(),...(pics?{pics}:{})};S.pitchMine={...S.pitchMine,[id]:p};return setDoc(doc(S.db,'pitches',id),p).catch(writeErr)}
+function savePitch(jobKey,say,amt,pics,near){const {doc,setDoc,deleteDoc}=S.fb,me=S.me.id,id=jobKey+'~'+me,owner=jobKey.split('~')[0];
+  if(amt){const p={owner,by:me,job:jobKey,amt,say:(say||'').slice(0,90),at:Date.now(),...(pics?{pics}:{}),...(near?{near:true}:{})};S.pitchMine={...S.pitchMine,[id]:p};return setDoc(doc(S.db,'pitches',id),p).catch(writeErr)}
   const m={...S.pitchMine};delete m[id];S.pitchMine=m;return deleteDoc(doc(S.db,'pitches',id)).catch(()=>{})}
 function saveMine(mut){
   const {doc,setDoc}=S.fb;
@@ -540,7 +558,7 @@ function tile(j,D,i=0){
   return`<button class="tile r${i%3}" data-job="${esc(j.key)}" style="--glow:${GLOW[r]}">
     <span class="pin" style="background:${r};box-shadow:0 0 10px ${r}"></span>
     <span class="price">₹${fmt(j.price)}</span>
-    ${left<36e5?`<span class="flag">${Math.max(1,Math.round(left/6e4))} min left</span>`:''}
+    ${left<36e5?`<span class="flag">${Math.max(1,Math.round(left/6e4))} min left</span>`:''}${nearMe(j)?nearTag():''}
     <p>${esc(j.text)}</p>
     ${j.where||j.when?`<span class="where">${ic('place',12,2.2)}<span>${esc([j.where,left<36e5?'':j.when].filter(Boolean).join(' · '))}</span></span>`:''}
     <span class="by">${face(j.owner,22)}<span class="nm">${esc(firstName(j.owner))}</span><span class="n">${j.pics?ic('camera',12,2.2)+' ':''}${j.owner===S.me.id?`${n} ${n===1?'bid':'bids'}`:since(j.at)}</span></span>
@@ -552,9 +570,9 @@ function wallHTML(list,D){const n=wideMQ.matches?3:2,cols=Array.from({length:n},
   return`<div class="wall">${cols.map(c=>`<div class="wcol">${c.join('')}</div>`).join('')}</div>`}
 wideMQ.addEventListener?.('change',()=>{if(S.phase==='app')render()});
 function viewBoard(D){
-  const list=boardJobs(D),free=freePeople(D).filter(u=>u!==S.me.id),meFree=num(S.myDoc?.freeUntil)>Date.now();
+  const all=boardJobs(D),list=findJobs(all),filtered=!!(S.find.q.trim()||S.near),free=freePeople(D).filter(u=>u!==S.me.id),meFree=num(S.myDoc?.freeUntil)>Date.now();
   return`<div class="boardpage"><header class="top">
-    <div><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${esc(campus())} · ${list.length} pinned</span></div></div>
+    <div><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${esc(campus())} · ${all.length} pinned</span></div></div>
     <button data-go="me" aria-label="Your profile">${ring(S.me.id,48)}</button>
   </header>
   <section class="stripwrap" aria-label="Free right now"><p class="label">Free right now${free.length?' <span class="labelhint">· tap a face to ask for a favour</span>':''}</p>
@@ -563,9 +581,10 @@ function viewBoard(D){
       ${free.map(u=>`<button class="person" data-ask="${esc(u)}" aria-label="Ask ${esc(firstName(u))} for a favour">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}
       ${free.length?'':`<span class="stripnote">Nobody else is marked free. Tap + to say you're around.</span>`}
     </div></section>
-  <div class="dhead"><h1 class="h1">The board</h1><span class="muted">${list.length} pinned at ${esc(campus())}</span></div>
-  <div class="pills" role="group" aria-label="Sort jobs">${[['high','Top pay'],['newest','Newest'],['closing','Closing soon']].map(([k,l])=>`<button class="pill ${S.sort===k?'on':''}" data-sort="${k}" aria-pressed="${S.sort===k}">${l}</button>`).join('')}</div>
-  <div class="wallzone">${list.length?wallHTML(list,D)+`<div class="boardend"><span class="endpin" aria-hidden="true"></span><p>That's everything pinned at ${esc(campus())}.</p><button class="btn2" data-go="post">Pin a job</button></div>`
+  <div class="dhead"><h1 class="h1">The board</h1><span class="muted">${all.length} pinned at ${esc(campus())}</span></div>
+  <label class="search" for="q">${ic('search',17)}<input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search jobs: print, shawarma, today, library" value="${esc(S.find.q)}" data-bind="find.q" aria-label="Search jobs"></label>
+  <div class="pills" role="group" aria-label="Filter and sort jobs"><button class="pill ${S.near?'on':''}" data-act="toggleNear" aria-pressed="${S.near}">${ic('place',13,2.2)} Near you</button><span class="pillsep" aria-hidden="true"></span>${[['high','Top pay'],['newest','Newest'],['closing','Closing soon']].map(([k,l])=>`<button class="pill ${S.sort===k?'on':''}" data-sort="${k}" aria-pressed="${S.sort===k}">${l}</button>`).join('')}</div>
+  <div class="wallzone">${filtered&&!list.length&&all.length?`<div class="empty"><b>${S.near&&!S.find.q.trim()?'Nothing near you right now':'No jobs match that'}</b><p>${S.near?'Only jobs pinned with a location can show as near you.':'Try another word, like the place, the time or what you need.'}</p><button class="btn2" data-act="clearFind">Show all jobs</button></div>`:list.length?wallHTML(list,D)+`<div class="boardend"><span class="endpin" aria-hidden="true"></span><p>${filtered?`${list.length} of ${all.length} jobs shown.`:`That's everything pinned at ${esc(campus())}.`}</p><button class="btn2" data-go="post">Pin a job</button></div>`
     :`<div class="empty"><b>Nothing pinned yet</b><p>Pin the first job: a xerox run, a lift down four floors, an hour of help before a submission.</p><button class="cta" data-go="post">Pin a job</button></div>`}</div></div>`;
 }
 function viewJob(D){
@@ -625,7 +644,7 @@ function viewJob(D){
    <div class="stack" style="margin-top:6px">
     <span class="big" style="view-transition-name:jp">₹${fmt(j.price)}</span>
     <h1 class="h1">${esc(j.text)}</h1>
-    <div class="chips">${[j.when,j.where].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${stTag}</div>
+    <div class="chips">${[j.when,j.where].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${nearMe(j)?nearTag():''}${stTag}</div>
     ${j.more?`<p style="margin:0;font-size:var(--t-14);line-height:1.55;color:var(--fg2);max-width:52ch;overflow-wrap:anywhere;white-space:pre-wrap">${esc(j.more)}</p>`:''}
     ${picStrip('j:'+j.key,j.pics)}
     <button class="card" data-person="${esc(j.owner)}">${ring(j.owner,50)}
@@ -637,7 +656,7 @@ function viewJob(D){
       :`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">${myBid?'Your bid':'Bids'}</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--muted)">only ${esc(firstName(j.owner))} sees who bids</span></div>`}
     ${bids.length?bids.map(b=>`<div class="row">
       <button class="rowmain" data-person="${esc(b.by)}">${ring(b.by,42)}<span class="rowtext">
-        <span class="t1">${esc(shortName(b.by))}${b.by===me?' (you)':''} <span class="muted">· ${esc(metaOf(b.by))}${esc(rateLine(b.by,D))}</span></span>
+        <span class="t1">${esc(shortName(b.by))}${b.by===me?' (you)':''}${mine&&b.near?' '+nearTag():''} <span class="muted">· ${esc(metaOf(b.by))}${esc(rateLine(b.by,D))}</span></span>
         ${b.say?`<span class="t2">${esc(b.say)}</span>`:''}</span></button>
       <span class="amt">₹${fmt(b.amt)}</span>
       ${mine&&st==='open'?`<button class="pick" data-pick="${esc(b.by)}" aria-label="Pick ${esc(firstName(b.by))} for ₹${fmt(b.amt)}">Pick</button>`:''}
@@ -665,6 +684,7 @@ function viewPost(){
    <div class="stack gap8"><label for="jm" class="formlabel">Anything else <span class="muted">(optional)</span></label>
      <textarea id="jm" class="inp" rows="2" maxlength="600" style="resize:vertical" placeholder="Details the person doing it should know." data-bind="draft.more">${esc(d.more)}</textarea>
      ${picEdit('draft',d.pics)}</div>
+   <button class="locbtn" data-act="toggleJobLoc" aria-pressed="${!!d.useLoc}">${ic(d.useLoc?'tick':'place',16,2.4)}<span class="rowtext"><span class="t1">${d.useLoc?'Tagged with where you are now':'Tag this job with where you are'}</span><span class="t2">${d.useLoc?'Members nearby see a Near you tag. Turn off if the job is somewhere else.':'Helps people close by find it. Rounded to about 100 m, never shown on a map.'}</span></span></button>
    <div class="card">${ring(S.me.id,38)}<span style="font-size:var(--t-12);font-weight:500;color:var(--fg2)">Posting as <b style="color:var(--fg)">${esc(shortName(S.me.id))}${metaOf(S.me.id)?' · '+esc(metaOf(S.me.id)):''}</b>. Your photo and name show on the board.</span></div>
   </div></div>
   <div class="foot">${S.err.post?`<p class="err">${esc(S.err.post)}</p>`:''}<button class="cta" data-act="post">Put it on the board</button>
@@ -789,7 +809,9 @@ function viewPrivacy(){
    <h1 class="pageh" style="margin-bottom:6px">Privacy</h1>
    <p>tack is private to people ${esc(organiser())} invited. Nothing on the board is public.</p>
    <h2>What tack keeps</h2>
-   <p>Your email address and a password to log in. Your name, photo, year, branch, what you're good at and your ring colour. The jobs you pin, the bids you place, any photos you add to them, the ratings and reviews you give and your messages. Photos are shrunk on your phone first, which also strips their location data. When you mark yourself free, the time it ends.</p>
+   <p>Your email address and a password to log in. Your name, photo, year, branch, what you're good at and your ring colour. The jobs you pin, the bids you place, any photos you add to them, the ratings and reviews you give and your messages. Photos are shrunk on your phone first, which also strips their location data. When you mark yourself free, the time it ends. If you tag a job with your location, that spot rounded to about 100 m.</p>
+   <h2>Location</h2>
+   <p>Near you works on your phone: your location is used there to sort out which jobs are close, and is never saved. A job only has a location if its poster tagged it, rounded to about 100 m and never shown on a map. When you bid, tack saves only whether you were near the job, not where you were.</p>
    <h2>What other members see</h2>
    <p>Your name, photo, year and branch, the jobs you post, your ratings and reviews. They never see your email address. Your bids are private: only the poster of that job sees your bid, pitch and bid photos. Other members can't see who bid on a job or who took it.</p>
    <h2>Ratings</h2>
@@ -1002,8 +1024,8 @@ const ACT={
   post(){const d=S.draft,text=d.text.trim(),price=digits(d.price);
     if(!need(text.length>=8,'post','Say what you need in a few more words.')||!need(price>=10&&price<=20000,'post','Set a price between ₹10 and ₹20,000.'))return;
     const id=rid(),at=Date.now(),where=(d.whereText.trim()||d.where).slice(0,40);
-    const pics=cleanPics(d.pics);
-    saveMine(x=>{x.jobs={...(x.jobs||{}),[id]:{text:text.slice(0,200),more:d.more.trim().slice(0,600),price,kind:d.kind,when:d.when,where,at,deadline:deadlineFor(d.when,at),status:'open',...(pics.length?{pics:pics.length}:{})}};return x});
+    const pics=cleanPics(d.pics),geo=d.useLoc&&LOC.pos?{lat:Math.round(LOC.pos.lat*1e3)/1e3,lng:Math.round(LOC.pos.lng*1e3)/1e3}:null;
+    saveMine(x=>{x.jobs={...(x.jobs||{}),[id]:{text:text.slice(0,200),more:d.more.trim().slice(0,600),price,kind:d.kind,when:d.when,where,at,deadline:deadlineFor(d.when,at),status:'open',...(pics.length?{pics:pics.length}:{}),...(geo?{geo}:{})}};return x});
     if(pics.length){S.pics['j:'+S.me.id+'~'+id]=pics;S.fb.setDoc(S.fb.doc(S.db,'jobpics',S.me.id+'~'+id),{owner:S.me.id,job:id,pics,at}).catch(e=>{console.warn(e);toast('Your job is up, but the photos didn\u2019t upload.')})}
     S.draft=blankDraft();S.sort='newest';go('board');toast('Pinned to the board')},
   repost(){const j=derive().jobByKey[S.openJob];if(!j)return;S.draft={...blankDraft(),text:j.text,price:String(j.price),kind:KINDS.includes(j.kind)?j.kind:'Other',where:WHERES.includes(j.where)?j.where:'Gate 1',whereText:WHERES.includes(j.where)?'':j.where,more:j.more,pics:[...(S.pics['j:'+j.key]||[])]};
@@ -1011,7 +1033,7 @@ const ACT={
   bid(){const j=derive().jobByKey[S.openJob];if(!j)return;const amt=digits(S.bid.amt);
     if(!need(amt>=1&&amt<=50000,'bid','Enter a bid in rupees.'))return;const had=!!myBidOn(j.key);
     const id=j.key+'~'+S.me.id,old=num(myBidOn(j.key)?.pics),pics=S.bid.pics?cleanPics(S.bid.pics):null,n=pics?pics.length:old;
-    savePitch(j.key,S.bid.say.trim(),amt,n);render();S.err={};toast(had?'Bid updated':'Bid placed');
+    savePitch(j.key,S.bid.say.trim(),amt,n,!!(j.geo&&LOC.pos&&distM(LOC.pos,j.geo)<=NEAR_M));render();S.err={};toast(had?'Bid updated':'Bid placed');
     if(pics){const {doc,setDoc,deleteDoc}=S.fb;S.pics['b:'+id]=pics;
       if(pics.length)setDoc(doc(S.db,'bidpics',id),{owner:j.owner,by:S.me.id,job:j.key,pics,at:Date.now()}).catch(e=>{console.warn(e);toast('Your bid is in, but the photos didn\u2019t upload.')});
       else if(old)deleteDoc(doc(S.db,'bidpics',id)).catch(()=>{})}},
@@ -1028,6 +1050,12 @@ const ACT={
     deleteDoc(doc(S.db,'reviewpics',s.rid)).catch(()=>{});deleteDoc(doc(S.db,'reviews',s.rid)).then(()=>{delete S.revs[s.about];toast('Review deleted');render()}).catch(writeErr);
     S.sheet=null;render()},
   allReviews(el){S.allRevs=el.dataset.uid;render()},
+  toggleNear(){if(S.near){S.near=false;render();return}
+    if(LOC.pos){S.near=true;render();return}
+    toast('Finding where you are…');getLoc().then(p=>{if(p){S.near=true;render()}else toast('Couldn\u2019t get your location. Allow location for this site in your browser settings.')})},
+  clearFind(){S.find.q='';S.near=false;render()},
+  toggleJobLoc(){const d=S.draft;if(d.useLoc){d.useLoc=false;render();return}
+    getLoc().then(p=>{if(p){d.useLoc=true;render()}else toast('Couldn\u2019t get your location. Allow location for this site in your browser settings.')})},
   nextPic(){const s=S.sheet,l=S.pics[s?.k];if(!l||!l.length)return;S.sheet={...s,i:(s.i+1)%l.length};render()},
   confirmPick(){const j=derive().jobByKey[S.openJob],s=S.sheet;if(!j||!s)return;
     saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.status='assigned'}return x});
@@ -1150,7 +1178,7 @@ document.addEventListener('submit',e=>{
   if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
-document.addEventListener('input',bind);
+document.addEventListener('input',e=>{bind(e);if(e.target.id==='q')render()});
 document.addEventListener('change',async e=>{
   bind(e);
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}
@@ -1169,4 +1197,5 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&e.target.id==='invE'){e.preventDefault();ACT.invite();return}
 });
 setInterval(()=>{if(S.phase==='app'&&!document.activeElement?.matches?.('input,textarea'))render()},30000);
+if(locOptIn())getLoc();setInterval(()=>{if(S.phase==='app'&&locOptIn()&&!document.hidden)getLoc()},3e5);
 boot();
