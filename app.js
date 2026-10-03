@@ -108,9 +108,6 @@ function derive(){
   for(const uid of members){const d=pdoc(uid);
     if(d.jobs&&typeof d.jobs==='object')for(const[id,j]of Object.entries(d.jobs)){if(!JOB_RE.test(id)||!j||typeof j!=='object')continue;const n=normJob(id,j,uid);jobs.push(n);jobByKey[n.key]=n}
   }
-  for(const uid of members){const d=pdoc(uid);
-    void d;
-  }
   for(const p of [...Object.values(S.pitchIn),...Object.values(S.pitchMine)]){
     if(!p||typeof p.job!=='string'||typeof p.by!=='string'||!jobByKey[p.job]||!members.includes(p.by)||!(num(p.amt)>0))continue;
     const l=(bidsByJob[p.job]=bidsByJob[p.job]||[]);if(!l.some(b=>b.by===p.by))l.push({by:p.by,amt:num(p.amt),say:str(p.say,90),at:num(p.at)})}
@@ -123,7 +120,6 @@ function derive(){
   return D;
 }
 function myBidOn(jobKey){const p=S.pitchMine[jobKey+'~'+S.me.id];return p&&num(p.amt)>0?{amt:num(p.amt),say:str(p.say,90),at:num(p.at)}:null}
-function pitchFor(jobKey,bidder){const k=jobKey+'~'+bidder,p=S.pitchMine[k]||S.pitchIn[k];return p?str(p.say,90):''}
 function threadOpen(k){return !!S.threadDocs[k]}
 function canMessage(t,D){const me=S.me.id;
   if(!t.jobKey)return false;
@@ -153,7 +149,6 @@ function stats(uid,D){
 function rateLine(uid,D){const s=stats(uid,D);return s.avg?` · ★${s.avg} from ${s.done} ${s.done===1?'job':'jobs'}`:''}
 function posterLine(uid){const p=repOf(uid,'p');return p.n?` · ★${p.avg.toFixed(1)} as a poster`:''}
 const jobThreadKey=(jobKey,bidder)=>`j~${jobKey}~${bidder}`;
-const dmKey=(a,b)=>'d~'+[a,b].sort().join('~');
 function parseKey(k){const p=k.split('~');if(p[0]==='j'&&p.length===4)return{members:[p[1],p[3]],jobKey:p[1]+'~'+p[2]};if(p[0]==='d'&&p.length===3)return{members:[p[1],p[2]],jobKey:null};return null}
 function threadsOf(D){
   const me=S.me.id,out={};
@@ -378,7 +373,7 @@ async function doReset(){
   S.busy=false;S.authMsg=`If ${email} has an account, a reset link is on its way. Check spam too.`;render();
 }
 function authFail(m){S.authErr=m;S.busy=false;render();return false}
-async function logOut(){stopSubs();firstLoadDone=false;S.view='board';S.myDoc=null;try{await S.fb.signOut(S.auth)}catch{}}
+async function logOut(){stopSubs();firstLoadDone=false;S.view='board';S.myDoc=null;S.authMode='login';S.authErr='';S.authMsg='';S.form.pw='';try{await S.fb.signOut(S.auth)}catch{}}
 
 function closeThread(){if(S.chat.unsub)try{S.chat.unsub()}catch{};S.chat={key:null}}
 function openThread(t){
@@ -425,7 +420,7 @@ function readPhoto(file){
 function authHTML(){
   const m=S.authMode,f=S.form;
   const field=(id,label,type,key,ph,ac)=>`<div class="stack gap8"><label class="formlabel" for="${id}">${label}</label>
-    <input id="${id}" class="inp" type="${type}" autocomplete="${ac}" placeholder="${esc(ph)}" value="${esc(f[key])}" data-bind="form.${key}" ${type==='email'?'inputmode="email" autocapitalize="off" spellcheck="false"':''}></div>`;
+    ${type==='password'?`<span class="pwwrap">`:''}<input id="${id}" class="inp" type="${type==='password'&&S.showPw?'text':type}" autocomplete="${ac}" placeholder="${esc(ph)}" value="${esc(f[key])}" data-bind="form.${key}" ${type==='email'?'inputmode="email" autocapitalize="off" spellcheck="false"':''}>${type==='password'?`<button type="button" class="pwtoggle" data-act="togglePw" aria-label="${S.showPw?'Hide':'Show'} password">${S.showPw?'Hide':'Show'}</button></span>`:''}</div>`;
   const tabs=`<div class="authtabs" role="tablist"><button type="button" role="tab" aria-selected="${m==='login'}" class="${m==='login'?'on':''}" data-auth="login">Log in</button>
     <button type="button" role="tab" aria-selected="${m==='signup'}" class="${m==='signup'?'on':''}" data-auth="signup">Sign up</button></div>`;
   let body='';
@@ -541,7 +536,7 @@ function viewJob(D){
   if(!j)return`<div class="pad">${back('board','Back to the board')}<div class="empty" style="margin:18px 0"><b>This job is gone</b><p>The poster closed it or it was taken off the board.</p></div></div>`;
   const me=S.me.id,mine=j.owner===me,st=jobState(j),bids=bidsFor(D,j.key).sort((a,b)=>a.amt-b.amt||a.at-b.at);
   const myBid=myBidOn(j.key);
-  if(S.bid.key!==j.key)S.bid={key:j.key,amt:String(myBid?num(myBid.amt):j.price),say:myBid?pitchFor(j.key,me):''};
+  if(S.bid.key!==j.key)S.bid={key:j.key,amt:String(myBid?num(myBid.amt):j.price),say:myBid?myBid.say:''};
   const stTag={expired:'<span class="tag warn">Closed · time ran out</span>',closed:'<span class="tag">Closed</span>',removed:'<span class="tag warn">Removed</span>',
     assigned:mine||j.accepted===me?`<span class="tag ok">Picked ${esc(shortName(j.accepted))}</span>`:'<span class="tag">Taken</span>',done:payOf(j)?.ok?'<span class="tag ok">Done · Paid ✓</span>':'<span class="tag ok">Done</span>'}[st]||'';
   let foot='';
@@ -589,7 +584,7 @@ function viewJob(D){
    <div class="stack" style="margin-top:6px">
     <span class="big" style="view-transition-name:jp">₹${fmt(j.price)}</span>
     <h1 class="h1">${esc(j.text)}</h1>
-    <div class="chips">${[j.when,j.where,j.kind].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${stTag}</div>
+    <div class="chips">${[j.when,j.where].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${stTag}</div>
     ${j.more?`<p style="margin:0;font-size:var(--t-14);line-height:1.55;color:var(--fg2);max-width:52ch;overflow-wrap:anywhere;white-space:pre-wrap">${esc(j.more)}</p>`:''}
     <button class="card" data-person="${esc(j.owner)}">${ring(j.owner,50)}
       <span class="rowtext" style="gap:3px"><span style="font-size:var(--t-16);font-weight:700;letter-spacing:-.015em">${esc(shortName(j.owner))}${mine?' <span class="muted">(you)</span>':''}</span>
@@ -623,7 +618,7 @@ function viewPost(){
        <span class="priceIn">₹<input id="jp" type="text" inputmode="numeric" maxlength="5" placeholder="150" value="${esc(d.price)}" data-bind="draft.price"></span></label>
      <div style="display:flex;gap:7px;padding-bottom:8px"><button class="pill" data-bump="50">+50</button><button class="pill" data-bump="100">+100</button></div>
    </div>
-   ${group('What kind','kind',KINDS)}${group('By when','when',WHENS)}${group('Where','where',WHERES)}
+   ${group('By when','when',WHENS)}${group('Where','where',WHERES)}
    <input id="jw" class="inp" maxlength="40" placeholder="Or type a place: Seminar hall, B-wing 4th floor…" value="${esc(d.whereText)}" data-bind="draft.whereText" aria-label="Other place">
    <div class="stack gap8"><label for="jm" class="formlabel">Anything else <span class="muted">(optional)</span></label>
      <textarea id="jm" class="inp" rows="2" maxlength="600" style="resize:vertical" placeholder="Details the person doing it should know." data-bind="draft.more">${esc(d.more)}</textarea></div>
@@ -649,7 +644,7 @@ function viewBids(D){
     <span style="font-size:var(--t-14);line-height:1.4;color:var(--fg);overflow-wrap:anywhere">${esc(o.text)}</span>
     ${o.status==='pending'?`<div style="display:flex;gap:8px"><button class="pick" style="flex:1;padding:11px" data-act="acceptOffer" data-key="${esc(o.key)}">Accept</button><button class="btn2" style="flex:1;padding:11px" data-act="declineOffer" data-key="${esc(o.key)}">Can't do it</button></div>`
       :`<p class="okmsg">Accepted. ${esc(firstName(o.owner))} will message you here.</p>`}</div>`;
-  return`<div class="pad narrow"><h1 class="pageh">Bids</h1>
+  return`<div class="pad narrow"><h1 class="pageh">Activity</h1>
    <div class="stack">
     ${oin.length?`<div class="sect"><h2 class="h2">Offers for you</h2></div><div class="stack gap8">${oin.map(offerCard).join('')}</div>`:''}
     ${oout.length?`<div class="sect"><h2 class="h2">Offers you sent</h2></div><div class="stack gap8">${oout.map(o=>`<div class="row">${ring(o.to,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.to))} · ₹${fmt(o.price)}</span><span class="t2">${o.status==='declined'?'Can\u2019t do it this time':'Waiting for them to answer'} · ${esc(o.text)}</span></span>
@@ -716,7 +711,7 @@ function viewPerson(uid,D){
      <span class="ring" style="border-color:${ringOf(uid)};width:108px;height:108px;box-shadow:0 0 34px ${GLOW[ringOf(uid)]}">${face(uid,94)}</span>
      <span class="pname">${esc(shortName(uid))}</span>
      <div class="chips" style="justify-content:center">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campus())}</span>
-       <span class="chip vio">${uid===ownerId()?'Organiser':'Invited member'}</span>${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${free?'<span class="chip on">Free right now</span>':''}</div>
+       ${uid===ownerId()?'<span class="chip vio">Organiser</span>':''}${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${free?'<span class="chip on">Free right now</span>':''}</div>
    </div>
    <div class="stats"><div><b>${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b style="color:var(--accent)">${st.avg??'New'}</b><span>rating</span></div>${isMe?`<div><b>${fmt(st.earned)}</b><span>₹ earned · only you</span></div>`:`<div><b>${st.poster.n?st.poster.avg.toFixed(1):'–'}</b><span>as a poster</span></div>`}</div>
    ${st.doer.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a doer · from ${st.doer.n} ${st.doer.n===1?'rating':'ratings'}</span>${st.doer.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
@@ -878,9 +873,9 @@ function render(){
   const a=document.activeElement,fid=a&&a.id;let s0=null,s1=null;try{s0=a.selectionStart;s1=a.selectionEnd}catch{}
   const gate=$('gate'),app=$('app');
   if(S.phase!=='app'){
-    app.hidden=true;gate.hidden=false;gate.className='gate'+(['onboard','auth'].includes(S.phase)?' scroll':'');gate.innerHTML=gateHTML();$('sheetRoot').innerHTML='';lastView=null;
+    app.hidden=true;gate.hidden=false;document.title='tack';gate.className='gate'+(['onboard','auth'].includes(S.phase)?' scroll':'');gate.innerHTML=gateHTML();$('sheetRoot').innerHTML='';lastView=null;
   }else{
-    gate.hidden=true;app.hidden=false;
+    gate.hidden=true;app.hidden=false;if(gate.innerHTML)gate.innerHTML='';
     const D=derive(),main=$('main');if(lastView&&lastView!==S.view)scrollMem[lastView]=main.scrollTop;
     const keep=lastView===S.view?main.scrollTop:((DEPTH[S.view]??1)===0?scrollMem[S.view]||0:0);
     main.innerHTML=(VIEWS[S.view]||viewBoard)(D);main.scrollTop=keep;
@@ -890,13 +885,14 @@ function render(){
     const navOn=v=>S.view===v||(v==='board'&&['job','person'].includes(S.view))||(v==='chats'&&S.view==='chat')||(v==='me'&&['privacy','edit'].includes(S.view))||(v==='invites'&&S.view==='invites');
     $('sidebar').innerHTML=`<div style="padding:0 6px"><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${esc(campus())} · ${boardJobs(D).length} pinned</span></div></div>
       <button class="cta" data-go="post" style="padding:13px 10px;font-size:var(--t-16)">+ Pin a job</button>
-      <nav style="display:flex;flex-direction:column;gap:3px" aria-label="Sections">${[['board','Board','board'],['bids','Bids','bids'],['chats','Chats','chat'],['me','Profile','me']].concat(S.me.isOwner?[['invites','Invites','users']]:[])
+      <nav style="display:flex;flex-direction:column;gap:3px" aria-label="Sections">${[['board','Board','board'],['bids','Activity','bids'],['chats','Chats','chat'],['me','Profile','me']].concat(S.me.isOwner?[['invites','Invites','users']]:[])
         .map(([v,l,i])=>`<button class="navitem ${navOn(v)?'on':''}" data-go="${v}" ${navOn(v)?'aria-current="page"':''}>${ic(i,18)} ${l}${v==='chats'&&D.unread?'<span class="udot" aria-label="Unread"></span>':''}${v==='bids'&&(D.toConfirm||D.offersWaiting)?'<span class="udot" aria-label="Needs your answer"></span>':''}</button>`).join('')}</nav>
       <button class="card" style="margin-top:auto;padding:10px 12px;border-radius:var(--r-sm)" data-go="me">${ring(S.me.id,38)}<span class="rowtext"><span style="font-size:var(--t-12);font-weight:700">${esc(shortName(S.me.id))}</span>
         <span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc(metaOf(S.me.id)||campus())}</span></span></button>`;
-    $('tabbar').innerHTML=[['board','Board','board'],['bids','Bids','bids'],['post','','plus'],['chats','Chats','chat'],['me','Me','me']].map(([v,l,i])=>v==='post'
+    $('tabbar').innerHTML=[['board','Board','board'],['bids','Activity','bids'],['post','','plus'],['chats','Chats','chat'],['me','Me','me']].map(([v,l,i])=>v==='post'
       ?`<button class="tab" data-go="post" aria-label="Pin a job"><span class="fab">${ic('plus',24,3,'var(--bg)')}</span></button>`
       :`<button class="tab ${navOn(v)||(v==='me'&&S.view==='invites')?'on':''}" data-go="${v}">${ic(i,20)}<span>${l}</span>${(v==='chats'&&D.unread)||(v==='bids'&&(D.toConfirm||D.offersWaiting))?'<span class="udot"></span>':''}</button>`).join('');
+    const attn=D.unread+D.offersWaiting+D.toConfirm;document.title=attn?`(${attn}) tack`:'tack';
     const st=S.sheet?S.sheet.type:null;$('sheetRoot').innerHTML=sheetHTML(D);
     if(st&&st!==lastSheet)$('sheetRoot').classList.add('enter');else if(!st)$('sheetRoot').classList.remove('enter');
     if(st!==lastSheet&&st)requestAnimationFrame(()=>requestAnimationFrame(()=>$('sheetRoot').classList.remove('enter')));
@@ -929,6 +925,7 @@ function closeSheet(){
 function need(ok,key,msg){if(!ok){S.err={[key]:msg};render();return false}return true}
 const ACT={
   reload(){location.reload()},
+  togglePw(){S.showPw=!S.showPw;render();$('fPw')?.focus()},
   logout(){logOut()},
   closeSheet(){closeSheet()},
   checkVerified(){checkVerified().then(()=>{if(S.phase==='verify')toast('Not confirmed yet. Open the link in the email first.')})},
@@ -992,7 +989,6 @@ const ACT={
         if(t&&t.lastBy===me)await S.fb.setDoc(doc(S.db,'threads',k),{lastText:'Message deleted'},{merge:true}).catch(()=>{})}
       for(const id of Object.keys(S.pitchMine))await deleteDoc(doc(S.db,'pitches',id));
       for(const id of Object.keys(S.offersOut))await deleteDoc(doc(S.db,'offers',id)).catch(()=>{});
-      await deleteDoc(doc(S.db,'rep',me)).catch(()=>{});
       for(const[id,c]of Object.entries(S.myCodes))if(!c.usedBy)await deleteDoc(doc(S.db,'invcodes',id)).catch(()=>{});
       await deleteDoc(doc(S.db,'people',me));await deleteDoc(doc(S.db,'private',me));
       S.erased=true;stopSubs();await deleteUser(user);
@@ -1024,12 +1020,12 @@ const ACT={
     if(!need(text.length>=6,'offer','Say what you need in a few more words.')||!need(price>=10&&price<=20000,'offer','Set a price between ₹10 and ₹20,000.'))return;
     const id=rid(),key=`${me}~${id}~${o.to}`,d={owner:me,to:o.to,job:id,text:text.slice(0,200),price,when:o.when,where:o.where.trim().slice(0,40),at:Date.now(),status:'pending',...(o.prevJob?{prevJob:o.prevJob}:{})};
     S.offersOut={...S.offersOut,[key]:d};S.sheet=null;render();
-    S.fb.setDoc(S.fb.doc(S.db,'offers',key),d).then(()=>toast('Sent to '+firstName(o.to)+'. You\u2019ll see their answer in Bids.')).catch(e=>{const m={...S.offersOut};delete m[key];S.offersOut=m;render();
+    S.fb.setDoc(S.fb.doc(S.db,'offers',key),d).then(()=>toast('Sent to '+firstName(o.to)+'. You\u2019ll see their answer in Activity.')).catch(e=>{const m={...S.offersOut};delete m[key];S.offersOut=m;render();
       toast(e&&e.code==='permission-denied'?firstName(o.to)+' isn\u2019t free any more. Try again when they are.':'Couldn\u2019t send it. Try again.')})},
   acceptOffer(el){const k=el.dataset.key;S.fb.updateDoc(S.fb.doc(S.db,'offers',k),{status:'accepted',respondedAt:Date.now()}).then(()=>toast('Accepted. It\u2019s now a job between you two.')).catch(writeErr)},
   declineOffer(el){const k=el.dataset.key;S.fb.updateDoc(S.fb.doc(S.db,'offers',k),{status:'declined',respondedAt:Date.now()}).then(()=>toast('Declined')).catch(writeErr)},
   withdrawOffer(el){const k=el.dataset.key,m={...S.offersOut};delete m[k];S.offersOut=m;render();S.fb.deleteDoc(S.fb.doc(S.db,'offers',k)).catch(writeErr)},
-  toggleMemberInvites(el){saveConfig(c=>({...c,memberInvites:!!el.checked}));toast(el.checked?'Members can invite friends':'Member invites are off')},
+  toggleMemberInvites(el){S.config={...S.config,memberInvites:!!el.checked};render();S.fb.setDoc(S.fb.doc(S.db,'config','app'),S.config).catch(writeErr);toast(el.checked?'Members can invite friends':'Member invites are off')},
   saveCampus(){const c=(S.inv.campus||'').trim();if(!c)return;const {doc,setDoc}=S.fb;
     S.config={...S.config,campus:c.slice(0,40)};setDoc(doc(S.db,'config','app'),S.config).catch(writeErr);toast('Campus name saved');render()},
   copy(el){const t=el.dataset.text||'';

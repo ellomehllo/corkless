@@ -293,6 +293,9 @@ html[data-nav="tab"]::view-transition-new(main){animation:fadeIn .2s ease both}
 .critbar span{display:block;height:100%;border-radius:999px;background:var(--accent)}
 .critpick{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .stars.sm{gap:2px}
-.stars.sm .star{width:34px;height:34px;background:transparent}
+.stars.sm .star{width:40px;height:40px;background:transparent}
 .overall{display:flex;align-items:baseline;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px;font-weight:700;color:var(--fg2)}
 .overall b{font-family:var(--display);font-size:var(--t-23);color:var(--accent)}
+.pwwrap{position:relative;display:block}
+.pwwrap .inp{padding-right:72px}
+.pwtoggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);padding:8px 12px;border-radius:999px;font-size:var(--t-12);font-weight:700;color:var(--fg2);background:var(--surface2)}
