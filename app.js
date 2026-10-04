@@ -60,7 +60,7 @@ const I={
 const SAY_MAX=3500,SAY_WORDS=500,words=t=>(String(t||'').trim().match(/\S+/g)||[]).length,sayOver=t=>SAY_MAX<1000?String(t||'').length>SAY_MAX:words(t)>SAY_WORDS,sayCount=t=>SAY_MAX<1000?`${String(t||'').length} / ${SAY_MAX} characters`:`${words(t)} / ${SAY_WORDS} words`;
 const ic=(n,s=20,w=2,c='currentColor',fill='none')=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="${fill}" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
 
-const blankDraft=()=>({text:'',price:'',kind:'Errand',when:'Today',where:'Gate 1',whereText:'',more:'',pics:[],useLoc:locOptIn()});
+const blankDraft=()=>({text:'',price:'',kind:'Errand',when:'Today',where:'Gate 1',whereText:'',more:'',pics:[],useLoc:locOptIn(),hue:199});
 const inviteParam=(new URLSearchParams(location.search).get('invite')||'').trim().toLowerCase();
 const jobParam=(new URLSearchParams(location.search).get('job')||'').slice(0,80);
 const codeParam=((new URLSearchParams(location.search).get('code')||'').trim().toLowerCase().match(/^[a-z0-9]{8,24}$/)||[''])[0];
@@ -117,7 +117,7 @@ const isMember=uid=>{const d=pdoc(uid);return !!d.adult&&!d.removed};
 function normJob(id,j,uid){
   return{id,owner:uid,key:uid+'~'+id,text:str(j.text,400),more:str(j.more,600),price:num(j.price),kind:str(j.kind,20),
     when:str(j.when,20),where:str(j.where,40),at:num(j.at),deadline:num(j.deadline),
-    status:STATUSES.includes(j.status)?j.status:'open',doneAt:num(j.doneAt),pics:Math.min(MAX_PICS,Math.max(0,Math.floor(num(j.pics)))),geo:geoOk(j.geo),accepted:null,agreed:0,pick:null};
+    status:STATUSES.includes(j.status)?j.status:'open',doneAt:num(j.doneAt),pics:Math.min(MAX_PICS,Math.max(0,Math.floor(num(j.pics)))),geo:geoOk(j.geo),color:COLOR_RE.test(str(j.color,7))?str(j.color,7):'',accepted:null,agreed:0,pick:null};
 }
 function jobState(j){return j.status==='open'&&j.deadline<Date.now()?'expired':j.status}
 function derive(){
@@ -718,12 +718,14 @@ function viewSaved(D){const keys=Array.isArray(S.priv.saved)?S.priv.saved:[],lis
   return`<div class="pad narrow"><h1 class="pageh">Saved jobs</h1>${list.length?'':`<div class="empty" style="margin:8px 0"><b>Nothing saved yet</b><p>Hold a note on the board, or tap the bookmark on a job, to keep it here.</p><button class="btn2" style="width:auto;padding:10px 20px;margin-top:6px" data-go="board">Browse the board</button></div>`}</div>
   ${list.length?`<div class="wallzone">${wallHTML(list,D)}</div>`:''}${gone?`<p class="note" style="padding:0 16px 24px">${gone} saved ${gone===1?'job is':'jobs are'} no longer on the board.</p>`:''}`}
 const NOTES=['#A18CFF','#4FE3E0','#FF7AD1','#FFC53D','#FF9F45','#6CB6FF'];
-const PRICE_STOPS=[[0,'#3CC9FF'],[150,'#3CC9FF'],[300,'#45D982'],[500,'#FFC32F']];
-function priceHue(p){p=Math.max(0,num(p));let i=0;while(i<PRICE_STOPS.length-2&&p>PRICE_STOPS[i+1][0])i++;const[a,b]=[PRICE_STOPS[i],PRICE_STOPS[i+1]],t=Math.min(1,(p-a[0])/(b[0]-a[0]));
-  const c=(h,k)=>parseInt(h.slice(1+k*2,3+k*2),16);return'#'+[0,1,2].map(k=>Math.round(c(a[1],k)+(c(b[1],k)-c(a[1],k))*t).toString(16).padStart(2,'0')).join('')}
-const gradNote=j=>num(j&&j.price)>500;
+const COLOR_RE=/^#[0-9a-fA-F]{6}$/,DEFAULT_NOTE='#3CC9FF';
+function hueHex(h){h=((num(h)%360)+360)%360;const s=.85,l=.6,k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>l-a*Math.max(-1,Math.min(k(n)-3,9-k(n),1));
+  return'#'+[f(0),f(8),f(4)].map(x=>Math.round(x*255).toString(16).padStart(2,'0')).join('').toUpperCase()}
+function hexHue(x){const r=parseInt(x.slice(1,3),16)/255,g=parseInt(x.slice(3,5),16)/255,b=parseInt(x.slice(5,7),16)/255,mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;
+  if(!d)return 199;const h=mx===r?((g-b)/d)%6:mx===g?(b-r)/d+2:(r-g)/d+4;return Math.round((h*60+360)%360)}
+const gradNote=j=>false;
 const gcls=j=>gradNote(j)?' gnote':'',gvars=j=>gradNote(j)?';--nc1:var(--g1);--nc2:var(--g2)':'';
-function noteOf(j){return gradNote(j)?'#5CB8FF':priceHue(j&&typeof j==='object'?j.price:0)}
+function noteOf(j){return j&&COLOR_RE.test(j.color||'')?j.color:DEFAULT_NOTE}
 function tile(j,D,i=0){
   const c=noteOf(j),n=bidsFor(D,j.key).length,left=j.deadline-Date.now();
   const ph=j.pics?(picsOf('j:'+j.key)||[])[0]:'',d=-((Date.now()/1000+i*2.3)%32).toFixed(2);
@@ -851,8 +853,8 @@ function viewJob(D){
   ${!mine?`<div class="reportrow"><button class="linkbtn" data-sheet="report" data-about="${esc(j.owner)}">Report this job</button>${mod}</div>`:''}`;
 }
 const NOTE_WORDS=50,noteCount=t=>`${words(t)} / ${NOTE_WORDS} words`;
-function noteTone(){const p=digits(S.draft.price)||0,j={price:p};return{c:noteOf(j),g:gradNote(j)}}
-function syncNoteTone(){const n=$('bignote');if(!n)return;const {c,g}=noteTone();n.style.setProperty('--nc',c);n.classList.toggle('gnote',g);
+function noteTone(){return{c:hueHex(S.draft.hue),g:false}}
+function syncNoteTone(){const hb=$('jhue');if(hb)hb.style.setProperty('--thumb',hueHex(S.draft.hue));const n=$('bignote');if(!n)return;const {c,g}=noteTone();n.style.setProperty('--nc',c);n.classList.toggle('gnote',g);
   if(g){n.style.setProperty('--nc1','var(--g1)');n.style.setProperty('--nc2','var(--g2)')}else{n.style.removeProperty('--nc1');n.style.removeProperty('--nc2')}
   const pr=$('bnPrice');if(pr)pr.classList.toggle('blank',!digits(S.draft.price))}
 function viewPost(){
@@ -869,6 +871,7 @@ function viewPost(){
      <div class="bnpics">${picEdit('draft',d.pics)}</div>
      <span class="bnfoot"><span class="by">${face(me,22)}<span class="nm">${esc(firstName(me))}</span></span><span class="wc ${words(d.text)>NOTE_WORDS?'over':''}" id="jtWc">${noteCount(d.text)}</span></span>
    </div>
+   <div class="huewrap"><input type="range" id="jhue" class="huebar" min="0" max="359" step="1" value="${num(d.hue)}" data-bind="draft.hue" aria-label="Note colour" style="--thumb:${c}"><span class="formlabel">Slide to pick the note colour</span></div>
    <div class="bnbump"><span class="formlabel">You'll pay</span><button class="pill" data-bump="50">+₹50</button><button class="pill" data-bump="100">+₹100</button></div>
    <div class="stack postsec"><h2 class="h2">Tags</h2>
      ${group('By when','when',WHENS)}${group('Where','where',WHERES)}
@@ -1393,10 +1396,10 @@ const ACT={
     if(!need(words(text)<=NOTE_WORDS,'post','Keep the note to '+NOTE_WORDS+' words. Put the rest in the details.')||!need(text.length>=8,'post','Say what you need in a few more words.')||!need(price>=10&&price<=20000,'post','Set a price between ₹10 and ₹20,000.'))return;
     const id=rid(),at=Date.now(),where=(d.whereText.trim()||d.where).slice(0,40);
     const pics=cleanPics(d.pics),geo=d.useLoc&&LOC.pos?{lat:Math.round(LOC.pos.lat*1e3)/1e3,lng:Math.round(LOC.pos.lng*1e3)/1e3}:null;
-    saveMine(x=>{x.jobs={...(x.jobs||{}),[id]:{text:text.slice(0,400),more:d.more.trim().slice(0,600),price,kind:d.kind,when:d.when,where,at,deadline:deadlineFor(d.when,at),status:'open',...(pics.length?{pics:pics.length}:{}),...(geo?{geo}:{})}};return x});
+    saveMine(x=>{x.jobs={...(x.jobs||{}),[id]:{text:text.slice(0,400),more:d.more.trim().slice(0,600),price,kind:d.kind,when:d.when,where,at,deadline:deadlineFor(d.when,at),status:'open',color:hueHex(d.hue),...(pics.length?{pics:pics.length}:{}),...(geo?{geo}:{})}};return x});
     if(pics.length){S.pics['j:'+S.me.id+'~'+id]=pics;S.fb.setDoc(S.fb.doc(S.db,'jobpics',S.me.id+'~'+id),{owner:S.me.id,job:id,pics,at}).catch(e=>{console.warn(e);toast('Your job is up, but the photos didn\u2019t upload.')})}
     S.draft=blankDraft();S.sort='newest';S.fresh=S.me.id+'~'+id;go('board');moment('Pinned.','Classmates can bid on it now.',1100);setTimeout(()=>{S.fresh=null},4000)},
-  repost(){const j=derive().jobByKey[S.openJob];if(!j)return;S.draft={...blankDraft(),text:j.text,price:String(j.price),kind:KINDS.includes(j.kind)?j.kind:'Other',where:WHERES.includes(j.where)?j.where:'Gate 1',whereText:WHERES.includes(j.where)?'':j.where,more:j.more,pics:[...(S.pics['j:'+j.key]||[])]};
+  repost(){const j=derive().jobByKey[S.openJob];if(!j)return;S.draft={...blankDraft(),hue:hexHue(noteOf(j)),text:j.text,price:String(j.price),kind:KINDS.includes(j.kind)?j.kind:'Other',where:WHERES.includes(j.where)?j.where:'Gate 1',whereText:WHERES.includes(j.where)?'':j.where,more:j.more,pics:[...(S.pics['j:'+j.key]||[])]};
     saveMine(x=>{if(x.jobs?.[j.id])x.jobs[j.id].status='closed';return x});go('post')},
   bid(){const j=derive().jobByKey[S.openJob];if(!j)return;const amt=digits(S.bid.amt);
     if(!need(amt>=1&&amt<=50000,'bid','Enter a bid in rupees.'))return;if(!need(!sayOver(S.bid.say),'bid',SAY_MAX<1000?'Keep your pitch under '+SAY_MAX+' characters.':'Keep your pitch under '+SAY_WORDS+' words.'))return;const had=!!myBidOn(j.key);
@@ -1613,7 +1616,7 @@ document.addEventListener('submit',e=>{
   if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
-document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='q')render();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){w.textContent=noteCount(e.target.value);w.classList.toggle('over',words(e.target.value)>NOTE_WORDS)}}if(e.target.id==='jp')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
+document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='q')render();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){w.textContent=noteCount(e.target.value);w.classList.toggle('over',words(e.target.value)>NOTE_WORDS)}}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
 document.addEventListener('change',async e=>{
   bind(e);syncNeed();
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}
