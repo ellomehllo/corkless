@@ -1,6 +1,6 @@
 import firebaseConfig from './firebase-config.js';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610040746';
-import {modHit,MOD_CAT} from './mod.js?v=202610040746';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610041804';
+import {modHit,MOD_CAT} from './mod.js?v=202610041804';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
@@ -744,7 +744,7 @@ function hexHue(x){const r=parseInt(x.slice(1,3),16)/255,g=parseInt(x.slice(3,5)
   if(!d)return 199;const h=mx===r?((g-b)/d)%6:mx===g?(b-r)/d+2:(r-g)/d+4;return Math.round((h*60+360)%360)}
 const gradNote=j=>false;
 const gcls=j=>gradNote(j)?' gnote':'',gvars=j=>gradNote(j)?';--nc1:var(--g1);--nc2:var(--g2)':'';
-function noteOf(j){return j&&COLOR_RE.test(j.color||'')?j.color:DEFAULT_NOTE}
+function noteOf(j){if(!j)return DEFAULT_NOTE;if(COLOR_RE.test(j.color||''))return j.color;if(!j.key)return DEFAULT_NOTE;let h=2166136261;for(let i=0;i<j.key.length;i++){h^=j.key.charCodeAt(i);h=Math.imul(h,16777619)}return hueHex((h>>>0)%360)}
 function tile(j,D,i=0){
   const c=noteOf(j),n=bidsFor(D,j.key).length,left=j.deadline-Date.now();
   const ph=j.pics?(picsOf('j:'+j.key)||[])[0]:'',d=-((Date.now()/1000+i*2.3)%32).toFixed(2);
