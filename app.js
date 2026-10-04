@@ -1,6 +1,6 @@
 import firebaseConfig from './firebase-config.js';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610041804';
-import {modHit,MOD_CAT} from './mod.js?v=202610041804';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610041850';
+import {modHit,MOD_CAT} from './mod.js?v=202610041850';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
@@ -165,19 +165,22 @@ function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str
   const joined=num(S.myDoc?.joinedAt);add(joined,'tack','Welcome to tack. Pin a small job or bid on one from the board.',{go:'board'});
   for(const j of D.jobs){
     if(j.owner===me){
-      for(const b of bidsFor(D,j.key))if(b.by!==me&&ok(b.by))add(b.at,b.by,`${nm(b.by)} bid ₹${fmt(b.amt)} on ${t(j)}`,{job:j.key});
+      for(const b of bidsFor(D,j.key))if(b.by!==me&&ok(b.by))add(b.at,b.by,`${nm(b.by)} bid on ${t(j)}`,{job:j.key});
       const pk=j.pick;if(pk&&ok(pk.doer)){const pay=payOf(j);
-        if(pay)add(pay.at,pk.doer,pay.ok?`${nm(pk.doer)} confirmed they got ₹${fmt(j.agreed)} for ${t(j)}`:`${nm(pk.doer)} hasn\u2019t got your ₹${fmt(j.agreed)} for ${t(j)} yet`,{job:j.key})}
+        if(pay)add(pay.at,pk.doer,pay.ok?`${nm(pk.doer)} confirmed your payment for ${t(j)}`:`${nm(pk.doer)} says your payment for ${t(j)} hasn\u2019t arrived yet`,{job:j.key})}
       const st=jobState(j);
       if(st==='expired')add(j.deadline,'tack',`Time ran out on ${t(j)}. Pin it again if you still need it.`,{job:j.key});
       if(st==='removed')add(j.at,'tack',`${t(j)} was taken off the board by ${esc(organiser())}.`,{job:j.key});
-    }else if(j.accepted===me&&j.pick){const pk=j.pick;
-      add(num(pk.at),j.owner,`${nm(j.owner)} picked you for ${t(j)} · ₹${fmt(j.agreed)}`,{job:j.key});
-      if(pk.status==='done')add(num(pk.doneAt),j.owner,`${nm(j.owner)} marked ${t(j)} as done. Did you get ₹${fmt(j.agreed)}?`,{job:j.key});
-      if(typeof pk.review==='string')add(num(pk.doneAt)+1,'tack','Someone you worked for left you a public review.',{person:me});
+    }else if(j.accepted===me&&j.pick){const pk=j.pick,pay=payOf(j);
+      add(num(pk.at),j.owner,`${nm(j.owner)} picked you for ${t(j)}`,{job:j.key});
+      if(pk.status==='done')add(num(pk.doneAt),j.owner,`${nm(j.owner)} marked ${t(j)} as done. Got paid?`,{job:j.key});
+      if(pay&&pay.ok)add(pay.at,'tack',`Congrats, you finished ${t(j)}`,{job:j.key,earn:j.agreed||j.price});
+      if(typeof pk.review==='string')add(num(pk.doneAt)+2,j.owner,`${nm(j.owner)} left you a review. Tap to see it.`,{rev:pk.review});
+    }else if(ok(j.owner)){const b=myBidOn(j.key);
+      if(b&&lostBid(j))add(lostAt(j,b.at),j.owner,`${nm(j.owner)} picked someone else for ${t(j)}`,{job:j.key});
     }
   }
-  for(const o of offerList(S.offersIn))if(ok(o.owner))add(num(o.at),o.owner,`${nm(o.owner)} asked you: ${esc(str(o.text,60))} · ₹${fmt(num(o.price))}`,{go:'bids'});
+  for(const o of offerList(S.offersIn))if(ok(o.owner))add(num(o.at),o.owner,`${nm(o.owner)} asked you: ${esc(str(o.text,60))}`,{go:'bids'});
   for(const o of offerList(S.offersOut))if(ok(o.to)&&o.status!=='pending')add(num(o.respondedAt),o.to,o.status==='accepted'?`${nm(o.to)} said yes to ${esc(str(o.text,60))}`:`${nm(o.to)} can\u2019t do ${esc(str(o.text,60))} this time`,{go:'bids'});
   return out.sort((a,b)=>b.at-a.at).slice(0,80);
 }
@@ -733,6 +736,21 @@ function openShare(k){const j=derive().jobByKey[k];if(!j)return;S.sheet={type:'s
   if(S.shareImg?.key===k)return;S.shareImg=null;const go2=()=>noteCard(j).then(b=>{if(!b)return;S.shareImg={key:k,blob:b,url:URL.createObjectURL(b)};if(S.sheet?.type==='share')render()});
   if(j.pics&&picsOf('j:'+k)===null)setTimeout(go2,700);else go2()}
 function saveImg(){if(!S.shareImg)return;const a=document.createElement('a');a.href=S.shareImg.url;a.download='tack-job.png';document.body.appendChild(a);a.click();a.remove()}
+function revBy(rid,D){const pk=Object.values(S.picks||{}).find(p=>p&&p.review===rid);return pk&&D.members.includes(pk.owner)?pk.owner:null}
+function starsHTML(v,size,anim){const st=ic('star',size,2,'currentColor','currentColor');return`<span class="revstars${anim?' anim':''}" aria-label="${v?v.toFixed(1)+' out of 5':'No stars'}">${[1,2,3,4,5].map(n=>{const c=v>=n-.25?'on':v>=n-.75?'half':'';return`<span class="rs ${c}" style="--i:${n}">${c==='half'?`<span class="hf">${st}</span>`:''}${st}</span>`}).join('')}</span>`}
+function viewReviews(D){const l=reviewsOf(S.me.id);
+  return`<div class="pad">${back('me','Profile')}<div class="stack narrow" style="margin-top:6px;gap:14px"><div class="stack gap8"><h1 class="pageh">Your reviews</h1><p class="note" style="text-align:left;margin:0">From posters you did jobs for. Everyone else sees them without names.</p></div>
+    ${!l?'<p class="note" style="text-align:left">Loading\u2026</p>':!l.length?'<div class="empty" style="margin:8px 0"><b>No reviews yet</b><p>When a poster reviews your work, it shows up here.</p></div>'
+      :l.map(r=>{const by=revBy(r.id,D);return`<button class="box revcard" data-review="${esc(r.id)}"><span class="revtop">${by?ring(by,30):''}<span class="revwho">${by?`<b>${esc(firstName(by))}</b>`:'A poster'}<span>${new Date(r.at).toLocaleDateString('en-IN',{month:'short',year:'numeric'})}</span></span>${r.stars?starsHTML(r.stars,15):''}</span><p class="revtext">${esc(r.text)}</p>${picStrip('r:'+r.id,r.pics,'flush')}</button>`}).join('')}
+  </div></div><div style="height:24px"></div>`}
+function viewReview(D){const l=reviewsOf(S.me.id),r=l&&l.find(x=>x.id===S.openRev),by=r&&revBy(r.id,D);
+  return`<div class="pad">${back('reviews','Your reviews')}<div class="stack narrow" style="margin-top:6px">
+    ${!l?'<p class="note">Loading\u2026</p>':!r?'<div class="empty" style="margin:8px 0"><b>This review was removed</b><p>It no longer shows on your profile.</p></div>'
+      :`<div class="revreveal">${by?ring(by,64):''}<h1 class="pageh" style="text-align:center">${by?`<b>${esc(firstName(by))}</b> reviewed you`:'Your review'}</h1>
+        ${starsHTML(r.stars,34,true)}${r.stars?`<b class="revnum">${r.stars.toFixed(1)}</b>`:''}
+        <p class="revwords">\u201c${esc(r.text)}\u201d</p>${picStrip('r:'+r.id,r.pics,'flush')}
+        <p class="note">Shows on your profile without their name.</p></div>`}
+  </div></div><div style="height:24px"></div>`}
 function viewSaved(D){const keys=Array.isArray(S.priv.saved)?S.priv.saved:[],list=keys.map(k=>D.jobByKey[k]).filter(j=>j&&j.status!=='removed'),gone=keys.length-list.length;
   return`<div class="pad narrow"><h1 class="pageh">Saved jobs</h1>${list.length?'':`<div class="empty" style="margin:8px 0"><b>Nothing saved yet</b><p>Hold a note on the board, or tap the bookmark on a job, to keep it here.</p><button class="btn2" style="width:auto;padding:10px 20px;margin-top:6px" data-go="board">Browse the board</button></div>`}</div>
   ${list.length?`<div class="wallzone">${wallHTML(list,D)}</div>`:''}${gone?`<p class="note" style="padding:0 16px 24px">${gone} saved ${gone===1?'job is':'jobs are'} no longer on the board.</p>`:''}`}
@@ -945,9 +963,10 @@ function viewBids(D){
       const empty=t=>`<p class="note" style="text-align:left">${t}</p>`;
       return`<div class="pills" style="padding:4px 0 0" role="group" aria-label="Show">${tabs.map(([k,l,n])=>`<button class="pill ${S.actTab===k?'on':''}" data-acttab="${k}" aria-pressed="${S.actTab===k}">${l}${n?' · '+n:''}</button>`).join('')}</div>
       ${S.actTab==='all'?(()=>{const feed=[...D.notes.map(n=>({...n,kind:'n'})),...jobsNow.map(j=>({kind:'j',j,at:j.at})),...[...active,...waiting,...notPicked].map(y=>({kind:'b',y,at:y.at||y.j.at}))].sort((a,b)=>b.at-a.at);
-        const one=f=>f.kind==='j'?row(f.j,jobLine(f.j),f.j.price,me):f.kind==='b'?row(f.y.j,bidLine(f.y.x||{j:f.y.j}),f.y.amt)
-          :`<button class="item notif ${f.at>S.actSeenAt?'new':''}" ${f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span></span>${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`;
-        return feed.length?`<div class="ifeed">${dateGroups(feed,f=>f.at).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(one).join('')}</section>`).join('')}</div>`:empty('Bids, picks and payments show up here.')})()
+        const np=([l,c])=>[String(l).replace(/\s*·\s*₹[\d,]+/g,'').replace(/₹[\d,]+\s*·\s*/g,''),c];
+        const one=f=>f.kind==='j'?row(f.j,np(jobLine(f.j)),f.j.price,me):f.kind==='b'?row(f.y.j,np(bidLine(f.y.x||{j:f.y.j})),f.y.amt)
+          :`<button class="item notif ${f.at>S.actSeenAt?'new':''}${f.earn?' earned':''}" ${f.rev?`data-review="${esc(f.rev)}"`:f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span></span>${f.earn?`<b class="earn">+₹${fmt(f.earn)}</b>`:''}${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`;
+        return feed.length?`<div class="ifeed allfeed">${dateGroups(feed,f=>f.at).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(one).join('')}</section>`).join('')}</div>`:empty('Bids, picks and payments show up here.')})()
       :S.actTab==='jobs'?`${jobsNow.length?`<div class="ifeed"><section class="igroup">${jobsNow.map(j=>row(j,jobLine(j),j.price,me)).join('')}</section></div>`:empty('Nothing pinned right now.')}
         <button class="linkbtn" data-go="post" style="align-self:flex-start;padding:0">Pin a job</button>`
       :S.actTab==='bids'?(active.length||waiting.length||notPicked.length?`<div class="ifeed">${grp('Active',active)+grp('Waiting',waiting)+grp('Not picked',notPicked)}</div>`:empty('Bids you place on the board show up here.'))
@@ -1013,12 +1032,13 @@ function viewPerson(uid,D){
        ${uid===ownerId()?'<span class="chip vio">Organiser</span>':''}${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${free?'<span class="chip on">Free right now</span>':''}</div>
      ${bio?`<p class="pbio">${esc(bio)}</p>`:''}
    </div>
-   <div class="stats"><div><b style="color:var(--cyan)">${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b style="color:var(--amber)">${st.avg??'New'}</b><span>rating</span></div>${isMe?`<div><b style="color:var(--accent)">${fmt(st.earned)}</b><span>₹ earned · only you</span></div>`:`<div><b style="color:var(--violet)">${st.poster.n?st.poster.avg.toFixed(1):'–'}</b><span>as a poster</span></div>`}</div>
+   <div class="stats"><div><b style="color:var(--cyan)">${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b style="color:var(--amber)">${st.avg??'New'}</b><span>rating</span></div>${isMe?`<div><b style="color:var(--money)">₹${fmt(st.earned)}</b><span>earned · only you</span></div>`:`<div><b style="color:var(--violet)">${st.poster.n?st.poster.avg.toFixed(1):'–'}</b><span>as a poster</span></div>`}</div>
    ${st.doer.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a doer · from ${st.doer.n} ${st.doer.n===1?'rating':'ratings'}</span>${st.doer.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
-   ${reviewList(uid)}
+   ${isMe?'':reviewList(uid)}
    ${st.poster.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a poster · from ${st.poster.n} ${st.poster.n===1?'rating':'ratings'}</span>${st.poster.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
    ${isMe?`<button class="card" data-sheet="free">${ic('clock',20)}<span class="rowtext"><span class="t1">${free?'You’re free until '+clock(num(d.freeUntil)):'Free right now?'}</span><span class="t2">${free?'Anyone can message you until then. Tap to change.':'Show you’re around and open to quick requests'}</span></span><span class="chev">${ic('chev',18)}</span></button>`:''}
    ${isMe?`<div class="menu">
+       <button data-go="reviews">${ic('star',18)} Your reviews${(()=>{const l=reviewsOf(S.me.id);return l&&l.length?`<span class="menuval">${l.length}</span>`:''})()}<span class="chev">${ic('chev',16)}</span></button>
        <button data-act="${pushOn()?'pushOff':'pushOn'}" ${S.busy?'disabled':''}>${ic('bell',18)} Notifications<span class="menuval">${pushOn()?'On':'Off'}</span></button>
        ${S.me.isOwner?`<button data-go="invites">${ic('users',18)} Invites and members<span class="chev">${ic('chev',16)}</span></button>`:''}
        <button data-act="replayIntro">${ic('board',18)} How tack works<span class="chev">${ic('chev',16)}</span></button>
@@ -1279,7 +1299,7 @@ function sheetHTML(D){
   return`<div class="scrim" data-act="closeSheet"></div><div class="sheet sheet-${s.type}" role="dialog" aria-modal="true" aria-labelledby="sheetT">${b}</div>`;
 }
 
-const VIEWS={board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewSettings,settings:viewSettings,help:viewHelp,invites:viewInvites,saved:viewSaved,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
+const VIEWS={board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewSettings,settings:viewSettings,help:viewHelp,invites:viewInvites,saved:viewSaved,reviews:viewReviews,review:viewReview,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
 let lastView=null,lastSheet=null;const scrollMem={};
 const INTRO=[
   {k:'board',t:'This is the board.',b:'Classmates pin small jobs here. A print run, a lift down four floors, an hour of help before a deadline.'},
@@ -1362,7 +1382,7 @@ function render(){
     const keep=lastView===S.view?main.scrollTop:((DEPTH[S.view]??1)===0?scrollMem[S.view]||0:0);
     main.dataset.view=S.view;main.innerHTML=((DEPTH[S.view]??1)===0?bannerHTML():'')+(VIEWS[S.view]||viewBoard)(D);main.scrollTop=keep;
     if(lastView!==S.view&&S.view==='chat')requestAnimationFrame(()=>{main.scrollTop=main.scrollHeight});
-    lastView=S.view;
+    lastView=S.view;nbCheck(D);
     $('rail').innerHTML=railHTML(D);
     const navOn=v=>S.view===v||(v==='board'&&['job','person'].includes(S.view))||(v==='chats'&&S.view==='chat')||(v==='me'&&['privacy','edit','settings','help'].includes(S.view))||(v==='invites'&&S.view==='invites');
     $('sidebar').innerHTML=`<div style="padding:0 6px"><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${esc(campus())} · ${boardJobs(D).length} pinned</span></div></div>
@@ -1382,9 +1402,25 @@ function render(){
   }
   if(fid){const el=$(fid);if(el&&el!==document.activeElement){el.focus({preventScroll:true});try{if(s0!=null)el.setSelectionRange(s0,s1)}catch{}}}
 }
+const NB={since:0,seen:new Set(),q:[],on:null,t:0};
+const nbKey=n=>n.at+'|'+n.who+'|'+n.html;
+function nbCheck(D){const now=Date.now();
+  if(!NB.since){NB.since=now;for(const n of D.notes)NB.seen.add(nbKey(n));return}
+  for(const n of D.notes){const k=nbKey(n);if(NB.seen.has(k))continue;NB.seen.add(k);if(n.at>=NB.since-5e3&&n.at<=now+6e4&&S.view!=='bids')NB.q.push(n)}
+  if(!NB.on)nbNext()}
+function nbRoot(){let r=$('nbanners');if(!r){r=document.createElement('div');r.id='nbanners';r.className='nbanners';r.setAttribute('aria-live','polite');document.body.appendChild(r)}return r}
+function nbNext(){const n=NB.q.shift();if(!n){NB.on=null;return}NB.on=n;const r=nbRoot(),go2=n.rev?`data-review="${esc(n.rev)}"`:n.job?`data-job="${esc(n.job)}"`:n.person?`data-person="${esc(n.person)}"`:`data-go="${n.go}"`;
+  r.innerHTML=`<button class="nbanner" ${go2}>${n.who==='tack'?tackFace(36):ring(n.who,36)}<span class="ntext">${n.html}</span>${n.earn?`<b class="earn">+\u20b9${fmt(n.earn)}</b>`:''}</button>`;
+  const el=r.firstChild;let y0=null;
+  el.addEventListener('pointerdown',e=>{y0=e.clientY});el.addEventListener('pointermove',e=>{if(y0!=null&&e.clientY-y0<-18){y0=null;nbHide()}});
+  el.addEventListener('click',()=>{clearTimeout(NB.t);nbHide(true)});
+  clearTimeout(NB.t);NB.t=setTimeout(()=>nbHide(),4500)}
+function nbHide(now){const el=$('nbanners')?.firstChild;clearTimeout(NB.t);if(!el){nbNext();return}
+  if(now||reduceMotion.matches){el.remove();setTimeout(nbNext,200);return}
+  el.classList.add('out');el.addEventListener('animationend',()=>{el.remove();setTimeout(nbNext,250)},{once:true})}
 let toastT;
 function toast(msg){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},2800)}
-const DEPTH={board:0,bids:0,chats:0,me:0,saved:0,invites:1,post:1,job:1,person:1,chat:1,privacy:1,settings:1,help:2,edit:2};
+const DEPTH={board:0,bids:0,chats:0,me:0,saved:0,invites:1,post:1,job:1,person:1,chat:1,privacy:1,settings:1,help:2,edit:2,reviews:1,review:2};
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
 function go(v,keepThread){
   const from=S.view;
@@ -1619,7 +1655,7 @@ const ACT={
 };
 
 document.addEventListener('click',e=>{
-  const el=e.target.closest('[data-doc],[data-pref],[data-asks],[data-helpkind],[data-helpjob],[data-helpwhy],[data-acttab],[data-pic],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
+  const el=e.target.closest('[data-doc],[data-pref],[data-asks],[data-helpkind],[data-helpjob],[data-helpwhy],[data-acttab],[data-pic],[data-review],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
   if(!el)return;const ds=el.dataset;
   if(ds.ask!==undefined){if(ds.ask===S.me?.id)return;S.offer={to:ds.ask,prevJob:ds.prev||null,text:'',price:'',when:'Next hour',where:''};S.err={};S.sheet={type:'offer'};render();return}
   if(ds.ofwhen!==undefined){S.offer.when=ds.ofwhen;render();return}
@@ -1643,6 +1679,7 @@ document.addEventListener('click',e=>{
   if(ds.sheet!==undefined){if(ds.sheet==='invitefriend')S.lastCode=null;S.err={};S.erase={pw:''};if(ds.sheet==='done'||ds.sheet==='ratePoster'||ds.sheet==='review')S.rate={a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]};if(ds.sheet==='report')S.rep={why:ds.prewhy||'',note:'',block:false};S.sheet={type:ds.sheet,about:ds.about,rid:ds.rid};render();return}
   if(ds.free!==undefined){const now=new Date(),t={'1h':+now+36e5,'3h':+now+3*36e5,day:new Date(now).setHours(23,59,0,0),off:0}[ds.free];
     saveMine(d=>{d.freeUntil=t;return d});S.sheet=null;toast(t?'You’re on the Free right now row':'Marked not free');return}
+  if(ds.review!==undefined){S.openRev=ds.review;go('review');return}
   if(ds.pic!==undefined){S.sheet={type:'pic',k:ds.pic,i:+ds.i||0};render();return}
   if(ds.unpic!==undefined){const o=ds.unpic==='draft'?S.draft:ds.unpic==='rev'?S.rate:S.bid;o.pics=(o.pics||[]).filter((_,i)=>i!==+ds.i);render();return}
   if(ds.star!==undefined){S.rate[ds.star[0]]=+ds.star.slice(1);render();return}
