@@ -102,9 +102,35 @@ function deadlineFor(when,at){
 }
 
 function pdoc(uid){return uid===S.me?.id?(S.myDoc||{}):(S.peopleDocs[uid]||{})}
-function fullName(uid){const n=str(pdoc(uid).name,60).trim();if(n)return n;if(uid===S.me?.id)return (S.onb.name||S.user?.displayName||'').trim();return''}
-function shortName(uid){const n=fullName(uid);if(!n)return uid===S.me?.id?'You':'Someone';const p=n.split(/\s+/);return p.length>1?`${p[0]} ${p[p.length-1][0].toUpperCase()}.`:p[0]}
-function firstName(uid){const n=fullName(uid);return n?n.split(/\s+/)[0]:(uid===S.me?.id?'You':'Someone')}
+const HANDLE_RE=/^(?![.])(?!.*[.]{2})[a-z0-9._]{4,20}(?<![.])$/,HANDLE_DAYS=30,HANDLE_RESERVED=['tack','admin','organiser','organizer','support','official','moderator','staff','help','team','system','root','null','undefined','everyone'];
+function handleOf(uid){const h=str(pdoc(uid).handle,20).toLowerCase();return HANDLE_RE.test(h)?h:''}
+function myRealName(){return str(S.myName||S.myDoc?.name||S.onb.name||S.user?.displayName,60).trim()}
+function realNameOf(uid){const me=S.me?.id;if(!uid)return'';if(uid===me)return myRealName();
+  for(const p of Object.values(S.picks||{})){if(!p)continue;if(p.owner===me&&p.doer===uid&&typeof p.doerName==='string')return str(p.doerName,60).trim();if(p.doer===me&&p.owner===uid&&typeof p.posterName==='string')return str(p.posterName,60).trim()}
+  if(S.me?.isOwner&&S.names&&S.names[uid])return S.names[uid];
+  return handleOf(uid)?'':str(pdoc(uid).name,60).trim()}
+function fullName(uid){return realNameOf(uid)}
+function shortName(uid){const n=uid===S.me?.id&&handleOf(uid)?'':realNameOf(uid);if(n){const p=n.split(/\s+/);return p.length>1?`${p[0]} ${p[p.length-1][0].toUpperCase()}.`:p[0]}const h=handleOf(uid);return h?'@'+h:(uid===S.me?.id?'You':'Someone')}
+function firstName(uid){const n=uid===S.me?.id&&handleOf(uid)?'':realNameOf(uid);if(n)return n.split(/\s+/)[0];const h=handleOf(uid);return h?'@'+h:(uid===S.me?.id?'You':'Someone')}
+function handleCheck(raw){const h=String(raw||'').trim().replace(/^@/,'').toLowerCase();if(!h)return{h,st:'empty'};
+  if(h.length<4)return{h,st:'short'};if(!HANDLE_RE.test(h))return{h,st:'chars'};if(HANDLE_RESERVED.includes(h)||modHit(h,h.replace(/[._]/g,'')))return{h,st:'taken'};return{h,st:'check'}}
+let handleT=null;
+function checkHandle(raw){const r=handleCheck(raw);S.hcheck={...r};clearTimeout(handleT);
+  if(r.st==='check'){if(r.h===handleOf(S.me.id)){S.hcheck.st='mine';return}handleT=setTimeout(()=>{S.fb.getDoc(S.fb.doc(S.db,'usernames',r.h)).then(d=>{if(S.hcheck.h!==r.h)return;S.hcheck.st=d.exists()&&d.data().uid!==S.me.id?'taken':'ok';paintHandle()}).catch(()=>{S.hcheck.st='ok';paintHandle()})},350)}}
+function handleMsg(){const c=S.hcheck||{};return{empty:'',short:'At least 4 characters',chars:'Letters, numbers, . and _ only',taken:'Not available',check:'Checking…',ok:'Available ✓',mine:'This is your username'}[c.st]||''}
+function paintHandle(){const el=$('hMsg');if(el){el.textContent=handleMsg();el.className='hmsg '+(S.hcheck?.st||'')}syncNeed()}
+function handleLockedUntil(){const at=num(S.myDoc?.handleAt);return handleOf(S.me.id)&&at&&Date.now()<at+HANDLE_DAYS*864e5?at+HANDLE_DAYS*864e5:0}
+function handleField(locked){const h=S.onb.handle||'';return`<div class="stack gap8"><label class="formlabel" for="ohd">Username <span class="muted">· what people see on the board</span></label>
+  <label class="field hfield ${locked?'locked':''}" for="ohd"><span class="hat">@</span><input id="ohd" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" value="${esc(h)}" data-bind="onb.handle" ${locked?'disabled':''} aria-describedby="hMsg"></label>
+  <span id="hMsg" class="hmsg ${S.hcheck?.st||''}">${locked?esc(locked):handleMsg()}</span></div>`}
+async function claimHandle(h){const {doc,writeBatch}=S.fb,me=S.me.id,b=writeBatch(S.db),old=handleOf(me);
+  b.set(doc(S.db,'usernames',h),{uid:me,at:Date.now()});if(old&&old!==h)b.delete(doc(S.db,'usernames',old));
+  if(!S.myNameSaved){const n=myRealName();if(n.length>=2)b.set(doc(S.db,'names',me),{name:n.slice(0,60)})}
+  await b.commit();S.myNameSaved=true}
+function loadNames(D){S.names=S.names||{};for(const u of D.members){if(u in S.names||!handleOf(u))continue;S.names[u]='';S.fb.getDoc(S.fb.doc(S.db,'names',u)).then(d=>{if(d.exists()){S.names[u]=str(d.data().name,60);render()}}).catch(()=>{})}}
+function syncDealNames(){const me=S.me?.id,n=myRealName();if(!me||!n||S.dealSync)return;
+  for(const[k,p]of Object.entries(S.picks||{})){if(!p)continue;const f=p.doer===me&&typeof p.doerName!=='string'?'doerName':p.owner===me&&typeof p.posterName!=='string'?'posterName':'';if(!f||(S.dealFail||{})[k+f])continue;
+    S.dealSync=true;S.picks={...S.picks,[k]:{...p,[f]:n}};S.fb.updateDoc(S.fb.doc(S.db,'picks',k),{[f]:n}).catch(e=>{console.warn(e);S.dealFail={...(S.dealFail||{}),[k+f]:1}}).finally(()=>{S.dealSync=false});return}}
 function photoOf(uid){const p=uid===S.me?.id&&(S.phase==='onboard'||S.view==='edit')?S.onb.photo:pdoc(uid).photo;return typeof p==='string'&&p.length<300000&&PHOTO_RE.test(p)?p:''}
 function ringOf(uid){const r=uid===S.me?.id&&S.onb.ring&&(S.phase==='onboard'||S.view==='edit')?S.onb.ring:pdoc(uid).ring;if(RINGS.includes(r))return r;let h=0;for(const c of String(uid))h=(h*31+c.charCodeAt(0))|0;return RINGS[Math.abs(h)%RINGS.length]}
 function metaOf(uid){const d=pdoc(uid);return [str(d.year,12),str(d.branch,24)].filter(Boolean).join(' ')}
@@ -313,7 +339,7 @@ function convertOffers(){
     const at=num(o.at)||Date.now();
     saveMine(x=>{x.jobs={...(x.jobs||{})};if(!x.jobs[o.job])x.jobs[o.job]={text:str(o.text,200),more:'',price:num(o.price),kind:'Other',when:str(o.when,20),where:str(o.where,40),at,deadline:deadlineFor(o.when,at),
       status:'assigned',takenAt:Date.now(),offer:true};return x});
-    enqueue('me',()=>S.fb.setDoc(S.fb.doc(S.db,'picks',S.me.id+'~'+o.job),{owner:S.me.id,job:o.job,doer:o.to,agreed:num(o.price),at:num(o.respondedAt)||Date.now(),status:'assigned'}))
+    enqueue('me',()=>S.fb.setDoc(S.fb.doc(S.db,'picks',S.me.id+'~'+o.job),{owner:S.me.id,job:o.job,doer:o.to,agreed:num(o.price),at:num(o.respondedAt)||Date.now(),status:'assigned',posterName:myRealName()}))
       .then(()=>S.fb.deleteDoc(S.fb.doc(S.db,'offers',o.key))).catch(e=>console.warn(e));
   }
 }
@@ -377,7 +403,7 @@ function stopSubs(){S.subs.forEach(u=>{try{u()}catch{}});S.subs=[];closeThread()
 let verifyTimer=null;
 function stopVerifyPoll(){clearInterval(verifyTimer);verifyTimer=null}
 async function handleUser(user){
-  stopSubs();stopVerifyPoll();S.user=user;S.me=null;
+  stopSubs();stopVerifyPoll();S.user=user;S.me=null;S.myName=null;S.myNameSaved=false;S.names={};S.dealFail={};S.dealSync=false;S.hcheck=null;firstLoadDone=false;
   if(S.signingUp)return;
   if(!user){if(!S.erased)S.phase='auth';render();return}
   if(!user.emailVerified){S.phase='verify';render();verifyTimer=setInterval(checkVerified,5000);return}
@@ -435,9 +461,10 @@ function startSubs(){
 let firstLoadDone=false;
 function afterData(){
   if(!(S.ready.config&&S.ready.people&&S.ready.priv))return;
-  const {doc,setDoc,updateDoc}=S.fb,me=S.me.id;
+  const {doc,setDoc,updateDoc,getDoc}=S.fb,me=S.me.id;
   if(!firstLoadDone){
     firstLoadDone=true;setTimeout(syncPush,1500);
+    getDoc(doc(S.db,'names',me)).then(d=>{if(d.exists()&&typeof d.data().name==='string'){S.myName=str(d.data().name,60);S.myNameSaved=true;render()}}).catch(()=>{});
     if(S.me.isOwner&&ownerId()!==me)setDoc(doc(S.db,'config','app'),{...S.config,adminUid:me,campus:str(S.config.campus,40)||DEFAULT_CAMPUS}).catch(writeErr);
     if(!S.me.isOwner&&S.myInvite&&S.myInvite.uid!==me)updateDoc(doc(S.db,'invites',S.me.email),{uid:me,joinedAt:Date.now()}).catch(()=>{});
     if(S.myDoc&&S.myDoc.removed)saveMine(d=>{delete d.removed;return d});
@@ -450,9 +477,10 @@ function computePhase(){
   if(S.erased){S.phase='erased';return}
   if(!(S.ready.config&&S.ready.people&&S.ready.priv)){S.phase='loading';return}
   if(!S.myDoc||!S.myDoc.adult){if(S.phase!=='onboard')seedOnb();S.phase='onboard';return}
+  if(!handleOf(S.me.id)){if(S.phase!=='handle'){seedOnb();S.hcheck=null}S.phase='handle';return}
   S.phase='app';
 }
-function seedOnb(){const d=S.myDoc||{};S.onb={name:str(d.name,60)||S.user?.displayName||'',photo:PHOTO_RE.test(d.photo||'')?d.photo:'',year:str(d.year,12),branch:str(d.branch,24),does:str(d.bio,BIO_MAX)||str(d.does,60),banner:bannerOk(d.banner)?d.banner:'',ring:RINGS.includes(d.ring)?d.ring:ringOf(S.me.id),adult:!!d.adult,rules:!!d.adult}}
+function seedOnb(){const d=S.myDoc||{};S.onb={handle:str(d.handle,20),name:str(d.name,60)||S.myName||S.user?.displayName||'',photo:PHOTO_RE.test(d.photo||'')?d.photo:'',year:str(d.year,12),branch:str(d.branch,24),does:str(d.bio,BIO_MAX)||str(d.does,60),banner:bannerOk(d.banner)?d.banner:'',ring:RINGS.includes(d.ring)?d.ring:ringOf(S.me.id),adult:!!d.adult,rules:!!d.adult}}
 
 const AUTH_ERR={
   'auth/invalid-credential':'Wrong email or password.','auth/wrong-password':'Wrong email or password.','auth/user-not-found':'Wrong email or password.',
@@ -653,6 +681,10 @@ function gateHTML(){
   case'erased':return`<div class="gatebox"><div class="mark">tack</div><h1>Your account is deleted</h1>
     <p>Your profile, jobs, bids and messages are erased, and your login is gone.</p></div>`;
   case'onboard':return onboardHTML(false);
+  case'handle':return`<div class="gatebox onb" style="gap:20px"><div class="mark">tack</div><div><h1>Pick your username</h1>
+    <p style="margin-top:8px">tack now shows a username on the board, on your jobs and your bids. Your real name, <b>${esc(myRealName())}</b>, is only shown to the person you make a deal with.</p></div>
+    ${handleField('')}${S.err.onb?`<p class="err" role="alert">${esc(S.err.onb)}</p>`:''}
+    <button class="cta" data-act="saveHandle" data-need="handle">Save username</button></div>`;
   }
   return'';
 }
@@ -672,7 +704,8 @@ function onboardHTML(edit){
      <label class="upload" for="oph">${ic('camera',16)} ${o.photo?'Change photo':'Add a photo'}<input id="oph" type="file" accept="image/*" data-photo></label>
      ${o.photo?'<button class="linkbtn" style="align-self:flex-start;padding:0" data-act="clearPhoto">Remove photo</button>':''}</div></div>`}
    <div class="stack gap8"><label class="formlabel" for="onm">Full name</label>
-     <input id="onm" class="inp" maxlength="60" autocomplete="name" value="${esc(o.name)}" data-bind="onb.name"></div>
+     ${edit?`<div class="inp lockedname">${esc(myRealName())}</div><span class="labelhint">As on your college ID. Only the person you make a deal with sees it. It can’t be changed.</span>`:`<input id="onm" class="inp" maxlength="60" autocomplete="name" value="${esc(o.name)}" data-bind="onb.name"><span class="labelhint">As on your college ID. You can’t change it later. Only the person you make a deal with sees it.</span>`}</div>
+   ${handleField(edit&&handleLockedUntil()?`You can change it again on ${new Date(handleLockedUntil()).toLocaleDateString('en-IN',{day:'numeric',month:'long'})}.`:'')}
    <div class="stack gap8"><span class="formlabel" id="yl">Year</span>
      <div class="chips" role="group" aria-labelledby="yl">${YEARS.map(y=>`<button class="chip ${o.year===y?'on':''}" data-onb="year" data-val="${y}" aria-pressed="${o.year===y}">${y}</button>`).join('')}</div></div>
    <div class="stack gap8"><label class="formlabel" for="obr">Branch</label>
@@ -1027,7 +1060,8 @@ function viewPerson(uid,D){
   <div class="stack narrow" style="margin:6px auto 0;gap:18px">
    <div class="prof ${bn?'hasbanner':''}">${bn?`<div class="pbanner" style="${bannerStyle(bn)}"></div>`:''}${isMe?`<button class="editpen" data-go="edit" aria-label="Edit profile">${ic('edit',17)}</button>`:''}
      <span class="ring" style="border-color:${ringOf(uid)};width:108px;height:108px;box-shadow:0 0 34px ${GLOW[ringOf(uid)]}">${face(uid,94)}</span>
-     <span class="pname">${esc(shortName(uid))}</span>
+     <span class="pname">${handleOf(uid)?'@'+esc(handleOf(uid)):esc(shortName(uid))}</span>
+     ${realNameOf(uid)&&handleOf(uid)?`<span class="realname">${esc(realNameOf(uid))}${isMe?' · only people you make a deal with see your name':''}</span>`:''}
      <div class="chips" style="justify-content:center">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campus())}</span>
        ${uid===ownerId()?'<span class="chip vio">Organiser</span>':''}${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${free?'<span class="chip on">Free right now</span>':''}</div>
      ${bio?`<p class="pbio">${esc(bio)}</p>`:''}
@@ -1357,8 +1391,9 @@ const NEED={
   signup:()=>S.form.name.trim().length>=2&&validEmail(S.form.email.trim())&&S.form.pw.length>=8,
   login:()=>validEmail(S.form.email.trim())&&!!S.form.pw,
   reset:()=>validEmail(S.form.email.trim()),
-  join:()=>S.onb.name.trim().length>=2&&!!S.onb.year&&!!S.onb.branch.trim()&&!!S.onb.adult&&!!S.onb.rules,
-  profile:()=>S.onb.name.trim().length>=2&&!!S.onb.year&&!!S.onb.branch.trim(),
+  handle:()=>S.hcheck?.st==='ok',
+  join:()=>(S.hcheck?.st==='ok')&&S.onb.name.trim().length>=2&&!!S.onb.year&&!!S.onb.branch.trim()&&!!S.onb.adult&&!!S.onb.rules,
+  profile:()=>(handleLockedUntil()||['ok','mine'].includes(S.hcheck?.st||'mine'))&&!!S.onb.year&&!!S.onb.branch.trim(),
   bid:()=>{const a=digits(S.bid.amt);return a>=1&&a<=50000},
   post:()=>{const p=digits(S.draft.price);return S.draft.text.trim().length>=8&&S.draft.text.length<=NOTE_MAX&&p>=10&&p<=20000},
   rate:()=>!!(S.rate.a&&S.rate.b&&S.rate.c&&S.rate.d),
@@ -1378,7 +1413,7 @@ function render(){
     app.hidden=true;gate.hidden=false;document.title='tack';gate.className='gate'+(['onboard','auth'].includes(S.phase)?' scroll':'');gate.innerHTML=gateHTML();$('sheetRoot').innerHTML='';lastView=null;
   }else{
     gate.hidden=true;app.hidden=false;if(gate.innerHTML)gate.innerHTML='';
-    const D=derive(),main=$('main');if(jobParam&&!S.deepDone&&D.jobByKey[jobParam]){S.deepDone=true;S.openJob=jobParam;S.bid={key:null};S.view='job'}if(lastView&&lastView!==S.view)scrollMem[lastView]=main.scrollTop;
+    const D=derive(),main=$('main');syncDealNames();if(S.me.isOwner)loadNames(D);if(jobParam&&!S.deepDone&&D.jobByKey[jobParam]){S.deepDone=true;S.openJob=jobParam;S.bid={key:null};S.view='job'}if(lastView&&lastView!==S.view)scrollMem[lastView]=main.scrollTop;
     const keep=lastView===S.view?main.scrollTop:((DEPTH[S.view]??1)===0?scrollMem[S.view]||0:0);
     main.dataset.view=S.view;main.innerHTML=((DEPTH[S.view]??1)===0?bannerHTML():'')+(VIEWS[S.view]||viewBoard)(D);main.scrollTop=keep;
     if(lastView!==S.view&&S.view==='chat')requestAnimationFrame(()=>{main.scrollTop=main.scrollHeight});
@@ -1425,7 +1460,7 @@ const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
 function go(v,keepThread){
   const from=S.view;
   if(v!=='chat'&&!keepThread)closeThread();
-  const apply=()=>{if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}S.view=v;S.sheet=null;S.err={};if(v==='help'&&from!=='help')S.help={kind:null,job:null,why:'',note:'',sent:null};if(v==='settings'){S.pwOpen=false}if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit')seedOnb();if(v==='invites')S.inv.campus='';render();
+  const apply=()=>{if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}S.view=v;S.sheet=null;S.err={};if(v==='help'&&from!=='help')S.help={kind:null,job:null,why:'',note:'',sent:null};if(v==='settings'){S.pwOpen=false}if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit'){seedOnb();S.hcheck={h:handleOf(S.me.id),st:'mine'}}if(v==='invites')S.inv.campus='';render();
     if(v==='board'&&from==='job'&&S.openJob){const p=document.querySelector(`.tile[data-job="${CSS.escape(S.openJob)}"] .price`);if(p)p.style.viewTransitionName='jp'}};
   if(from===v||S.phase!=='app'||!document.startViewTransition||reduceMotion.matches){apply();return}
   const d=(DEPTH[v]??1)-(DEPTH[from]??1),root=document.documentElement;
@@ -1455,15 +1490,20 @@ const ACT={
   cropUse(){cropDone()},
   cropCancel(){if(S.crop)URL.revokeObjectURL(S.crop.url);S.crop=null;S.cropImg=null;S.sheet=null;render()},
   pickBanner(el){S.onb.banner=el.dataset.val||'';render()},
-  join(){const o=S.onb;
+  async join(){const o=S.onb;
+    if(!need(S.hcheck?.st==='ok','onb','Pick a username that’s available.'))return;
     if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.')||!need(o.adult,'onb','tack is for students who are 18 or older.')||!need(o.rules,'onb','Agree to the Terms of Use and Privacy Policy to continue.'))return;
     if(modBlock('profile',o.name,o.does,o.branch))return;
+    const h=S.hcheck.h;S.myName=o.name.trim().slice(0,60);
+    try{await claimHandle(h)}catch(e){console.warn(e);S.hcheck={h,st:'taken'};S.err={onb:'That username was just taken. Try another.'};render();return}
     savePriv({terms:{v:TERMS_V,at:Date.now()}});
-    saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),bio:o.does.trim().slice(0,BIO_MAX),does:o.does.trim().slice(0,60),ring:o.ring,adult:true,joinedAt:d.joinedAt||Date.now(),jobs:d.jobs||{}}));
+    saveMine(d=>{const x={...d,handle:h,handleAt:Date.now(),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),bio:o.does.trim().slice(0,BIO_MAX),does:o.does.trim().slice(0,60),ring:o.ring,adult:true,joinedAt:d.joinedAt||Date.now(),jobs:d.jobs||{}};delete x.name;return x});
     S.err={};S.view='board';S.joining=true;computePhase();render();
     moment(`You\u2019re on the board, ${o.name.trim().split(/\s+/)[0]}.`,'Give us a second to show you around.',1600).then(()=>{S.joining=false;if(!S.priv.introSeen)openIntro()})},
-  saveProfile(){const o=S.onb;if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.'))return;if(modBlock('profile',o.name,o.does,o.branch))return;
-    saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),bio:o.does.trim().slice(0,BIO_MAX),does:o.does.trim().slice(0,60),banner:bannerOk(o.banner)?o.banner:'',ring:o.ring}));go('me');toast('Profile saved')},
+  async saveProfile(){const o=S.onb;if(!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.'))return;if(modBlock('profile',o.does,o.branch))return;
+    let h=handleOf(S.me.id),hAt=num(S.myDoc?.handleAt);const want=S.hcheck?.h;
+    if(want&&want!==h&&!handleLockedUntil()){if(S.hcheck.st!=='ok'){S.err={onb:'That username isn’t available.'};render();return}try{await claimHandle(want);h=want;hAt=Date.now()}catch(e){console.warn(e);S.err={onb:'That username was just taken. Try another.'};render();return}}
+    saveMine(d=>{const x={...d,handle:h,handleAt:hAt||Date.now(),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),bio:o.does.trim().slice(0,BIO_MAX),does:o.does.trim().slice(0,60),banner:bannerOk(o.banner)?o.banner:'',ring:o.ring};delete x.name;return x});go('me');toast('Profile saved')},
   post(){const d=S.draft,text=d.text.trim(),price=digits(d.price);
     if(!need(text.length<=NOTE_MAX,'post','Keep the note to '+NOTE_MAX+' characters. Put the rest in the details.')||!need(text.length>=8,'post','Say what you need in a few more words.')||!need(price>=10&&price<=20000,'post','Set a price between ₹10 and ₹20,000.'))return;
     if(modBlock('job',text,d.more,d.whereText))return;
@@ -1537,8 +1577,8 @@ const ACT={
   nextPic(){const s=S.sheet,l=S.pics[s?.k];if(!l||!l.length)return;S.sheet={...s,i:(s.i+1)%l.length};render()},
   confirmPick(){const j=derive().jobByKey[S.openJob],s=S.sheet;if(!j||!s)return;
     saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.status='assigned';o.takenAt=Date.now();delete o.repickAt}return x});
-    S.picks={...S.picks,[j.key]:{owner:S.me.id,job:j.id,doer:s.uid,agreed:s.amt,at:Date.now(),status:'assigned'}};
-    S.fb.setDoc(S.fb.doc(S.db,'picks',j.key),{owner:S.me.id,job:j.id,doer:s.uid,agreed:s.amt,at:Date.now(),status:'assigned'}).catch(e=>{console.warn(e);toast('Couldn\u2019t save the pick. Try again.')});
+    S.picks={...S.picks,[j.key]:{owner:S.me.id,job:j.id,doer:s.uid,agreed:s.amt,at:Date.now(),status:'assigned',posterName:myRealName()}};
+    S.fb.setDoc(S.fb.doc(S.db,'picks',j.key),{owner:S.me.id,job:j.id,doer:s.uid,agreed:s.amt,at:Date.now(),status:'assigned',posterName:myRealName()}).catch(e=>{console.warn(e);toast('Couldn\u2019t save the pick. Try again.')});
     S.sheet=null;toast('Picked '+firstName(s.uid)+'. Sort out the details in chat.');openThread({key:jobThreadKey(j.key,s.uid),other:s.uid,jobKey:j.key})},
   async confirmDone(){const j=derive().jobByKey[S.openJob];if(!j||!j.pick||j.pick.ratedDoer)return;const r=S.rate;
     if(!need(r.a&&r.b&&r.c&&r.d,'rate','Rate all four, from 1 to 5.'))return;
@@ -1649,6 +1689,9 @@ const ACT={
     }).catch(e=>{console.warn(e);toast('Couldn’t change the pick yet. Try again in a bit.')})},
   reopenJob(){const j=derive().jobByKey[S.openJob];if(!j||j.owner!==S.me.id||j.accepted)return;
     saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.status='open';delete o.repickAt;delete o.takenAt;if(num(o.deadline)<Date.now()+36e5)o.deadline=Date.now()+864e5}return x});toast('Back on the board')},
+  async saveHandle(){if(S.hcheck?.st!=='ok')return;const h=S.hcheck.h;
+    try{await claimHandle(h)}catch(e){console.warn(e);S.hcheck={h,st:'taken'};S.err={onb:'That username was just taken. Try another.'};render();return}
+    S.err={};saveMine(d=>{const x={...d,handle:h,handleAt:Date.now()};delete x.name;return x});computePhase();render();toast('Your username is @'+h)},
   clearSearch(){S.find.q='';render();setTimeout(()=>$('q')?.focus(),0)},
   copy(el){const t=el.dataset.text||'';
     try{navigator.clipboard.writeText(t).then(()=>toast('Copied'),()=>toast('Couldn’t copy. Select the text and copy it.'))}catch{toast('Couldn’t copy.')}}
@@ -1702,7 +1745,7 @@ document.addEventListener('submit',e=>{
   if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
-document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='q')render();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
+document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='q')render();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
 document.addEventListener('change',async e=>{
   bind(e);syncNeed();
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}
