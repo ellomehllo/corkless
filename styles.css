@@ -920,3 +920,17 @@ svg[aria-hidden="true"]{stroke-width:1.6}
   :root{--grad:linear-gradient(in oklab 115deg,#D2F55E 0%,#C6F24E 40%,#9FDB74 72%,#4A72D6 112%);
         --grad-v:linear-gradient(in oklab 160deg,#D2F55E 0%,#C6F24E 40%,#9FDB74 72%,#4A72D6 112%)}}
 .cta,.pill.on,.chip.on:not(.pchips .chip),.fab,.eavcam{color:var(--on-grad)}
+
+/* calm tint notes: every note colour redrawn at one shared depth, so no note shouts; white text */
+.tile.ntile,.bignote.tile.ntile{
+  background:linear-gradient(165deg,color-mix(in srgb,var(--nc) 30%,var(--tile)),color-mix(in srgb,var(--nc) 16%,var(--tile)));
+  background:linear-gradient(165deg,oklch(from var(--nc) .34 .07 h),oklch(from var(--nc) .25 .045 h));
+  border-color:color-mix(in srgb,var(--nc) 35%,transparent);
+  border-color:oklch(from var(--nc) .5 .08 h / .45);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 16px 30px -16px rgba(0,0,0,.95)}
+.tile.ntile .pin{background:var(--nc);background:oklch(from var(--nc) .76 .13 h);box-shadow:0 0 10px color-mix(in srgb,var(--nc) 70%,transparent)}
+.tile.ntile p,.tile.ntile .price,.bignote .bntext{color:var(--fg)}
+.bignote .bntext::placeholder{color:rgba(255,255,255,.4)}
+.tile.ntile .where{color:rgba(255,255,255,.62);color:oklch(from var(--nc) .8 .03 h / .75)}
+.tile.ntile .by{color:rgba(255,255,255,.8);color:oklch(from var(--nc) .9 .02 h / .85)}
+.tile.ntile .by .n{color:rgba(255,255,255,.5);color:oklch(from var(--nc) .8 .03 h / .6)}
