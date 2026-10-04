@@ -1,5 +1,5 @@
 export const TERMS_V='2026-10-03';
-export const EFFECTIVE='3 October 2026';
+export const EFFECTIVE='5 October 2026';
 
 export const PRIVACY=`
 <p class="lede">This Privacy Policy explains what personal data tack collects, why, who can see it, how long it is kept and the choices you have. It applies to the tack web app and any app that opens it. It is written to meet the Digital Personal Data Protection Act, 2023 and the Information Technology Act, 2000 and the rules made under them.</p>
@@ -36,7 +36,7 @@ export const PRIVACY=`
 </ul>
 
 <h2>5. Service providers</h2>
-<p>tack is built on Google Firebase (authentication and database) and hosted on GitHub Pages. These providers process data on our behalf under their own security and privacy terms, and their servers may be located outside India. We do not share your data with anyone else except where required by law, to protect someone's safety, or with your consent.</p>
+<p>tack is built on Supabase (accounts and database), uses Google Firebase Cloud Messaging only to deliver notifications you turn on, and is hosted on GitHub Pages. These providers process data on our behalf under their own security and privacy terms, and their servers may be located outside India. We do not share your data with anyone else except where required by law, to protect someone's safety, or with your consent.</p>
 
 <h2>6. How long we keep it</h2>
 <p>We keep your data while your account is active. When you delete your account, your profile, jobs, bids, photos, the reviews you wrote and your messages are erased straight away. Anonymous rating totals and reviews written about you by others may remain because they cannot be linked back to the person who wrote them. Reports may be kept for as long as needed to keep the community safe or to meet legal obligations.</p>

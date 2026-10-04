@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610042228';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610042228';
-import {modHit,MOD_CAT} from './mod.js?v=202610042228';
+import {makeDb} from './db.js?v=202610042351';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610042351';
+import {modHit,MOD_CAT} from './mod.js?v=202610042351';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -524,7 +524,7 @@ async function doReset(){
   const email=S.form.email.trim().toLowerCase();
   if(!validEmail(email))return authFail('Enter the email you signed up with.');
   S.busy=true;S.authErr='';render();
-  const {error}=await S.sb.auth.resetPasswordForEmail(email,{redirectTo:SITE});if(error&&authErr(error).code==='auth/too-many-requests'){S.busy=false;return authFail(authMsg(authErr(error)))}
+  const {error}=await S.sb.auth.resetPasswordForEmail(email,{redirectTo:SITE});if(error){S.busy=false;const e=authErr(error);return authFail(e.code==='auth/too-many-requests'||e.code==='auth/network-request-failed'?authMsg(e):'Couldn\u2019t send the email right now. Try again in a few minutes.')}
   S.busy=false;S.authMsg=`If ${email} has an account, a reset link is on its way. Check spam too.`;render();
 }
 function authFail(m){S.authErr=m;S.busy=false;render();return false}
