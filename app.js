@@ -118,7 +118,7 @@ const isMember=uid=>{const d=pdoc(uid);return !!d.adult&&!d.removed};
 function normJob(id,j,uid){
   return{id,owner:uid,key:uid+'~'+id,text:str(j.text,400),more:str(j.more,600),price:num(j.price),kind:str(j.kind,20),
     when:str(j.when,20),where:str(j.where,40),at:num(j.at),deadline:num(j.deadline),
-    status:STATUSES.includes(j.status)?j.status:'open',doneAt:num(j.doneAt),pics:Math.min(MAX_PICS,Math.max(0,Math.floor(num(j.pics)))),geo:geoOk(j.geo),color:COLOR_RE.test(str(j.color,7))?str(j.color,7):'',accepted:null,agreed:0,pick:null};
+    status:STATUSES.includes(j.status)?j.status:'open',doneAt:num(j.doneAt),takenAt:num(j.takenAt),repickAt:num(j.repickAt),dropped:arr(j.dropped).filter(u=>typeof u==='string').slice(0,5),pics:Math.min(MAX_PICS,Math.max(0,Math.floor(num(j.pics)))),geo:geoOk(j.geo),color:COLOR_RE.test(str(j.color,7))?str(j.color,7):'',accepted:null,agreed:0,pick:null};
 }
 function jobState(j){return j.status==='open'&&j.deadline<Date.now()?'expired':j.status}
 function derive(){
@@ -155,6 +155,10 @@ const warnsOf=()=>Array.isArray(S.priv.warns)?S.priv.warns.filter(w=>w&&typeof w
 function modBlock(area,...texts){const cat=modHit(...texts);if(!cat)return false;const at=Date.now(),warns=[...warnsOf(),{at,area,cat}].slice(-20);
   savePriv({warns});S.fb.addDoc(S.fb.collection(S.db,'flags'),{by:S.me.id,area,cat,at}).catch(()=>{});
   S.sheet={type:'blocked',area,cat,n:warns.length};S.err={};render();return true}
+function droppedMe(j){return!!S.me&&j.dropped.includes(S.me.id)}
+function repicking(j){return jobState(j)==='assigned'&&!j.accepted&&j.repickAt>0}
+function lostBid(j){const me=S.me?.id,st=jobState(j);return!!me&&j.owner!==me&&j.accepted!==me&&(droppedMe(j)||(!(j.repickAt>0&&!j.accepted)&&(!!j.accepted||st==='assigned'||st==='done')))}
+function lostAt(j,bidAt=0){return num(j.takenAt)||num(bidAt)}
 function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str(j.text,200).trim().replace(/[.!?\s]+$/,'');return'<i>\u201c'+esc(x.length>56?x.slice(0,55).trim()+'\u2026':x)+'\u201d</i>'},nm=u=>'<b>'+esc(firstName(u))+'</b>',ok=u=>u&&D.members.includes(u)&&!D.blocked.has(u);
   const add=(at,who,html,go)=>{if(at>0)out.push({at,who,html,...go})};
   for(const w of warnsOf())if(MOD_CAT[w.cat])add(num(w.at),'tack',`Your ${MOD_AREA[w.area]||'post'} wasn\u2019t posted: it broke tack\u2019s rules on ${MOD_CAT[w.cat]}. Repeated attempts can get your account removed.`,{go:'settings'});
@@ -305,7 +309,7 @@ function convertOffers(){
     if(o.status!=='accepted'||converting.has(o.key)||!JOB_RE.test(o.job||''))continue;converting.add(o.key);
     const at=num(o.at)||Date.now();
     saveMine(x=>{x.jobs={...(x.jobs||{})};if(!x.jobs[o.job])x.jobs[o.job]={text:str(o.text,200),more:'',price:num(o.price),kind:'Other',when:str(o.when,20),where:str(o.where,40),at,deadline:deadlineFor(o.when,at),
-      status:'assigned',offer:true};return x});
+      status:'assigned',takenAt:Date.now(),offer:true};return x});
     enqueue('me',()=>S.fb.setDoc(S.fb.doc(S.db,'picks',S.me.id+'~'+o.job),{owner:S.me.id,job:o.job,doer:o.to,agreed:num(o.price),at:num(o.respondedAt)||Date.now(),status:'assigned'}))
       .then(()=>S.fb.deleteDoc(S.fb.doc(S.db,'offers',o.key))).catch(e=>console.warn(e));
   }
@@ -787,12 +791,17 @@ function viewJob(D){
   if(S.bid.key!==j.key)S.bid={key:j.key,amt:String(myBid?num(myBid.amt):j.price),say:myBid?myBid.say:'',pics:myBid&&num(myBid.pics)?null:[]};
   if(S.bid.pics===null){const l=picsOf('b:'+j.key+'~'+me);if(l)S.bid.pics=[...l]}
   const stTag={expired:'<span class="tag warn">Closed · time ran out</span>',closed:'<span class="tag">Closed</span>',removed:'<span class="tag warn">Removed</span>',
-    assigned:mine||j.accepted===me?`<span class="tag ok">Picked ${esc(shortName(j.accepted))}</span>`:'<span class="tag">Taken</span>',done:payOf(j)?.ok?'<span class="tag ok">Done · Paid ✓</span>':'<span class="tag ok">Done</span>'}[st]||'';
+    assigned:repicking(j)?(mine?'<span class="tag warn">Choose someone else</span>':droppedMe(j)?'<span class="tag">Taken</span>':'<span class="tag">Choosing again</span>'):mine||j.accepted===me?`<span class="tag ok">Picked ${esc(shortName(j.accepted))}</span>`:'<span class="tag">Taken</span>',done:payOf(j)?.ok?'<span class="tag ok">Done · Paid ✓</span>':'<span class="tag ok">Done</span>'}[st]||'';
   let foot='';
   if(mine){
     if(st==='open')foot=`<div class="foot"><button class="btn2" data-sheet="close">Close this job</button><p class="note">Pick someone from the bids to take it off the board.</p></div>`;
+    else if(st==='assigned'&&!j.accepted){const left=bids.filter(b=>!j.dropped.includes(b.by)).length;
+      foot=`<div class="foot"><div class="banner warnbanner">${left?'Pick someone else from the bids':'Nobody else has bid yet'}</div>
+      <p class="note">${left?'The job stays off the board while you choose.':'Put it back on the board so others can bid, or close it.'}</p>
+      ${left?'':'<button class="cta" data-act="reopenJob">Put it back on the board</button>'}<button class="btn2" data-sheet="close">Close this job</button></div>`}
     else if(st==='assigned')foot=`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} You picked ${esc(firstName(j.accepted))} for ₹${fmt(j.agreed)}</div>
-      <button class="cta" data-sheet="done">Mark as done</button>${posterPay(j)}<button class="btn2" data-thread-with="${esc(j.accepted)}">Message ${esc(firstName(j.accepted))}</button></div>`;
+      <button class="cta" data-sheet="done">Mark as done</button>${posterPay(j)}<button class="btn2" data-thread-with="${esc(j.accepted)}">Message ${esc(firstName(j.accepted))}</button>
+      ${sentOf(j)||payOf(j)?'':`<button class="linkbtn" data-sheet="repick">${esc(firstName(j.accepted))} can’t do it? Pick someone else</button>`}</div>`;
     else if(st==='done'){const pay=payOf(j),dn=esc(firstName(j.accepted));
       foot=`<div class="foot">${pay?.ok?`<div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${dn} confirmed they got ₹${fmt(j.agreed)}</div>`
         :pay?`<div class="banner warnbanner">${dn} hasn’t got your payment yet</div>`:''}${posterPay(j)}
@@ -846,8 +855,9 @@ function viewJob(D){
         <span class="t1">${esc(shortName(b.by))}${b.by===me?' (you)':''}${mine&&b.near?' '+nearTag():''} <span class="muted">· ${esc(metaOf(b.by))}${esc(rateLine(b.by,D))}</span></span>
         ${b.say?`<span class="t2 bidsay">${esc(b.say)}</span>`:''}</span></button>
       <span class="bidend"><span class="amt">₹${fmt(b.amt)}</span>
-      ${mine&&st==='open'?`<button class="pick" data-pick="${esc(b.by)}" aria-label="Pick ${esc(firstName(b.by))} for ₹${fmt(b.amt)}">Pick</button>`:''}
-      ${mine&&st==='open'?`<button class="iconbtn" data-thread-with="${esc(b.by)}" aria-label="Message ${esc(firstName(b.by))}">${ic('chat',17)}</button>`:''}
+      ${mine&&(st==='open'||repicking(j))&&!j.dropped.includes(b.by)?`<button class="pick" data-pick="${esc(b.by)}" aria-label="Pick ${esc(firstName(b.by))} for ₹${fmt(b.amt)}">Pick</button>`:''}
+      ${mine&&(st==='open'||repicking(j))&&!j.dropped.includes(b.by)?`<button class="iconbtn" data-thread-with="${esc(b.by)}" aria-label="Message ${esc(firstName(b.by))}">${ic('chat',17)}</button>`:''}
+      ${mine&&j.dropped.includes(b.by)?'<span class="tag">Didn’t do it</span>':''}
       ${j.accepted===b.by?'<span class="tag ok">Picked</span>':''}</span>
     </div>${picStrip('b:'+j.key+'~'+b.by,b.pics,'sub')}`).join(''):`<p class="note" style="text-align:left">${mine?'No bids yet. Classmates see this on the board now.':'Your bid shows up here once you place it. Only '+esc(firstName(j.owner))+' sees it.'}</p>`}
    </div>
@@ -908,9 +918,9 @@ function viewBids(D){
   const myBids=Object.values(S.pitchMine).filter(p=>p&&num(p.amt)>0).map(p=>({k:p.job,b:{amt:num(p.amt),at:num(p.at)},j:D.jobByKey[p.job]})).filter(x=>x.j&&x.j.owner!==me).sort((a,b)=>num(b.b.at)-num(a.b.at));
   const jobLine=j=>{const st=jobState(j),n=bidsFor(D,j.key).length;
     return st==='open'?[`${n} ${n===1?'bid':'bids'} in`,'']:st==='assigned'?[`Picked ${shortName(j.accepted)} · ₹${fmt(j.agreed)}`,'ok']:st==='done'?(payOf(j)?.ok?[j.pick?.ratedDoer?'Done · Paid ✓':'Done · Paid ✓ · rate them','ok']:[`Done · ${payOf(j)?'they haven\u2019t got your payment':'waiting for them to confirm payment'}`,payOf(j)?'warn':'']):st==='expired'?['Time ran out','warn']:['Closed','']};
-  const bidLine=({j})=>{const st=jobState(j);return j.accepted===me?(st==='done'?(payOf(j)?.ok?['Done · Paid ✓','ok']:['Done · confirm you got paid','warn']):[`Accepted · ₹${fmt(j.agreed)}`,'ok']):j.accepted?['Went to someone else','']:st==='open'?[`Waiting for ${firstName(j.owner)} to pick`,'']:['Closed','']};
+  const bidLine=({j})=>{const st=jobState(j);return j.accepted===me?(st==='done'?(payOf(j)?.ok?['Done · Paid ✓','ok']:['Done · confirm you got paid','warn']):[`Accepted · ₹${fmt(j.agreed)}`,'ok']):droppedMe(j)?[`${firstName(j.owner)} picked someone else`,'lost']:repicking(j)?[`Waiting for ${firstName(j.owner)} to pick again`,'']:lostBid(j)?['Someone else got picked · keep trying','lost']:st==='open'?[`Waiting for ${firstName(j.owner)} to pick`,'']:st==='expired'?['Time ran out','']:['Closed','']};
   const row=(j,[line,cls],amt,who)=>`<button class="item" data-job="${esc(j.key)}">${ring(who||j.owner,38)}<span class="itext"><span class="t1" style="font-weight:600;color:var(--fg)">${esc(j.text)}</span>
-    <span style="font-size:var(--t-11);font-weight:700;color:${cls==='ok'?'var(--accent)':cls==='warn'?'var(--coral-ink)':'var(--muted)'}">${esc(line)}</span></span><span class="amt" style="font-size:var(--t-16);color:${noteOf(j)}">₹${fmt(amt)}</span></button>`;
+    <span style="font-size:var(--t-11);font-weight:700;color:${cls==='ok'?'var(--accent)':cls==='warn'?'var(--coral-ink)':cls==='lost'?'var(--amber-ink)':'var(--muted)'}">${esc(line)}</span></span><span class="amt" style="font-size:var(--t-16);color:${noteOf(j)}">₹${fmt(amt)}</span></button>`;
   const oin=offerList(S.offersIn).filter(o=>D.members.includes(o.owner)&&!D.blocked.has(o.owner)&&o.status!=='declined').sort((a,b)=>num(b.at)-num(a.at));
   const oout=offerList(S.offersOut).filter(o=>o.status!=='accepted').sort((a,b)=>num(b.at)-num(a.at));
   const doing=D.jobs.filter(j=>j.accepted===me&&!myBidOn(j.key)&&j.status!=='removed').sort((a,b)=>b.at-a.at);
@@ -926,20 +936,21 @@ function viewBids(D){
       <button class="btn2" style="width:auto;padding:8px 12px;font-size:var(--t-12)" data-act="withdrawOffer" data-key="${esc(o.key)}">${o.status==='declined'?'Dismiss':'Withdraw'}</button></div>`).join('')}</div>`:''}
     ${(()=>{const pastJob=j=>{const st=jobState(j);return st==='closed'||st==='expired'||st==='removed'||(st==='done'&&payOf(j)?.ok&&j.pick?.ratedDoer)};
       const all=[...doing.map(j=>({j,amt:j.agreed||j.price,at:num(j.pick?.at)||j.at})),...myBids.map(x=>({j:x.j,amt:num(x.b.amt),at:x.b.at,x}))];
-      const pastBid=({j})=>j.accepted===me?(jobState(j)==='done'&&payOf(j)?.ok&&j.pick?.ratedPoster):jobState(j)!=='open'||!!j.accepted;
+      const pastBid=({j})=>j.accepted===me?(jobState(j)==='done'&&payOf(j)?.ok&&j.pick?.ratedPoster):(jobState(j)!=='open'&&!(repicking(j)&&!droppedMe(j)))||!!j.accepted;
       const jobsNow=myJobs.filter(j=>!pastJob(j)),active=all.filter(y=>y.j.accepted===me&&!pastBid(y)),waiting=all.filter(y=>y.j.accepted!==me&&!pastBid(y));
+      const notPicked=all.filter(y=>y.x&&lostBid(y.j)&&lostAt(y.j,y.at)>Date.now()-14*864e5).sort((a,b)=>lostAt(b.j,b.at)-lostAt(a.j,a.at));
       const hist=[...D.jobs.filter(j=>j.owner===me&&pastJob(j)).map(j=>({j,mine:true,amt:j.agreed||j.price,at:Math.max(j.doneAt||0,j.at)})),...all.filter(pastBid).map(y=>({...y,at:Math.max(y.j.doneAt||0,y.at||0,y.j.at)}))].sort((a,b)=>b.at-a.at);
       const tabs=[['all','All',0],['jobs','Your jobs',jobsNow.length],['bids','Your bids',active.length+waiting.length],['history','History',hist.length]];
       const grp=(t,l)=>l.length?`<section class="igroup"><h2 class="ihead">${t}</h2>${l.map(y=>row(y.j,bidLine(y.x||{j:y.j}),y.amt)).join('')}</section>`:'';
       const empty=t=>`<p class="note" style="text-align:left">${t}</p>`;
       return`<div class="pills" style="padding:4px 0 0" role="group" aria-label="Show">${tabs.map(([k,l,n])=>`<button class="pill ${S.actTab===k?'on':''}" data-acttab="${k}" aria-pressed="${S.actTab===k}">${l}${n?' · '+n:''}</button>`).join('')}</div>
-      ${S.actTab==='all'?(()=>{const feed=[...D.notes.map(n=>({...n,kind:'n'})),...jobsNow.map(j=>({kind:'j',j,at:j.at})),...[...active,...waiting].map(y=>({kind:'b',y,at:y.at||y.j.at}))].sort((a,b)=>b.at-a.at);
+      ${S.actTab==='all'?(()=>{const feed=[...D.notes.map(n=>({...n,kind:'n'})),...jobsNow.map(j=>({kind:'j',j,at:j.at})),...[...active,...waiting,...notPicked].map(y=>({kind:'b',y,at:y.at||y.j.at}))].sort((a,b)=>b.at-a.at);
         const one=f=>f.kind==='j'?row(f.j,jobLine(f.j),f.j.price,me):f.kind==='b'?row(f.y.j,bidLine(f.y.x||{j:f.y.j}),f.y.amt)
           :`<button class="item notif ${f.at>S.actSeenAt?'new':''}" ${f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span></span>${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`;
         return feed.length?`<div class="ifeed">${dateGroups(feed,f=>f.at).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(one).join('')}</section>`).join('')}</div>`:empty('Bids, picks and payments show up here.')})()
       :S.actTab==='jobs'?`${jobsNow.length?`<div class="ifeed"><section class="igroup">${jobsNow.map(j=>row(j,jobLine(j),j.price,me)).join('')}</section></div>`:empty('Nothing pinned right now.')}
         <button class="linkbtn" data-go="post" style="align-self:flex-start;padding:0">Pin a job</button>`
-      :S.actTab==='bids'?(active.length||waiting.length?`<div class="ifeed">${grp('Active',active)+grp('Waiting',waiting)}</div>`:empty('Bids you place on the board show up here.'))
+      :S.actTab==='bids'?(active.length||waiting.length||notPicked.length?`<div class="ifeed">${grp('Active',active)+grp('Waiting',waiting)+grp('Not picked',notPicked)}</div>`:empty('Bids you place on the board show up here.'))
       :hist.length?`<div class="ifeed">${dateGroups(hist,y=>y.at).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(y=>y.mine?row(y.j,jobLine(y.j),y.amt,me):row(y.j,bidLine(y.x||{j:y.j}),y.amt)).join('')}</section>`).join('')}</div>`:empty('Finished and closed jobs and bids show up here.')}`})()}
    </div></div><div style="height:24px"></div>`;
 }
@@ -1222,6 +1233,12 @@ function sheetHTML(D){
     <p class="note">Drag to move. Pinch or use the slider to zoom.</p>
     <input id="cropZoom" class="cropzoom" type="range" min="1" max="4" step="0.01" value="${c.z}" aria-label="Zoom">
     <button class="cta" data-act="cropUse">${c.target==='banner'?'Use banner':'Use photo'}</button><button class="linkbtn" data-act="cropCancel">Cancel</button>`;break}
+  case'repick':{if(!j||!j.accepted){b='';break}const dn=esc(firstName(j.accepted));
+    b=`<h2 id="sheetT">Pick someone else?</h2><p>${dn} will stop being picked for this job and see that you chose someone else. The job stays off the board, and you can pick from the other bids.</p>
+    <div class="chips" role="group" aria-label="Why">${['Didn’t show up','Can’t do it any more','Stopped replying','Something else'].map(r=>`<button class="chip ${S.repick===r?'on':''}" data-act="repickWhy" data-val="${esc(r)}" aria-pressed="${S.repick===r}">${esc(r)}</button>`).join('')}</div>
+    <button class="cta" data-act="confirmRepick" ${S.repick?'':'disabled'}>Pick someone else</button>
+    <button class="linkbtn" data-sheet="report" data-about="${esc(j.accepted)}" data-prewhy="No-show or didn’t pay">Report ${dn} instead</button>
+    <button class="linkbtn" data-act="closeSheet">Keep ${dn}</button>`;break}
   case'paysafe':{if(!j||!upiOf(j)){b='<h2 id="sheetT">Payment</h2><p>This job has no UPI ID to pay yet.</p>';break}const dn=esc(firstName(j.accepted)),full=esc(shortName(j.accepted));
     b=`<h2 id="sheetT">Pay ${dn} ₹${fmt(j.agreed)}</h2>
     <ul class="safelist">
@@ -1483,7 +1500,7 @@ const ACT={
     getLoc().then(p=>{if(p){d.useLoc=true;render()}else toast('Couldn\u2019t get your location. Allow location for this site in your browser settings.')})},
   nextPic(){const s=S.sheet,l=S.pics[s?.k];if(!l||!l.length)return;S.sheet={...s,i:(s.i+1)%l.length};render()},
   confirmPick(){const j=derive().jobByKey[S.openJob],s=S.sheet;if(!j||!s)return;
-    saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.status='assigned'}return x});
+    saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.status='assigned';o.takenAt=Date.now();delete o.repickAt}return x});
     S.picks={...S.picks,[j.key]:{owner:S.me.id,job:j.id,doer:s.uid,agreed:s.amt,at:Date.now(),status:'assigned'}};
     S.fb.setDoc(S.fb.doc(S.db,'picks',j.key),{owner:S.me.id,job:j.id,doer:s.uid,agreed:s.amt,at:Date.now(),status:'assigned'}).catch(e=>{console.warn(e);toast('Couldn\u2019t save the pick. Try again.')});
     S.sheet=null;toast('Picked '+firstName(s.uid)+'. Sort out the details in chat.');openThread({key:jobThreadKey(j.key,s.uid),other:s.uid,jobKey:j.key})},
@@ -1587,6 +1604,15 @@ const ACT={
     S.err={};S.upiEdit=false;S.pay.upi=null;if(S.priv.upi!==u)savePriv({upi:u});S.picks={...S.picks,[j.key]:{...S.picks[j.key],upi:u}};render();
     S.fb.updateDoc(S.fb.doc(S.db,'picks',j.key),{upi:u}).then(()=>toast('Shared with '+firstName(j.owner))).catch(e=>{console.warn(e);toast('Couldn’t share it yet. Try again in a bit.')})},
   editUpi(){S.upiEdit=true;S.pay.upi=null;render()},
+  repickWhy(el){S.repick=el.dataset.val;render()},
+  confirmRepick(){const j=derive().jobByKey[S.openJob];if(!j||j.owner!==S.me.id||!j.accepted||!S.repick)return;const doer=j.accepted,why=S.repick;
+    S.fb.deleteDoc(S.fb.doc(S.db,'picks',j.key)).then(()=>{
+      const p={...S.picks};delete p[j.key];S.picks=p;
+      saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.repickAt=Date.now();o.dropped=[...arr(o.dropped).filter(u=>u!==doer),doer].slice(-5);o.dropWhy=why.slice(0,40)}return x});
+      S.sheet=null;S.repick=null;render();toast('Pick someone else from the bids')
+    }).catch(e=>{console.warn(e);toast('Couldn’t change the pick yet. Try again in a bit.')})},
+  reopenJob(){const j=derive().jobByKey[S.openJob];if(!j||j.owner!==S.me.id||j.accepted)return;
+    saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.status='open';delete o.repickAt;delete o.takenAt;if(num(o.deadline)<Date.now()+36e5)o.deadline=Date.now()+864e5}return x});toast('Back on the board')},
   clearSearch(){S.find.q='';render();setTimeout(()=>$('q')?.focus(),0)},
   copy(el){const t=el.dataset.text||'';
     try{navigator.clipboard.writeText(t).then(()=>toast('Copied'),()=>toast('Couldn’t copy. Select the text and copy it.'))}catch{toast('Couldn’t copy.')}}
