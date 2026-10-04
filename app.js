@@ -1,5 +1,6 @@
 import firebaseConfig from './firebase-config.js';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610040734';
+import {modHit,MOD_CAT} from './mod.js?v=202610040734';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
@@ -149,8 +150,14 @@ function workedWith(uid,D){const me=S.me.id;return D.jobs.filter(j=>(j.status===
 function lastJobFor(uid,D){return D.jobs.filter(j=>j.owner===S.me.id&&j.accepted===uid&&(j.status==='assigned'||j.status==='done')).sort((a,b)=>b.at-a.at)[0]||null}
 const offerList=o=>Object.entries(o).map(([k,v])=>({key:k,...v})).filter(x=>x&&typeof x.text==='string');
 function bidsFor(D,key){return (D.bidsByJob[key]||[]).filter(b=>!D.blocked.has(b.by))}
+const MOD_AREA={job:'job',bid:'bid',chat:'message',offer:'request',review:'review',profile:'profile'};
+const warnsOf=()=>Array.isArray(S.priv.warns)?S.priv.warns.filter(w=>w&&typeof w==='object'):[];
+function modBlock(area,...texts){const cat=modHit(...texts);if(!cat)return false;const at=Date.now(),warns=[...warnsOf(),{at,area,cat}].slice(-20);
+  savePriv({warns});S.fb.addDoc(S.fb.collection(S.db,'flags'),{by:S.me.id,area,cat,at}).catch(()=>{});
+  S.sheet={type:'blocked',area,cat,n:warns.length};S.err={};render();return true}
 function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str(j.text,200).trim().replace(/[.!?\s]+$/,'');return'<i>\u201c'+esc(x.length>56?x.slice(0,55).trim()+'\u2026':x)+'\u201d</i>'},nm=u=>'<b>'+esc(firstName(u))+'</b>',ok=u=>u&&D.members.includes(u)&&!D.blocked.has(u);
   const add=(at,who,html,go)=>{if(at>0)out.push({at,who,html,...go})};
+  for(const w of warnsOf())if(MOD_CAT[w.cat])add(num(w.at),'tack',`Your ${MOD_AREA[w.area]||'post'} wasn\u2019t posted: it broke tack\u2019s rules on ${MOD_CAT[w.cat]}. Repeated attempts can get your account removed.`,{go:'settings'});
   const joined=num(S.myDoc?.joinedAt);add(joined,'tack','Welcome to tack. Pin a small job or bid on one from the board.',{go:'board'});
   for(const j of D.jobs){
     if(j.owner===me){
@@ -515,6 +522,7 @@ function markSeen(){
 }
 function sendMsg(){
   const c=S.chat,t=S.chatDraft.text.trim();if(!c.key||!t)return;
+  if(modBlock('chat',t))return;
   if(!canMessage(c,derive())){toast('You can\u2019t message them yet.');return}
   const {collection,addDoc,doc,setDoc}=S.fb,me=S.me.id,at=Date.now();
   S.chatDraft.text='';
@@ -1177,6 +1185,9 @@ function sheetHTML(D){
     <button class="cta" data-act="closeSheet">Got it</button>`;break;
   case'delReview':b=`<h2 id="sheetT">Delete this review?</h2><p>It comes off ${esc(firstName(s.about))}'s profile for good. It can't be written again for this job.</p>
     <button class="cta destructive" data-act="confirmDelReview">Delete review</button><button class="linkbtn" data-act="closeSheet">Keep it</button>`;break;
+  case'blocked':b=`<h2 id="sheetT">That can\u2019t go on tack</h2><p>Your ${esc(MOD_AREA[s.area]||'post')} includes words about ${esc(MOD_CAT[s.cat]||'something that isn\u2019t allowed')}, which tack doesn\u2019t allow. Nothing was posted.</p>
+    <div class="modwarn"><b>This attempt has been recorded${s.n>1?` (${s.n} so far)`:''}.</b> Repeated attempts to post hate, abuse or illegal content can get your account removed from tack.</div>
+    <button class="cta" data-act="closeSheet">Edit it</button><button class="linkbtn" data-doc="terms">Read the rules</button>`;break;
   case'pic':{const l=S.pics[s.k]||[],src=l[s.i];
     b=`<h2 id="sheetT" class="sr">Photo ${s.i+1} of ${l.length}</h2>${src?`<img class="bigpic" src="${src}" alt="Photo ${s.i+1} of ${l.length}">`:''}
     ${l.length>1?`<button class="btn2" data-act="nextPic">Show photo ${(s.i+1)%l.length+1} of ${l.length}</button>`:''}<button class="linkbtn" data-act="closeSheet">Close</button>`;break}
@@ -1386,14 +1397,16 @@ const ACT={
   pickBanner(el){S.onb.banner=el.dataset.val||'';render()},
   join(){const o=S.onb;
     if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.')||!need(o.adult,'onb','tack is for students who are 18 or older.')||!need(o.rules,'onb','Agree to the Terms of Use and Privacy Policy to continue.'))return;
+    if(modBlock('profile',o.name,o.does,o.branch))return;
     savePriv({terms:{v:TERMS_V,at:Date.now()}});
     saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),bio:o.does.trim().slice(0,BIO_MAX),does:o.does.trim().slice(0,60),ring:o.ring,adult:true,joinedAt:d.joinedAt||Date.now(),jobs:d.jobs||{}}));
     S.err={};S.view='board';S.joining=true;computePhase();render();
     moment(`You\u2019re on the board, ${o.name.trim().split(/\s+/)[0]}.`,'Give us a second to show you around.',1600).then(()=>{S.joining=false;if(!S.priv.introSeen)openIntro()})},
-  saveProfile(){const o=S.onb;if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.'))return;
+  saveProfile(){const o=S.onb;if(!need(o.name.trim().length>=2,'onb','Add your full name.')||!need(o.year,'onb','Pick your year.')||!need(o.branch.trim(),'onb','Add your branch.'))return;if(modBlock('profile',o.name,o.does,o.branch))return;
     saveMine(d=>({...d,name:o.name.trim().slice(0,60),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),bio:o.does.trim().slice(0,BIO_MAX),does:o.does.trim().slice(0,60),banner:bannerOk(o.banner)?o.banner:'',ring:o.ring}));go('me');toast('Profile saved')},
   post(){const d=S.draft,text=d.text.trim(),price=digits(d.price);
     if(!need(text.length<=NOTE_MAX,'post','Keep the note to '+NOTE_MAX+' characters. Put the rest in the details.')||!need(text.length>=8,'post','Say what you need in a few more words.')||!need(price>=10&&price<=20000,'post','Set a price between ₹10 and ₹20,000.'))return;
+    if(modBlock('job',text,d.more,d.whereText))return;
     const id=rid(),at=Date.now(),where=(d.whereText.trim()||d.where).slice(0,40);
     const pics=cleanPics(d.pics),geo=d.useLoc&&LOC.pos?{lat:Math.round(LOC.pos.lat*1e3)/1e3,lng:Math.round(LOC.pos.lng*1e3)/1e3}:null;
     saveMine(x=>{x.jobs={...(x.jobs||{}),[id]:{text:text.slice(0,400),more:d.more.trim().slice(0,600),price,kind:d.kind,when:d.when,where,at,deadline:deadlineFor(d.when,at),status:'open',color:hueHex(d.hue),...(pics.length?{pics:pics.length}:{}),...(geo?{geo}:{})}};return x});
@@ -1402,7 +1415,7 @@ const ACT={
   repost(){const j=derive().jobByKey[S.openJob];if(!j)return;S.draft={...blankDraft(),hue:hexHue(noteOf(j)),text:j.text,price:String(j.price),kind:KINDS.includes(j.kind)?j.kind:'Other',where:WHERES.includes(j.where)?j.where:'Gate 1',whereText:WHERES.includes(j.where)?'':j.where,more:j.more,pics:[...(S.pics['j:'+j.key]||[])]};
     saveMine(x=>{if(x.jobs?.[j.id])x.jobs[j.id].status='closed';return x});go('post')},
   bid(){const j=derive().jobByKey[S.openJob];if(!j)return;const amt=digits(S.bid.amt);
-    if(!need(amt>=1&&amt<=50000,'bid','Enter a bid in rupees.'))return;if(!need(!sayOver(S.bid.say),'bid',SAY_MAX<1000?'Keep your pitch under '+SAY_MAX+' characters.':'Keep your pitch under '+SAY_WORDS+' words.'))return;const had=!!myBidOn(j.key);
+    if(!need(amt>=1&&amt<=50000,'bid','Enter a bid in rupees.'))return;if(!need(!sayOver(S.bid.say),'bid',SAY_MAX<1000?'Keep your pitch under '+SAY_MAX+' characters.':'Keep your pitch under '+SAY_WORDS+' words.'))return;if(modBlock('bid',S.bid.say))return;const had=!!myBidOn(j.key);
     const id=j.key+'~'+S.me.id,old=num(myBidOn(j.key)?.pics),pics=S.bid.pics?cleanPics(S.bid.pics):null,n=pics?pics.length:old;
     savePitch(j.key,S.bid.say.trim(),amt,n,!!(pref('near')&&j.geo&&LOC.pos&&distM(LOC.pos,j.geo)<=NEAR_M));render();S.err={};toast(had?'Bid updated':'Bid placed');
     if(pics){const {doc,setDoc,deleteDoc}=S.fb;S.pics['b:'+id]=pics;
@@ -1412,7 +1425,7 @@ const ACT={
     if(had){delete S.pics['b:'+id];S.fb.deleteDoc(S.fb.doc(S.db,'bidpics',id)).catch(()=>{})}
     render();S.bid={key:null};toast('Bid withdrawn')},
   async postReview(){const j=derive().jobByKey[S.openJob];if(!j||!j.pick||j.pick.review||j.owner!==S.me.id||jobState(j)!=='done')return;
-    const text=S.rate.rev.trim().slice(0,400);if(!need(text.length>=3,'rate','Write a few words first.'))return;
+    const text=S.rate.rev.trim().slice(0,400);if(!need(text.length>=3,'rate','Write a few words first.'))return;if(modBlock('review',text))return;
     S.busy=true;render();
     try{await reviewBatch(j.key,j.accepted,text,cleanPics(S.rate.pics),num((S.priv.gave||{})[j.key]));S.sheet=null;toast('Review posted')}
     catch(e){console.warn(e);S.err={rate:'Couldn\u2019t post your review. Try again.'}}
@@ -1468,6 +1481,7 @@ const ACT={
     S.sheet=null;toast('Picked '+firstName(s.uid)+'. Sort out the details in chat.');openThread({key:jobThreadKey(j.key,s.uid),other:s.uid,jobKey:j.key})},
   async confirmDone(){const j=derive().jobByKey[S.openJob];if(!j||!j.pick||j.pick.ratedDoer)return;const r=S.rate;
     if(!need(r.a&&r.b&&r.c&&r.d,'rate','Rate all four, from 1 to 5.'))return;
+    if(modBlock('review',r.rev,r.text))return;
     const vals={timing:r.a,quality:r.b,comm:r.c,care:r.d},at=Date.now(),note=r.text.trim().slice(0,200);
     if(j.status!=='done')saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.status='done';o.doneAt=at}return x});
     S.busy=true;render();
@@ -1535,6 +1549,7 @@ const ACT={
   async shareCode(el){const c=el.dataset.code;try{await navigator.share({title:'Join me on tack',text:codeText(c).replace(/\n.*$/s,''),url:codeLink(c)})}catch{}},
   sendOffer(){const o=S.offer,text=o.text.trim(),price=digits(o.price),me=S.me.id;
     if(!need(text.length>=6,'offer','Say what you need in a few more words.')||!need(price>=10&&price<=20000,'offer','Set a price between ₹10 and ₹20,000.'))return;
+    if(modBlock('offer',text,o.where))return;
     const id=rid(),key=`${me}~${id}~${o.to}`,d={owner:me,to:o.to,job:id,text:text.slice(0,200),price,when:o.when,where:o.where.trim().slice(0,40),at:Date.now(),status:'pending',...(o.prevJob?{prevJob:o.prevJob}:{})};
     S.offersOut={...S.offersOut,[key]:d};S.sheet=null;render();
     S.fb.setDoc(S.fb.doc(S.db,'offers',key),d).then(()=>toast('Sent to '+firstName(o.to)+'. You\u2019ll see their answer in Activity.')).catch(e=>{const m={...S.offersOut};delete m[key];S.offersOut=m;render();
