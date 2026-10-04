@@ -1064,3 +1064,22 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 
 /* the gradient ring only marks people who are free right now; prices are white everywhere, like on the notes */
 .jbids .amt{color:var(--fg)}
+
+/* job page: the job is the headline, the poster and price support it */
+.jhead .h1{font-size:clamp(28px,7.6vw,40px);line-height:1.1;letter-spacing:-.035em;font-weight:700}
+.jhero{min-height:300px;padding-bottom:70px}
+.jposter{margin-top:-46px;gap:4px}
+.jposter .pname{font-size:var(--fs-b);font-weight:600;letter-spacing:-.01em}
+.jposter .jmeta{font-size:var(--fs-c)}
+.jcard .big{font-size:30px}
+
+/* a placed bid reads as a card, not an open editor */
+.bidcard{gap:10px}
+.bidtop{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.bidtop .muted{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-c)}
+.bidamt{font-family:var(--display);font-size:30px;font-weight:700;letter-spacing:-.035em;color:var(--fg);font-variant-numeric:tabular-nums}
+.bidpitch{white-space:pre-wrap}
+.bidwhen{font-size:var(--fs-c);color:var(--muted)}
+.bidbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.bidbtns .btn2{flex:1;display:flex;align-items:center;justify-content:center;gap:7px}
+.bidwd{align-self:center;color:var(--muted)}

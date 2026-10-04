@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050443';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050443';
-import {modHit,MOD_CAT} from './mod.js?v=202610050443';
+import {makeDb} from './db.js?v=202610050452';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050452';
+import {modHit,MOD_CAT} from './mod.js?v=202610050452';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -911,8 +911,19 @@ function viewJob(D){
         ${j.pick?.noteToPoster?`<div class="box stack" style="gap:4px"><span class="formlabel">${dn}'s private note to you</span><span class="t2" style="color:var(--fg)">${esc(str(j.pick.noteToPoster,200))}</span></div>`:''}</div>`}
     else if(st==='expired')foot=`<div class="foot"><button class="btn2" data-act="repost">Pin it again</button></div>`;
   }else{
-    if(st==='open')foot=`<div class="foot">
-      <h2 class="h2">${myBid?'Change your bid':'Place your bid'}</h2>
+    if(st==='open'&&myBid&&S.bidEdit!==j.key)foot=`<div class="foot">
+      <div class="jcard stack bidcard">
+        <div class="bidtop"><span class="formlabel">Your bid</span><span class="muted">${ic('shield',12,2.2)} only ${esc(firstName(j.owner))} sees this</span></div>
+        <span class="bidamt">₹${fmt(myBid.amt)}</span>
+        ${myBid.say?`<p class="jmore bidpitch">${esc(myBid.say)}</p>`:'<p class="jmore muted">No pitch added.</p>'}
+        ${picStrip('b:'+j.key+'~'+me,myBid.pics,'sub')}
+        <span class="bidwhen">Placed ${since(myBid.at)}</span>
+        <div class="bidbtns"><button class="btn2" data-act="editBid">${ic('edit',15)} Edit bid</button>${threadOpen(jobThreadKey(j.key,me))?`<button class="btn2" data-thread-job>${ic('chat',15)} Message ${esc(firstName(j.owner))}</button>`:''}</div>
+        <button class="linkbtn bidwd" data-act="withdraw">Withdraw my bid</button>
+      </div>
+      <p class="note">${threadOpen(jobThreadKey(j.key,me))?`${esc(firstName(j.owner))} messaged you about this job.`:`You can message ${esc(firstName(j.owner))} once they pick you.`} You pay each other on UPI.</p></div>`;
+    else if(st==='open')foot=`<div class="foot">
+      <h2 class="h2">${myBid?'Edit your bid':'Place your bid'}</h2>
       <div style="display:flex;gap:9px"><label class="field" for="bidAmt"><span class="fl">Your bid ₹</span>
         <input id="bidAmt" type="text" inputmode="numeric" maxlength="6" value="${esc(S.bid.amt)}" data-bind="bid.amt" aria-label="Your bid in rupees"
          style="font-family:var(--display);font-size:var(--t-19);font-weight:700;letter-spacing:-.035em;font-variant-numeric:tabular-nums"></label>
@@ -921,8 +932,8 @@ function viewJob(D){
         <textarea id="bidSay" rows="5" maxlength="${SAY_MAX}" placeholder="Why you? Past work, what you'll bring, when you can do it." data-bind="bid.say">${esc(S.bid.say)}</textarea>
         <div class="pitchfoot">${S.bid.pics?picEdit('bid',S.bid.pics):'<div class="pics"><span class="pic wait" aria-hidden="true"></span></div>'}<span class="wc ${sayOver(S.bid.say)?'over':''}" id="bidWc">${sayCount(S.bid.say)}</span></div></div>
       ${S.err.bid?`<p class="err">${esc(S.err.bid)}</p>`:''}
-      <button class="cta" data-act="bid" data-need="bid">${myBid?'Update my bid':'Place bid'}</button>
-      ${myBid?'<button class="linkbtn" data-act="withdraw">Withdraw my bid</button>':''}
+      <button class="cta" data-act="bid" data-need="bid">${myBid?'Update bid':'Place bid'}</button>
+      ${myBid?'<button class="linkbtn" data-act="cancelBidEdit">Cancel</button>':''}
       <p class="note">${threadOpen(jobThreadKey(j.key,me))?`${esc(firstName(j.owner))} messaged you about this job.`:`You can message ${esc(firstName(j.owner))} once they pick you.`} You pay each other on UPI.</p></div>`;
     else if(j.accepted===me&&st==='done'){const pay=payOf(j),pn=esc(firstName(j.owner)),late=!pay?.ok&&Date.now()-(j.doneAt||pay?.at||Date.now())>PAY_GRACE;
       foot=pay?.ok?`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} Paid · you confirmed ₹${fmt(j.agreed)} ${since(pay.at)}</div>
@@ -965,7 +976,7 @@ function viewJob(D){
   return`<div class="pad jobpage${gcls(j)}" style="--nc:${noteOf(j)}${gvars(j)}">
   <div class="jhero">${cover}${back('board','Board')}<div class="jtools">${mine&&st==='open'?`<button class="jtool" data-act="editJob" data-key="${esc(j.key)}" aria-label="Edit this job">${ic('edit',18)}</button>`:''}<button class="jtool" data-act="openShare" data-key="${esc(j.key)}" aria-label="Share this job">${ic('share',18)}</button>${mine?'':`<button class="jtool ${isSaved(j.key)?'on':''}" data-act="toggleSave" data-key="${esc(j.key)}" aria-label="${isSaved(j.key)?'Remove from saved':'Save this job'}" aria-pressed="${isSaved(j.key)}">${ic('bookmark',18,2,'currentColor',isSaved(j.key)?'currentColor':'none')}</button>`}</div>
     <div class="jhead"><h1 class="h1">${esc(j.text)}</h1><span class="jhint">${hint}</span></div></div>
-  <button class="jposter" data-person="${esc(j.owner)}"><span class="javwrap"><span class="ring${liveOf(j.owner)?' live':''}" style="width:108px;height:108px">${face(j.owner,94)}</span>${online?'<span class="onl"><i></i>Online</span>':''}</span>
+  <button class="jposter" data-person="${esc(j.owner)}"><span class="javwrap"><span class="ring${freeNow(j.owner)?' live':''}" style="width:68px;height:68px">${face(j.owner,58)}</span>${online?'<span class="onl"><i></i>Online</span>':''}</span>
     <span class="pname">${esc(shortName(j.owner))}${mine?' <span class="muted">(you)</span>':''}</span>
     <span class="jmeta">${esc(metaOf(j.owner)||campus())}${esc(posterLine(j.owner))} · posted ${since(j.at)}${j.editedAt?' · edited':''}${esc(payLine(j.owner))}</span></button>
   <div class="jcard stack">
@@ -973,7 +984,7 @@ function viewJob(D){
     <div class="chips">${[j.when,online?'':j.where].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${nearMe(j)?nearTag():''}${stTag}</div>
     ${j.more?`<p class="jmore">${esc(j.more)}</p>`:''}
   </div>
-  ${mine?bidsSec+foot:foot+bidsSec}
+  ${mine?bidsSec+foot:foot+(st==='open'?'':bidsSec)}
   </div>
   ${!mine?`<div class="reportrow"><button class="linkbtn" data-sheet="report" data-about="${esc(j.owner)}">Report this job</button>${mod}</div>`:''}`;
 }
@@ -1618,14 +1629,16 @@ const ACT={
     S.openJob=j.key;S.editEnter=true;S.sheet=null;go('post')},
   repost(){const j=derive().jobByKey[S.openJob];if(!j)return;S.draft={...blankDraft(),hue:hexHue(noteOf(j)),white:noteOf(j)===NOTE_WHITE,text:j.text,price:String(j.price),kind:KINDS.includes(j.kind)?j.kind:'Other',where:WHERES.includes(j.where)?j.where:'Gate 1',whereText:WHERES.includes(j.where)?'':j.where,more:j.more,pics:[...(S.pics['j:'+j.key]||[])]};
     saveMine(x=>{if(x.jobs?.[j.id])x.jobs[j.id].status='closed';return x});go('post')},
+  editBid(){const j=derive().jobByKey[S.openJob],b=j&&myBidOn(j.key);if(!b)return;S.bidEdit=j.key;S.bid={key:j.key,amt:String(num(b.amt)),say:b.say||'',pics:num(b.pics)?null:[]};S.err={};render();setTimeout(()=>$('bidAmt')?.focus(),0)},
+  cancelBidEdit(){S.bidEdit=null;S.bid={key:null};S.err={};render()},
   bid(){const j=derive().jobByKey[S.openJob];if(!j)return;const amt=digits(S.bid.amt);
     if(!need(amt>=1&&amt<=50000,'bid','Enter a bid in rupees.'))return;if(!need(!sayOver(S.bid.say),'bid',SAY_MAX<1000?'Keep your pitch under '+SAY_MAX+' characters.':'Keep your pitch under '+SAY_WORDS+' words.'))return;if(modBlock('bid',S.bid.say))return;const had=!!myBidOn(j.key);
     const id=j.key+'~'+S.me.id,old=num(myBidOn(j.key)?.pics),pics=S.bid.pics?cleanPics(S.bid.pics):null,n=pics?pics.length:old;
-    savePitch(j.key,S.bid.say.trim(),amt,n,!!(pref('near')&&j.geo&&LOC.pos&&distM(LOC.pos,j.geo)<=NEAR_M));render();S.err={};toast(had?'Bid updated':'Bid placed');
+    S.bidEdit=null;savePitch(j.key,S.bid.say.trim(),amt,n,!!(pref('near')&&j.geo&&LOC.pos&&distM(LOC.pos,j.geo)<=NEAR_M));render();S.err={};toast(had?'Bid updated':'Bid placed');
     if(pics){const {doc,setDoc,deleteDoc}=S.fb;S.pics['b:'+id]=pics;
       if(pics.length)setDoc(doc(S.db,'bidpics',id),{owner:j.owner,by:S.me.id,job:j.key,pics,at:Date.now()}).catch(e=>{console.warn(e);toast('Your bid is in, but the photos didn\u2019t upload.')});
       else if(old)deleteDoc(doc(S.db,'bidpics',id)).catch(()=>{})}},
-  withdraw(){const k=S.openJob,id=k+'~'+S.me.id,had=num(myBidOn(k)?.pics);savePitch(k,'',0);
+  withdraw(){S.bidEdit=null;const k=S.openJob,id=k+'~'+S.me.id,had=num(myBidOn(k)?.pics);savePitch(k,'',0);
     if(had){delete S.pics['b:'+id];S.fb.deleteDoc(S.fb.doc(S.db,'bidpics',id)).catch(()=>{})}
     render();S.bid={key:null};toast('Bid withdrawn')},
   async postReview(){const j=derive().jobByKey[S.openJob];if(!j||!j.pick||j.pick.review||j.owner!==S.me.id||jobState(j)!=='done')return;
