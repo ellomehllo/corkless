@@ -1,6 +1,6 @@
 import firebaseConfig from './firebase-config.js';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610041903';
-import {modHit,MOD_CAT} from './mod.js?v=202610041903';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610041927';
+import {modHit,MOD_CAT} from './mod.js?v=202610041927';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
@@ -134,8 +134,9 @@ function syncDealNames(){const me=S.me?.id,n=myRealName();if(!me||!n||S.dealSync
 function photoOf(uid){const p=uid===S.me?.id&&(S.phase==='onboard'||S.view==='edit')?S.onb.photo:pdoc(uid).photo;return typeof p==='string'&&p.length<300000&&PHOTO_RE.test(p)?p:''}
 function ringOf(uid){const r=uid===S.me?.id&&S.onb.ring&&(S.phase==='onboard'||S.view==='edit')?S.onb.ring:pdoc(uid).ring;if(RINGS.includes(r))return r;let h=0;for(const c of String(uid))h=(h*31+c.charCodeAt(0))|0;return RINGS[Math.abs(h)%RINGS.length]}
 function metaOf(uid){const d=pdoc(uid);return [str(d.year,12),str(d.branch,24)].filter(Boolean).join(' ')}
-function face(uid,s){const src=photoOf(uid);return src?`<img class="av" src="${src}" width="${s}" height="${s}" alt="">`:`<span class="av av-empty" style="background:${ringOf(uid)}2e;color:${ringOf(uid)};width:${s}px;height:${s}px;font-size:${Math.round(s*.4)}px">${esc(firstName(uid)[0]||'?')}</span>`}
-function ring(uid,s){return `<span class="ring" style="border-color:${ringOf(uid)};width:${s}px;height:${s}px">${face(uid,s-8)}</span>`}
+function face(uid,s){const src=photoOf(uid);return src?`<img class="av" src="${src}" width="${s}" height="${s}" alt="">`:`<span class="av av-empty" style="width:${s}px;height:${s}px;font-size:${Math.round(s*.4)}px">${esc((firstName(uid).replace(/^@/,'')[0]||'?').toUpperCase())}</span>`}
+function liveOf(uid){const n=Date.now();return Object.values(pdoc(uid).jobs||{}).some(j=>j&&j.status==='open'&&num(j.deadline)>n)}
+function ring(uid,s){return `<span class="ring${liveOf(uid)?' live':''}" style="width:${s}px;height:${s}px">${face(uid,s-8)}</span>`}
 const campus=()=>str(S.config.campus,40)||DEFAULT_CAMPUS;
 const ownerId=()=>typeof S.config.adminUid==='string'?S.config.adminUid:null;
 const organiser=()=>{const o=ownerId();return o&&fullName(o)?firstName(o):'the organiser'};
@@ -712,8 +713,6 @@ function onboardHTML(edit){
      <input id="obr" class="inp" maxlength="24" placeholder="CSE, ECE, BDes…" value="${esc(o.branch)}" data-bind="onb.branch" autocomplete="off"></div>
    <div class="stack gap8"><label class="formlabel" for="odo">${edit?'Bio':'What are you good at?'} <span class="muted">(optional${edit?'':', shows as your bio'})</span></label>
      <textarea id="odo" class="inp" rows="3" maxlength="${BIO_MAX}" style="resize:none;line-height:1.45" placeholder="Photography, quick notes, I have a scooter for rides…" data-bind="onb.does">${esc(o.does)}</textarea></div>
-   <div class="stack gap8"><span class="formlabel" id="rl">Your ring colour</span>
-     <div class="chips" role="group" aria-labelledby="rl">${RINGS.map(r=>`<button class="swatch ${o.ring===r?'on':''}" style="background:${r}" data-onb="ring" data-val="${r}" aria-label="Ring colour ${r}" aria-pressed="${o.ring===r}"></button>`).join('')}</div></div>
    ${edit?'':`<label class="check" for="oad"><input type="checkbox" id="oad" data-bind="onb.adult" ${o.adult?'checked':''}> I'm 18 or older.</label>
    <label class="check" for="oru"><input type="checkbox" id="oru" data-bind="onb.rules" ${o.rules?'checked':''}> <span>I agree to the <button type="button" class="inlink" data-doc="terms">Terms of Use</button> and <button type="button" class="inlink" data-doc="privacy">Privacy Policy</button>, including no assignment or exam work and nothing illegal or unsafe.</span></label>`}
    ${S.err.onb?`<p class="err" role="alert">${esc(S.err.onb)}</p>`:''}
@@ -916,7 +915,7 @@ function viewJob(D){
   return`<div class="pad jobpage${gcls(j)}" style="--nc:${noteOf(j)}${gvars(j)}">
   <div class="jhero">${cover}${back('board','Board')}<div class="jtools"><button class="jtool" data-act="openShare" data-key="${esc(j.key)}" aria-label="Share this job">${ic('share',18)}</button>${mine?'':`<button class="jtool ${isSaved(j.key)?'on':''}" data-act="toggleSave" data-key="${esc(j.key)}" aria-label="${isSaved(j.key)?'Remove from saved':'Save this job'}" aria-pressed="${isSaved(j.key)}">${ic('bookmark',18,2,'currentColor',isSaved(j.key)?'currentColor':'none')}</button>`}</div>
     <div class="jhead"><h1 class="h1">${esc(j.text)}</h1><span class="jhint">${hint}</span></div></div>
-  <button class="jposter" data-person="${esc(j.owner)}"><span class="javwrap"><span class="ring" style="border-color:${noteOf(j)};width:108px;height:108px">${face(j.owner,94)}</span>${online?'<span class="onl"><i></i>Online</span>':''}</span>
+  <button class="jposter" data-person="${esc(j.owner)}"><span class="javwrap"><span class="ring${liveOf(j.owner)?' live':''}" style="width:108px;height:108px">${face(j.owner,94)}</span>${online?'<span class="onl"><i></i>Online</span>':''}</span>
     <span class="pname">${esc(shortName(j.owner))}${mine?' <span class="muted">(you)</span>':''}</span>
     <span class="jmeta">${esc(metaOf(j.owner)||campus())}${esc(posterLine(j.owner))} · posted ${since(j.at)}${esc(payLine(j.owner))}</span></button>
   <div class="jcard stack">
@@ -1059,7 +1058,7 @@ function viewPerson(uid,D){
   return`<div class="pad">${isMe?'':back('board','Back to the board')}
   <div class="stack narrow" style="margin:6px auto 0;gap:18px">
    <div class="prof ${bn?'hasbanner':''}">${bn?`<div class="pbanner" style="${bannerStyle(bn)}"></div>`:''}${isMe?`<button class="editpen" data-go="edit" aria-label="Edit profile">${ic('edit',17)}</button>`:''}
-     <span class="ring" style="border-color:${ringOf(uid)};width:108px;height:108px;box-shadow:0 0 34px ${GLOW[ringOf(uid)]}">${face(uid,94)}</span>
+     <span class="ring${liveOf(uid)?' live':''}" style="width:108px;height:108px">${face(uid,94)}</span>
      <span class="pname">${handleOf(uid)?'@'+esc(handleOf(uid)):esc(shortName(uid))}</span>
      ${realNameOf(uid)&&handleOf(uid)?`<span class="realname">${esc(realNameOf(uid))}${isMe?' · only people you make a deal with see your name':''}</span>`:''}
      <div class="chips" style="justify-content:center">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campus())}</span>
@@ -1345,7 +1344,7 @@ function introScene(k){const me=S.me?.id;
   if(k==='board')return`<div class="sc sc-board" aria-hidden="true">${[['₹120','Print 40 pages at Sai Xerox','#A18CFF'],['₹60','Parcel from Gate 1','#FF7AD1'],['₹300','20 photos at golden hour','#4FE3E0']].map(([p,t,c],i)=>`<span class="sct" style="--i:${i}"><span class="pin" style="background:${c};box-shadow:0 0 10px ${c}"></span><b>${p}</b><i>${t}</i></span>`).join('')}</div>`;
   if(k==='bid')return`<div class="sc sc-bid" aria-hidden="true"><span class="sct" style="--i:0"><span class="pin" style="background:#FFC53D;box-shadow:0 0 10px #FFC53D"></span><b>₹150</b><i>Help me move a cupboard</i></span>
     <span class="bubble" style="--i:1">${me?face(me,26):''}<b>₹120</b><span>I can do it by 5</span></span><span class="lock" style="--i:2">${ic('shield',13,2.2)} Only the poster sees this</span></div>`;
-  if(k==='pick')return`<div class="sc sc-pick" aria-hidden="true"><span class="who" style="--i:0">${me?ring(me,56):''}</span><span class="link" style="--i:1"></span><span class="who" style="--i:0"><span class="ring" style="border-color:#4FE3E0;width:56px;height:56px"><span class="av av-empty" style="background:#4FE3E02e;color:#4FE3E0;width:48px;height:48px;font-size:19px">S</span></span></span>
+  if(k==='pick')return`<div class="sc sc-pick" aria-hidden="true"><span class="who" style="--i:0">${me?ring(me,56):''}</span><span class="link" style="--i:1"></span><span class="who" style="--i:0"><span class="ring live" style="width:56px;height:56px"><span class="av av-empty" style="background:#4FE3E02e;color:#4FE3E0;width:48px;height:48px;font-size:19px">S</span></span></span>
     <span class="bubble b2" style="--i:2">On my way. 10 minutes.</span><span class="lock" style="--i:3">UPI or cash, between you two</span></div>`;
   if(k==='rate')return`<div class="sc sc-rate" aria-hidden="true"><span class="stars">${[0,1,2,3,4].map(i=>`<span class="st" style="--i:${i}">${ic('star',30,2,'currentColor','currentColor')}</span>`).join('')}</span><span class="lock" style="--i:6">${ic('shield',13,2.2)} Anonymous, always</span></div>`;
   return`<div class="sc sc-end" aria-hidden="true"><span class="bigpin"></span></div>`}

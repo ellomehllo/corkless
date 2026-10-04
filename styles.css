@@ -810,3 +810,13 @@ a.cta{text-decoration:none}
 .hmsg.taken,.hmsg.short,.hmsg.chars{color:var(--coral-ink)}
 .lockedname{color:var(--fg2);cursor:default}
 .realname{margin-top:-6px;font-size:var(--t-12);font-weight:600;color:var(--muted);text-align:center}
+
+/* people: no colour outlines; a blue gradient ring only while they have a job on the board */
+.ring,.jposter .ring,.gnote .jposter .ring{border-color:transparent!important;position:relative}
+.ring:not(.live),.jposter .ring:not(.live){box-shadow:none}
+.prof.hasbanner>.ring{box-shadow:0 0 0 5px var(--bg)!important}
+.ring.live::before{content:"";position:absolute;inset:-2.5px;border-radius:50%;padding:2.5px;background:var(--grad);pointer-events:none;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0)}
+.prof>.ring.live,.jposter .ring.live{box-shadow:0 0 34px rgba(29,125,252,.4)}
+.prof.hasbanner>.ring.live{box-shadow:0 0 0 5px var(--bg),0 0 34px rgba(29,125,252,.4)!important}
+.av-empty{background:var(--surface2);color:var(--fg2)}
