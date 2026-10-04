@@ -1061,3 +1061,9 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .colopt:active{background:var(--in)}
 .colchosen{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:rgba(170,226,84,.10);border:1px solid rgba(170,226,84,.35);font-size:var(--t-14);line-height:1.45}
 .colchosen .muted{font-size:var(--t-12)}
+
+/* no gradient ring around people; prices are white everywhere, like on the notes */
+.ring.live::before{display:none}
+.prof>.ring.live,.jposter .ring.live{box-shadow:none}
+.prof.hasbanner>.ring.live{box-shadow:0 0 0 5px var(--bg)!important}
+.jbids .amt{color:var(--fg)}
