@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050148';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050148';
-import {modHit,MOD_CAT} from './mod.js?v=202610050148';
+import {makeDb} from './db.js?v=202610050254';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050254';
+import {modHit,MOD_CAT} from './mod.js?v=202610050254';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -79,7 +79,7 @@ const S={
   view:'board', openJob:null, personOf:null, sort:'high', find:{q:''}, near:false,
   draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, pw:{cur:'',nw:''}, pwOpen:false, help:{kind:null,job:null,why:'',note:'',sent:null}, actTab:'all', actSeenAt:0, intro:{on:false,i:0}, fresh:null, chatDraft:{text:''}, pay:{upi:null,ref:''},
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',banner:'',adult:false,rules:false},
-  inv:{email:'',campus:''}, lastInvite:null,
+  inv:{email:'',campus:'',camp:''}, lastInvite:null, myCampus:null, campuses:{}, viewCampus:(()=>{try{return localStorage.getItem('tack.viewCampus')||''}catch{return''}})(),
   picks:{}, repDocs:{},
   sheet:null, rate:{a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]}, rep:{why:'',note:'',block:false}, erase:{pw:''},
   chat:{key:null}, err:{}
@@ -140,7 +140,10 @@ function metaOf(uid){const d=pdoc(uid);return [str(d.year,12),str(d.branch,24)].
 function face(uid,s){const src=photoOf(uid);return src?`<img class="av" src="${src}" width="${s}" height="${s}" alt="">`:`<span class="av av-empty" style="width:${s}px;height:${s}px;font-size:${Math.round(s*.4)}px">${esc((firstName(uid).replace(/^@/,'')[0]||'?').toUpperCase())}</span>`}
 function liveOf(uid){const n=Date.now();return Object.values(pdoc(uid).jobs||{}).some(j=>j&&j.status==='open'&&num(j.deadline)>n)}
 function ring(uid,s){return `<span class="ring${liveOf(uid)?' live':''}" style="width:${s}px;height:${s}px">${face(uid,s-8)}</span>`}
-const campus=()=>str(S.config.campus,40)||DEFAULT_CAMPUS;
+const campusName=id=>str(S.campuses?.[id]?.name,60)||(id&&id===S.myCampus?.id?str(S.myCampus.name,60):'')||DEFAULT_CAMPUS;
+const curCampus=()=>(S.me?.isOwner&&S.viewCampus&&S.campuses[S.viewCampus]?S.viewCampus:S.myCampus?.id)||'mit-wpu';
+const campusOf=uid=>str(pdoc(uid).campus,40)||'mit-wpu';
+const campus=()=>campusName(curCampus());
 const ownerId=()=>typeof S.config.adminUid==='string'?S.config.adminUid:null;
 const organiser=()=>{const o=ownerId();return o&&fullName(o)?firstName(o):'the organiser'};
 const isMember=uid=>{const d=pdoc(uid);return !!d.adult&&!d.removed};
@@ -153,7 +156,7 @@ function normJob(id,j,uid){
 function jobState(j){return j.status==='open'&&j.deadline<Date.now()?'expired':j.status}
 function derive(){
   const me=S.me.id,blocked=new Set(arr(S.priv.blocked));
-  const members=Object.keys(S.peopleDocs).filter(u=>u!==me&&ID_RE.test(u)&&isMember(u));
+  const cc=curCampus(),members=Object.keys(S.peopleDocs).filter(u=>u!==me&&ID_RE.test(u)&&isMember(u)&&(!S.me.isOwner||campusOf(u)===cc));
   if(S.myDoc?.adult)members.push(me);
   const jobs=[],jobByKey={},bidsByJob={};
   for(const uid of members){const d=pdoc(uid);
@@ -406,12 +409,14 @@ async function handleUser(user){
   const {doc,getDoc}=S.fb,email=(user.email||'').toLowerCase();
   let isOwner=false;
   try{isOwner=(await S.fb.rpc('am_admin'))===true}catch{}
+  let camp=null;try{camp=await S.fb.rpc('ensure_my_campus')}catch(e){console.warn(e)}
+  if(!camp&&savedCode()){try{if(await S.fb.rpc('use_invite_code',{p_code:savedCode()}))camp=await S.fb.rpc('ensure_my_campus')}catch(e){console.warn(e)}}
+  if(!camp&&!isOwner){S.phase='notinvited';render();return}
+  try{localStorage.removeItem('tack.code')}catch{}
+  S.myCampus=camp&&typeof camp.id==='string'?{id:camp.id,name:str(camp.name,60)}:null;
   if(!isOwner){
     let inv=null;try{inv=await getDoc(doc(S.db,'invites',email))}catch{}
-    if((!inv||!inv.exists())&&savedCode()){try{if(await S.fb.rpc('use_invite_code',{p_code:savedCode()})){inv=await getDoc(doc(S.db,'invites',email))}}catch(e){console.warn(e)}}
-    if(!inv||!inv.exists()){S.phase='notinvited';render();return}
-    try{localStorage.removeItem('tack.code')}catch{}
-    S.myInvite=inv.data();
+    S.myInvite=inv&&inv.exists()?inv.data():null;
   }
   S.me={id:user.uid,email,isOwner};
   startSubs();
@@ -440,6 +445,7 @@ function startSubs(){
   const pk={own:{},doer:{}},mergePicks=()=>{S.picks={...pk.doer,...pk.own};if(S.phase==='app')render()};
   S.subs.push(onSnapshot(query(collection(db,'picks'),where('owner','==',me)),snap=>{pk.own={};snap.forEach(x=>{pk.own[x.id]=x.data()});mergePicks()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'picks'),where('doer','==',me)),snap=>{pk.doer={};snap.forEach(x=>{pk.doer[x.id]=x.data()});mergePicks()},e=>console.warn(e)));
+  S.subs.push(onSnapshot(collection(db,'campuses'),snap=>{const c={};snap.forEach(x=>{c[x.id]=x.data()});S.campuses=c;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(collection(db,'strikes'),snap=>{const r={};snap.forEach(x=>{r[x.id]=x.data()});S.strikes=r;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(collection(db,'rep'),snap=>{const r={};snap.forEach(x=>{r[x.id]=x.data()});S.repDocs=r;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'offers'),where('to','==',me)),snap=>{const o={};snap.forEach(x=>{o[x.id]=x.data()});S.offersIn=o;if(S.phase==='app')render()},e=>console.warn(e)));
@@ -500,9 +506,9 @@ async function doSignup(){
   S.busy=true;S.authErr='';S.signingUp=true;render();
   let can='';
   try{can=await S.fb.rpc('can_join',{p_email:email,p_code:codeParam||null})}catch(e){S.signingUp=false;return authFail('Couldn\u2019t reach tack. Check your connection and try again.')}
-  if(can!=='invited'&&can!=='code'){S.signingUp=false;S.busy=false;S.phase='auth';
+  if(can!=='invited'&&can!=='code'&&can!=='college'){S.signingUp=false;S.busy=false;S.phase='auth';
     return authFail(can==='usedcode'?'This invite link has already been used. Ask your friend for a new one.':can==='badcode'?'This invite link isn\u2019t valid. Check you copied all of it, or ask your friend for a new one.'
-      :`${email} isn’t on the invite list. Use the email address your invite was sent to, or ask the organiser to invite you.`)}
+      :`${email} isn’t a college email tack recognises, and it isn’t on the invite list. Sign up with your college email, or ask the organiser to invite you.`)}
   if(can==='code')try{localStorage.setItem('tack.code',codeParam)}catch{}
   const {data,error}=await S.sb.auth.signUp({email,password:f.pw,options:{data:{name},emailRedirectTo:SITE}});
   S.signingUp=false;S.busy=false;
@@ -634,11 +640,11 @@ function authHTML(){
   if(m==='signup')body=`<form class="stack" id="authForm" data-form="signup" novalidate style="gap:14px">
      ${inviteParam?`<div class="invitebanner">You're invited. Create your account with <b>${esc(inviteParam)}</b>, the address your invite went to.</div>`:codeParam?`<div class="invitebanner">A friend invited you to tack. Sign up with any email you use.</div>`:''}
      ${field('fName','Full name','text','name','Sana Qureshi','name')}
-     ${field('fEmail','Email','email','email',codeParam?'you@college.edu.in':'The address you were invited on','email')}
+     ${field('fEmail','College email','email','email',inviteParam?'The address you were invited on':'you@college.edu.in','email')}
      ${field('fPw','Password','password','pw','At least 8 characters','new-password')}
      ${S.authErr?`<p class="err" role="alert">${esc(S.authErr)}</p>`:''}
      <button class="cta" type="submit" data-need="signup" ${S.busy?'disabled':''}>${S.busy?'Creating your account…':'Create account'}</button>
-     <p class="note">Only invited emails can join. We'll email you a link to confirm your address.</p></form>`;
+     <p class="note">Use your college email and you’ll join your campus board. No college email? Ask the organiser for an invite. We’ll email you a link to confirm your address.</p></form>`;
   else if(m==='login')body=`<form class="stack" id="authForm" data-form="login" novalidate style="gap:14px">
      ${field('fEmail','Email','email','email','you@college.edu.in','email')}
      ${field('fPw','Password','password','pw','Your password','current-password')}
@@ -653,7 +659,7 @@ function authHTML(){
      <button type="button" class="linkbtn" data-auth="login">Back to log in</button></form>`;
   return`<div class="gatebox"><div class="mark">tack</div>
     <h1>${m==='signup'?'Create your account':m==='reset'?'Reset your password':'The campus noticeboard'}</h1>
-    ${m==='login'?'<p>Pin a small job, classmates bid, you pick someone. Invite-only.</p>':''}
+    ${m==='login'?'<p>Pin a small job, classmates bid, you pick someone. Sign up with your college email.</p>':''}
     ${m!=='reset'?tabs:''}${body}</div>`;
 }
 function gateHTML(){
@@ -673,8 +679,8 @@ function gateHTML(){
     <div class="stack gap8"><label class="formlabel" for="fNewPw">New password</label><span class="pwwrap"><input id="fNewPw" class="inp" type="${S.showPw?'text':'password'}" autocomplete="new-password" placeholder="At least 8 characters" value="${esc(S.pw.nw)}" data-bind="pw.nw"><button type="button" class="pwtoggle" data-act="togglePw" aria-label="${S.showPw?'Hide':'Show'} password">${S.showPw?'Hide':'Show'}</button></span></div>
     ${S.err.pw?`<p class="err" role="alert">${esc(S.err.pw)}</p>`:''}
     <button class="cta" type="submit" ${S.busy?'disabled':''}>${S.busy?'Saving…':'Save password'}</button></form></div>`;
-  case'notinvited':return`<div class="gatebox"><div class="mark">tack</div><h1>This email isn't on the invite list</h1>
-    <p><b>${email}</b> hasn't been invited to tack, or its invite was removed. Ask the organiser to invite this address, then log in again.</p>
+  case'notinvited':return`<div class="gatebox"><div class="mark">tack</div><h1>Use your college email</h1>
+    <p><b>${email}</b> isn’t a college email tack recognises, and it isn’t on the invite list. Log out and sign up with your college email to join your campus board, or ask the organiser to invite this address.</p>
     <button class="btn2" data-act="logout">Log out</button></div>`;
   case'erased':return`<div class="gatebox"><div class="mark">tack</div><h1>Your account is deleted</h1>
     <p>Your profile, jobs, bids and messages are erased, and your login is gone.</p></div>`;
@@ -759,7 +765,7 @@ async function noteCard(j){
   x.restore();
   x.textAlign='center';x.fillStyle='#F4F1FA';x.font='800 64px Gabarito';x.fillText('Bid on it on tack',W/2,H-250);
   x.fillStyle='#9C96AE';x.font='600 36px Figtree';x.fillText(SITE.replace(/^https?:\/\//,'').replace(/\/$/,''),W/2,H-180);
-  x.fillStyle='#6F6987';x.font='600 30px Figtree';x.fillText('Invite-only job board for '+campus()+' students',W/2,H-124);
+  x.fillStyle='#6F6987';x.font='600 30px Figtree';x.fillText('The job board for '+campus()+' students',W/2,H-124);
   return new Promise(r=>c.toBlob(r,'image/png'))}
 function openShare(k){const j=derive().jobByKey[k];if(!j)return;S.sheet={type:'share',key:k};render();
   if(S.shareImg?.key===k)return;S.shareImg=null;const go2=()=>noteCard(j).then(b=>{if(!b)return;S.shareImg={key:k,blob:b,url:URL.createObjectURL(b)};if(S.sheet?.type==='share')render()});
@@ -1008,10 +1014,10 @@ const codeText=c=>`Join me on tack, the ${campus()} board for quick jobs and fav
 function codeShare(c){return`<div class="copyrow"><span>${esc(codeLink(c))}</span></div>
   <div class="slogos">${slogo('wa','WhatsApp',`href="https://wa.me/?text=${encodeURIComponent(codeText(c))}" target="_blank" rel="noopener"`)}${slogo('ig','Instagram',`data-act="igText" data-text="${esc(codeText(c))}"`)}${navigator.share?slogo('share','More',`data-act="shareCode" data-code="${esc(c)}"`):''}${slogo('link','Copy',`data-act="copy" data-text="${esc(codeText(c))}"`)}</div>`}
 function inviteCard(D,big){
-  if(S.config.memberInvites===false&&!S.me.isOwner)return big?'<div class="empty" style="margin:8px 0"><b>No chats yet</b><p>Bid on a job, or tap Ask on someone who\u2019s free, to start talking.</p></div>':'';
-  const used=Object.values(S.myCodes).filter(c=>c&&c.usedBy).length;
+  if(false)return big?'<div class="empty" style="margin:8px 0"><b>No chats yet</b><p>Bid on a job, or tap Ask on someone who\u2019s free, to start talking.</p></div>':'';
+  const used=0;
   return`<div class="${big?'empty':'box stack'}" style="${big?'margin:8px 0':'gap:10px'}">
-    ${big?'<b>No chats yet</b><p>Chats open when you work with someone: message your bidders, or ask someone who\u2019s free for a favour. Bring your friends onto the board too.</p>':'<span class="t1" style="font-size:var(--t-16)">Invite friends to tack</span><span class="t2">More people on the board means jobs get picked up faster. Each link lets one person join.</span>'}
+    ${big?'<b>No chats yet</b><p>Chats open when you work with someone: message your bidders, or ask someone who\u2019s free for a favour. Bring your friends onto the board too.</p>':'<span class="t1" style="font-size:var(--t-16)">Invite friends to tack</span><span class="t2">More people on the board means jobs get picked up faster. Friends from ${esc(campus())} join with their college email.</span>'}
     <button class="${big?'cta noglow':'btn2'}" data-sheet="invitefriend">Invite a friend</button>
     ${used?`<p class="note">${used} ${used===1?'person has':'people have'} joined with your links.</p>`:''}</div>`}
 function dateGroups(list,at){const d0=new Date().setHours(0,0,0,0),grp=t=>!t?'Earlier':t>=d0?'Today':t>=d0-864e5?'Yesterday':t>=d0-6*864e5?'Last 7 days':t>=d0-29*864e5?'Last 30 days':'Earlier',out=[];
@@ -1060,7 +1066,7 @@ function viewPerson(uid,D){
      <span class="pname">${handleOf(uid)?'@'+esc(handleOf(uid)):esc(shortName(uid))}</span>
      ${realNameOf(uid)&&handleOf(uid)?`<span class="realname">${esc(realNameOf(uid))}${isMe?`<span class="privnote">${ic('shield',11)} Only people you make a deal with see this</span>`:''}</span>`:''}
      ${bio?`<p class="pbio">${esc(bio)}</p>`:''}
-     <div class="chips pchips">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campus())}</span>
+     <div class="chips pchips">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campusName(campusOf(uid)))}</span>
        ${uid===ownerId()?'<span class="chip vio">Organiser</span>':''}${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${free?'<span class="chip on">Free right now</span>':''}</div>
    </div>
    <div class="stats"><div><b>${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b>${st.avg?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.avg}`:'New'}</b><span>rating</span></div>${isMe?`<div><b class="money">₹${fmt(st.earned)}</b><span>earned · only you</span></div>`:`<div><b>${st.poster.n?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.poster.avg.toFixed(1)}`:'–'}</b><span>as a poster</span></div>`}</div>
@@ -1174,23 +1180,29 @@ const inviteText=e=>`You're invited to tack, the ${campus()} noticeboard for sma
 function shareButtons(e){
   return`<div class="slogos">${slogo('mail','Email',`href="mailto:${encodeURIComponent(e)}?subject=${encodeURIComponent('You’re invited to tack')}&body=${encodeURIComponent(inviteText(e))}"`)}${slogo('wa','WhatsApp',`href="https://wa.me/?text=${encodeURIComponent(inviteText(e))}" target="_blank" rel="noopener"`)}${slogo('link','Copy',`data-act="copy" data-text="${esc(inviteText(e))}"`)}</div>`;
 }
+function campusList(){const n={};for(const[u,d]of Object.entries(S.peopleDocs))if(d&&d.adult&&!d.removed){const c=str(d.campus,40)||'mit-wpu';n[c]=(n[c]||0)+1}
+  const ids=new Set([...Object.keys(S.campuses),...Object.keys(n),curCampus()]);
+  return[...ids].map(id=>({id,name:campusName(id),auto:!!S.campuses[id]?.auto,n:n[id]||0})).sort((a,b)=>b.n-a.n||a.name.localeCompare(b.name))}
 function viewInvites(D){
   if(!S.me.isOwner)return viewBoard(D);
-  const list=Object.entries(S.invites).map(([e,x])=>({email:e,at:num(x?.at),uid:typeof x?.uid==='string'?x.uid:null,by:typeof x?.by==='string'?x.by:null,code:typeof x?.code==='string'})).sort((a,b)=>b.at-a.at);
+  const list=Object.entries(S.invites).filter(([e])=>e!==S.me.email).map(([e,x])=>({email:e,camp:typeof x?.campus==='string'?x.campus:'',at:num(x?.at),uid:typeof x?.uid==='string'?x.uid:null,by:typeof x?.by==='string'?x.by:null,code:typeof x?.code==='string'})).sort((a,b)=>b.at-a.at);
   const li=S.lastInvite;
   return`<div class="pad">${back('me','Back')}<div class="stack narrow" style="margin-top:6px;gap:20px">
    <div><h1 class="pageh" style="margin-bottom:6px">Invites and members</h1>
-   <p style="margin:0;font-size:var(--t-14);line-height:1.55;color:var(--fg2)">Only emails on this list can sign up. Add someone, then send them the invite. They create an account with that email and confirm it.</p></div>
+   <p style="margin:0;font-size:var(--t-14);line-height:1.55;color:var(--fg2)">Anyone with a college email can sign up and lands on their campus board. Invite everyone else here: add their email and campus, then send them the invite.</p></div>
    <div class="stack gap8"><label class="formlabel" for="invE">Invite by email</label>
      <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="invE" class="inp" style="flex:1;min-width:200px" type="email" inputmode="email" autocapitalize="off" spellcheck="false" autocomplete="off" placeholder="name@college.edu.in" value="${esc(S.inv.email)}" data-bind="inv.email">
      <button class="pick" style="padding:12px 18px;font-size:var(--t-14)" data-act="invite" data-need="invite">Add invite</button></div>
+     <label class="formlabel" for="invCamp" style="margin-top:6px">Their campus</label>
+     <select id="invCamp" class="inp" data-bind="inv.camp">${campusList().map(c=>`<option value="${esc(c.id)}" ${(S.inv.camp||curCampus())===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
+     <p class="note" style="text-align:left">People with a college email don’t need an invite. They sign up and land on their campus board. Invite people who use Gmail or another personal email.</p>
      ${S.err.inv?`<p class="err">${esc(S.err.inv)}</p>`:''}</div>
    ${li?`<div class="box stack" style="gap:10px;border:1px solid rgba(170,226,84,.35)">
      <span class="t1" style="font-size:var(--t-14)">${esc(li)} can sign up now. Send them the invite:</span>${shareButtons(li)}
      <p class="note" style="text-align:left">The invite has a link to the sign-up page with their email filled in.</p></div>`:''}
    <div class="stack gap8"><div class="sect"><h2 class="h2">Invited</h2><span class="time">${list.length}</span></div>
     ${list.length?list.map(x=>{const joined=x.uid&&S.peopleDocs[x.uid]?.adult;return`<div class="row">${joined?ring(x.uid,40):`<span class="add" style="width:40px;height:40px">${ic('clock',16)}</span>`}
-      <span class="rowtext"><span class="t1">${esc(x.email)}</span><span class="t2" style="color:${joined?'var(--accent)':'var(--muted)'}">${joined?'Joined as '+esc(shortName(x.uid)):(x.uid?'Signed up, setting up profile':'Not signed up yet · invited '+since(x.at))}${x.code&&x.by?' · invited by '+esc(shortName(x.by)):''}</span></span>
+      <span class="rowtext"><span class="t1">${esc(x.email)}</span><span class="t2" style="color:${joined?'var(--accent)':'var(--muted)'}">${joined?'Joined as '+esc(shortName(x.uid)):(x.uid?'Signed up, setting up profile':'Not signed up yet · invited '+since(x.at))}${x.code&&x.by?' · invited by '+esc(shortName(x.by)):''}${campusList().length>1&&x.camp?' · '+esc(campusName(x.camp)):''}</span></span>
       ${joined?'':`<button class="iconbtn" data-act="reshare" data-email="${esc(x.email)}" aria-label="Send ${esc(x.email)} the invite again">${ic('mail',16)}</button>`}
       <button class="iconbtn" data-sheet="uninvite" data-about="${esc(x.email)}" aria-label="Remove ${esc(x.email)}">${ic('trash',16)}</button></div>`}).join('')
      :'<p class="note" style="text-align:left">Nobody invited yet. Add the first email above.</p>'}</div>
@@ -1198,10 +1210,11 @@ function viewInvites(D){
     ${S.reports.length?S.reports.map(r=>`<div class="row" style="align-items:flex-start"><span class="rowtext" style="gap:3px"><span class="t1">${esc(shortName(str(r.by,128)))} reported ${esc(shortName(str(r.about,128)))}</span>
       <span class="t2">${esc(str(r.why,40))}${r.note?' · '+esc(str(r.note,200)):''}</span><span class="time">${stamp(num(r.at))}</span></span>
       <button class="btn2" style="width:auto;padding:8px 12px;font-size:var(--t-12)" data-person="${esc(str(r.about,128))}">View</button></div>`).join(''):'<p class="note" style="text-align:left">No reports.</p>'}</div>
-   <label class="check box" for="memInv" style="padding:14px 16px"><input type="checkbox" id="memInv" data-toggle="memberInvites" ${S.config.memberInvites===false?'':'checked'}>
-     <span><b style="color:var(--fg)">Members can invite friends</b><br>Each member can share personal invite links. Each link lets one person join, and the invite list shows who invited them.</span></label>
-   <div class="stack gap8"><label class="formlabel" for="invC">Campus name</label>
-     <div style="display:flex;gap:8px"><input id="invC" class="inp" maxlength="40" value="${esc(S.inv.campus||campus())}" data-bind="inv.campus"><button class="btn2" style="width:auto;padding:12px 18px" data-act="saveCampus">Save</button></div></div>
+   <div class="stack gap8"><div class="sect"><h2 class="h2">Boards</h2><span class="time">${campusList().length}</span></div>
+    ${campusList().map(c=>`<div class="row"><span class="rowtext"><span class="t1">${esc(c.name)}${c.id===curCampus()?' <span style="color:var(--accent)">· viewing</span>':''}</span><span class="t2">${c.n} ${c.n===1?'member':'members'}${c.auto?' · made from a college email':''}</span></span>
+      ${c.id===curCampus()?'':`<button class="btn2" style="width:auto;padding:8px 12px;font-size:var(--t-12)" data-act="viewCampus" data-id="${esc(c.id)}">View</button>`}</div>`).join('')}</div>
+   <div class="stack gap8"><label class="formlabel" for="invC">Name of the board you’re viewing</label>
+     <div style="display:flex;gap:8px"><input id="invC" class="inp" maxlength="60" value="${esc(S.inv.campus||campus())}" data-bind="inv.campus"><button class="btn2" style="width:auto;padding:12px 18px" data-act="saveCampus">Save</button></div></div>
    <p class="note" style="text-align:left">Removing an invite locks that person out straight away and takes their jobs off the board.</p>
   </div></div><div style="height:24px"></div>`;
 }
@@ -1310,8 +1323,11 @@ function sheetHTML(D){
       ${own&&jobState(mj)==='open'?`<button data-act="editJob" data-key="${esc(mj.key)}">${ic('edit',18)} Edit</button>`:''}
       <button data-job="${esc(mj.key)}">${ic('chev',18)} Open job</button>
       ${own?'':`<button class="danger" data-sheet="report" data-about="${esc(mj.owner)}">${ic('flag',18)} Report</button>`}</div>`;break}
-  case'invitefriend':{const off=S.config.memberInvites===false&&!S.me.isOwner,c=S.lastCode;
-    b=off?`<h2 id="sheetT">Invites are off</h2><p>${esc(Organiser())} has turned off member invites for now.</p><button class="linkbtn" data-act="closeSheet">OK</button>`
+  case'invitefriend':{const c=S.lastCode,jt=`Join me on tack, the ${campus()} board for quick jobs and favours. Sign up with your college email:\n${SITE}`;
+    b=!S.me.isOwner?`<h2 id="sheetT">Invite a friend</h2><p>Anyone from ${esc(campus())} can join with their college email. Send them the link.</p>
+      <div class="copyrow"><span>${esc(SITE)}</span></div>
+      <div class="slogos">${slogo('wa','WhatsApp',`href="https://wa.me/?text=${encodeURIComponent(jt)}" target="_blank" rel="noopener"`)}${slogo('ig','Instagram',`data-act="igText" data-text="${esc(jt)}"`)}</div>
+      <button class="linkbtn" data-act="closeSheet">Done</button>`
      :`<h2 id="sheetT">Invite a friend</h2><p>Each link works for one person. They sign up with any email. You're vouching for them, so only invite people you know.</p>
       ${c?codeShare(c):`<button class="cta noglow" data-act="makeCode">Create invite link</button>`}
       ${c?'<button class="linkbtn" data-act="makeCode">Make another link</button>':''}`;break}
@@ -1678,7 +1694,7 @@ const ACT={
     if(!need(!S.invites[e],'inv','That email is already invited.'))return;
     const {doc,setDoc}=S.fb;
     S.invites={...S.invites,[e]:{at:Date.now()}};
-    setDoc(doc(S.db,'invites',e),{at:Date.now(),by:S.me.id}).catch(writeErr);
+    setDoc(doc(S.db,'invites',e),{at:Date.now(),by:S.me.id,campus:S.inv.camp||curCampus()}).catch(writeErr);
     S.inv.email='';S.lastInvite=e;S.err={};render();toast('Invited. Now send it to them.')},
   reshare(el){S.sheet={type:'reshare',about:el.dataset.email};render()},
   confirmUninvite(){const e=S.sheet?.about;if(!e)return;const {doc,deleteDoc,updateDoc}=S.fb,inv=S.invites[e];
@@ -1702,7 +1718,8 @@ const ACT={
   withdrawOffer(el){const k=el.dataset.key,m={...S.offersOut};delete m[k];S.offersOut=m;render();S.fb.deleteDoc(S.fb.doc(S.db,'offers',k)).catch(writeErr)},
   toggleMemberInvites(el){S.config={...S.config,memberInvites:!!el.checked};render();S.fb.setDoc(S.fb.doc(S.db,'config','app'),S.config).catch(writeErr);toast(el.checked?'Members can invite friends':'Member invites are off')},
   saveCampus(){const c=(S.inv.campus||'').trim();if(!c)return;const {doc,setDoc}=S.fb;
-    S.config={...S.config,campus:c.slice(0,40)};setDoc(doc(S.db,'config','app'),S.config).catch(writeErr);toast('Campus name saved');render()},
+    const id=curCampus();S.campuses={...S.campuses,[id]:{...(S.campuses[id]||{}),name:c.slice(0,60)}};S.fb.updateDoc(doc(S.db,'campuses',id),{name:c.slice(0,60)}).catch(writeErr);S.inv.campus='';toast('Board renamed');render()},
+  viewCampus(el){S.viewCampus=el.dataset.id;try{localStorage.setItem('tack.viewCampus',S.viewCampus)}catch{}S.inv.campus='';toast('Viewing '+campusName(S.viewCampus));render()},
   openShare(el){openShare(el.dataset.key)},
   toggleSave(el){const k=el.dataset.key,was=isSaved(k),l=(S.priv.saved||[]).filter(x=>x!==k);if(!was)l.unshift(k);if(S.sheet?.type==='jobmenu')S.sheet=null;savePriv({saved:l.slice(0,100)});toast(was?'Removed from saved':'Saved. Find it under Profile, Saved jobs')},
   async shareTo(el){const j=derive().jobByKey[S.sheet?.key];if(!j)return;const to=el.dataset.to,text=jobShareText(j),img=S.shareImg?.key===j.key?S.shareImg:null;
