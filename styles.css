@@ -734,3 +734,7 @@ a.cta{text-decoration:none}
 .notewrap.straight .bignote{box-shadow:0 34px 60px -26px rgba(0,0,0,.95),0 0 60px -10px var(--glow,transparent)}
 .loading .mark{font-size:var(--t-48)}
 @media (prefers-reduced-motion:reduce){.notewrap{transition:none}}
+
+.wc.full{color:var(--coral-ink);animation:wcfull .4s ease}
+@keyframes wcfull{20%,60%{transform:translateX(-3px)}40%,80%{transform:translateX(3px)}}
+@media (prefers-reduced-motion:reduce){.wc.full{animation:none}}
