@@ -677,7 +677,7 @@ function authHTML(){
      ${field('fPw','Password','password','pw','At least 8 characters','new-password')}
      ${S.authErr?`<p class="err" role="alert">${esc(S.authErr)}</p>`:''}
      <button class="cta" type="submit" data-need="signup" ${S.busy?'disabled':''}>${S.busy?'Creating your account…':'Create account'}</button>
-     <p class="note">Use your college email and you’ll join your campus board. No college email? Ask the organiser for an invite. We’ll email you a link to confirm your address.</p></form>`;
+     <p class="note">No college email? Ask the organiser for an invite.</p></form>`;
   else if(m==='login')body=`<form class="stack" id="authForm" data-form="login" novalidate style="gap:14px">
      ${field('fEmail','Email','email','email','you@college.edu.in','email')}
      ${field('fPw','Password','password','pw','Your password','current-password')}
