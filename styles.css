@@ -1086,3 +1086,36 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .bidbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
 .bidbtns .btn2{flex:1;display:flex;align-items:center;justify-content:center;gap:7px}
 .bidwd{align-self:center;color:var(--muted)}
+
+/* gate screens: one centred column, the loading backdrop keeps drifting behind every screen */
+.gate.anim{position:relative;overflow-x:hidden}
+.gate.anim::before,.gate.anim::after{content:"";position:fixed;inset:-44px;pointer-events:none;background-image:radial-gradient(circle,rgba(255,255,255,.1) 0 1.2px,transparent 1.7px);background-size:22px 22px;animation:dotdrift 9s linear infinite;z-index:0}
+.gate.anim::after{background-image:radial-gradient(circle,rgba(198,242,78,.55) 0 1.3px,transparent 1.8px);
+  -webkit-mask:radial-gradient(ellipse 34% 60% at 50% 50%,#000 0,transparent 70%);mask:radial-gradient(ellipse 34% 60% at 50% 50%,#000 0,transparent 70%);
+  -webkit-mask-size:200% 100%;mask-size:200% 100%;animation:dotdrift 9s linear infinite,dotsweep 2.6s ease-in-out infinite alternate}
+.gate.anim>*{position:relative;z-index:1}
+.gate.scroll>*{margin-block:auto}
+.gatebox:not(.onb){text-align:center}
+.gatebox:not(.onb) .mark{align-self:center}
+@media (prefers-reduced-motion:reduce){.gate.anim::before,.gate.anim::after{animation:none}}
+
+/* login and sign-up: compact card under the logo */
+.authbox{max-width:372px;gap:22px}
+.authbox .mark{font-size:44px}
+.authcard{display:flex;flex-direction:column;gap:14px;text-align:left;padding:16px;border-radius:24px;background:rgba(18,18,21,.86);border:1px solid var(--line);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:0 24px 60px -24px rgba(0,0,0,.9)}
+.authh{margin:4px 2px 0;font-family:var(--display);font-size:var(--fs-h);font-weight:700;letter-spacing:-.025em}
+.authcard .authtabs{background:var(--bg);padding:4px}
+.authcard .authtabs button{padding:9px 10px;font-size:var(--fs-b)}
+.authcard .authtabs button.on{background:var(--grad);color:var(--on-grad)}
+.authcard form{gap:11px!important}
+.authcard .stack.gap8{gap:6px}
+.authcard .formlabel{font-size:var(--fs-c);color:var(--muted);padding-left:2px}
+.authcard .inp{padding:11px 14px;background:var(--surface2);border-radius:14px}
+.authcard .pwwrap .inp{padding-right:68px}
+.authcard .cta{margin-top:4px;padding-top:13px;padding-bottom:13px}
+.authcard .note{font-size:var(--fs-c);text-align:center;margin:0}
+.authcard .linkbtn{align-self:center}
+.authcard .err,.authcard .okmsg{margin:0;font-size:var(--fs-c)}
+.authcard .invitebanner{font-size:var(--fs-c)}
+.authcard .colres{max-height:200px}

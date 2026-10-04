@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050503';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050503';
-import {modHit,MOD_CAT} from './mod.js?v=202610050503';
+import {makeDb} from './db.js?v=202610050519';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050519';
+import {modHit,MOD_CAT} from './mod.js?v=202610050519';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -690,10 +690,8 @@ function authHTML(){
      ${S.authErr?`<p class="err" role="alert">${esc(S.authErr)}</p>`:''}${S.authMsg?`<p class="okmsg" role="status">${esc(S.authMsg)}</p>`:''}
      <button class="cta" type="submit" data-need="reset" ${S.busy?'disabled':''}>Send reset link</button>
      <button type="button" class="linkbtn" data-auth="login">Back to log in</button></form>`;
-  return`<div class="gatebox"><div class="mark">tack</div>
-    <h1>${m==='signup'?'Create your account':m==='reset'?'Reset your password':'The campus noticeboard'}</h1>
-    ${m==='login'?'<p>Pin a small job, classmates bid, you pick someone. Sign up with your college email.</p>':''}
-    ${m!=='reset'?tabs:''}${body}</div>`;
+  return`<div class="gatebox authbox"><div class="mark">tack</div>
+    <div class="authcard">${m==='reset'?'<h1 class="authh">Reset your password</h1>':tabs}${body}</div></div>`;
 }
 function gateHTML(){
   const email=esc(S.user?.email||'');
@@ -1504,14 +1502,22 @@ const NEED={
 };
 Object.assign(NEED,NEED_EXTRA);
 function syncNeed(){document.querySelectorAll('[data-need]').forEach(b=>{let ok=true;try{ok=!!NEED[b.dataset.need]?.()}catch{}b.classList.toggle('wait',!ok);if(ok)b.removeAttribute('aria-disabled');else b.setAttribute('aria-disabled','true')})}
+let lastGate=null;
+function gateHandoff(gate,m0){const mk=gate.querySelector('.mark');if(!mk)return;const m1=mk.getBoundingClientRect();
+  const dx=(m0.left+m0.width/2)-(m1.left+m1.width/2),dy=(m0.top+m0.height/2)-(m1.top+m1.height/2),k=m0.width/(m1.width||1);
+  mk.animate([{transform:`translate(${dx}px,${dy}px) scale(${k})`},{transform:'none'}],{duration:720,easing:'cubic-bezier(.65,0,.25,1)'});
+  const rest=[...mk.parentElement.children].filter(x=>x!==mk);
+  rest.forEach((el,i)=>el.animate([{opacity:0,transform:'translateY(18px) scale(.98)'},{opacity:1,transform:'none'}],{duration:520,delay:360+i*80,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'}))}
 function render(){
   queueMicrotask(syncNeed);queueMicrotask(renderTermsGate);
   const a=document.activeElement,fid=a&&a.id;let s0=null,s1=null;try{s0=a.selectionStart;s1=a.selectionEnd}catch{}
   const gate=$('gate'),app=$('app');
   if(S.phase!=='app'){
-    app.hidden=true;gate.hidden=false;document.title='tack';gate.className='gate'+(['onboard','auth','campus'].includes(S.phase)?' scroll':'');gate.innerHTML=gateHTML();$('sheetRoot').innerHTML='';lastView=null;
+    const from=lastGate,m0=from==='loading'?gate.querySelector('.mark')?.getBoundingClientRect():null;
+    app.hidden=true;gate.hidden=false;document.title='tack';gate.className='gate'+(['onboard','auth','campus'].includes(S.phase)?' scroll':'')+(S.phase==='onboard'?'':' anim');gate.innerHTML=gateHTML();$('sheetRoot').innerHTML='';lastView=null;
+    if(m0&&S.phase!=='loading'&&!reduceMotion.matches)gateHandoff(gate,m0);lastGate=S.phase;
   }else{
-    gate.hidden=true;app.hidden=false;if(gate.innerHTML)gate.innerHTML='';
+    gate.hidden=true;app.hidden=false;if(gate.innerHTML)gate.innerHTML='';lastGate=null;
     const D=derive(),main=$('main');syncDealNames();if(S.me.isOwner)loadNames(D);if(jobParam&&!S.deepDone&&D.jobByKey[jobParam]){S.deepDone=true;S.openJob=jobParam;S.bid={key:null};S.view='job'}if(lastView&&lastView!==S.view)scrollMem[lastView]=main.scrollTop;
     const keep=lastView===S.view?main.scrollTop:((DEPTH[S.view]??1)===0?scrollMem[S.view]||0:0);
     main.dataset.view=S.view;main.innerHTML=((DEPTH[S.view]??1)===0?bannerHTML():'')+(VIEWS[S.view]||viewBoard)(D);main.scrollTop=keep;
