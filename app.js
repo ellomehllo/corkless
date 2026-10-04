@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050254';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050254';
-import {modHit,MOD_CAT} from './mod.js?v=202610050254';
+import {makeDb} from './db.js?v=202610050302';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050302';
+import {modHit,MOD_CAT} from './mod.js?v=202610050302';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -71,7 +71,7 @@ const codeParam=((new URLSearchParams(location.search).get('code')||'').trim().t
 const S={
   phase:'loading', fb:null, db:null, auth:null, user:null, me:null, signingUp:false, erased:false,
   authMode:inviteParam||codeParam?'signup':'login', authErr:'', authMsg:'', busy:false,
-  form:{name:'',email:inviteParam,pw:''},
+  form:{name:'',email:inviteParam,pw:'',colq:'',college:'',notListed:false,ncol:'',ncity:''}, cat:null, cpick:null,
   ready:{config:false,people:false,priv:false}, subs:[],
   config:{}, peopleDocs:{}, priv:{}, threadDocs:{}, pitchIn:{}, pitchMine:{}, offersIn:{}, offersOut:{}, myCodes:{}, lastCode:null,
   offer:{to:null,prevJob:null,text:'',price:'',when:'Next hour',where:''}, invites:{}, reports:[], myInvite:null,
@@ -411,6 +411,8 @@ async function handleUser(user){
   try{isOwner=(await S.fb.rpc('am_admin'))===true}catch{}
   let camp=null;try{camp=await S.fb.rpc('ensure_my_campus')}catch(e){console.warn(e)}
   if(!camp&&savedCode()){try{if(await S.fb.rpc('use_invite_code',{p_code:savedCode()}))camp=await S.fb.rpc('ensure_my_campus')}catch(e){console.warn(e)}}
+  if(camp&&camp.need==='pick'&&!isOwner){S.me=null;S.cpick={opts:null,dom:str(camp.domain,80),q:'',add:!(camp.options||[]).length,ncol:'',ncity:'',busy:false,err:''};
+    S.cpick.opts=(camp.options||[]).map(o=>({id:o.id,name:o.name,city:o.city||'',domains:[str(camp.domain,80)],k:(o.name+' '+(o.city||'')).toLowerCase()}));S.phase='campus';render();return}
   if(!camp&&!isOwner){S.phase='notinvited';render();return}
   try{localStorage.removeItem('tack.code')}catch{}
   S.myCampus=camp&&typeof camp.id==='string'?{id:camp.id,name:str(camp.name,60)}:null;
@@ -503,6 +505,9 @@ async function doSignup(){
   if(name.length<2)return authFail('Add your full name.');
   if(!validEmail(email))return authFail('That doesn’t look like an email address.');
   if(f.pw.length<8)return authFail('Use a password of at least 8 characters.');
+  const viaInvite=!!(inviteParam||codeParam),col=f.college?catById(f.college):null;
+  if(!viaInvite&&!col&&!(f.notListed&&f.ncol.trim().length>=2))return authFail(f.notListed?'Add your college name.':'Pick your college from the list, or tap “My college isn’t listed”.');
+  if(col&&!domOk(email,col.domains))return authFail(`Use your ${col.domains.map(d=>'@'+d).join(' or ')} email to join ${col.name}.`);
   S.busy=true;S.authErr='';S.signingUp=true;render();
   let can='';
   try{can=await S.fb.rpc('can_join',{p_email:email,p_code:codeParam||null})}catch(e){S.signingUp=false;return authFail('Couldn\u2019t reach tack. Check your connection and try again.')}
@@ -510,7 +515,9 @@ async function doSignup(){
     return authFail(can==='usedcode'?'This invite link has already been used. Ask your friend for a new one.':can==='badcode'?'This invite link isn\u2019t valid. Check you copied all of it, or ask your friend for a new one.'
       :`${email} isn’t a college email tack recognises, and it isn’t on the invite list. Sign up with your college email, or ask the organiser to invite you.`)}
   if(can==='code')try{localStorage.setItem('tack.code',codeParam)}catch{}
-  const {data,error}=await S.sb.auth.signUp({email,password:f.pw,options:{data:{name},emailRedirectTo:SITE}});
+  if(!viaInvite&&!col&&can!=='college'){S.signingUp=false;S.busy=false;return authFail('That doesn’t look like a college email. Use the email your college gave you.')}
+  const meta={name,...(col?{campus:col.id}:{}),...(!col&&f.notListed?{newCampus:{college:f.ncol.trim().slice(0,60),city:f.ncity.trim().slice(0,40)}}:{})};
+  const {data,error}=await S.sb.auth.signUp({email,password:f.pw,options:{data:meta,emailRedirectTo:SITE}});
   S.signingUp=false;S.busy=false;
   if(error)return authFail(authMsg(authErr(error)));
   if(data?.user&&Array.isArray(data.user.identities)&&!data.user.identities.length)return authFail(AUTH_ERR['auth/email-already-in-use']);
@@ -630,6 +637,30 @@ function picEdit(t,l){l=l||[];
   return`<div class="pics">${l.map((src,i)=>`<span class="pic"><img src="${src}" alt="Photo ${i+1}"><button class="picx" data-unpic="${t}" data-i="${i}" aria-label="Remove photo ${i+1}">${ic('x',14,2.6)}</button></span>`).join('')}
     ${l.length<MAX_PICS?`<label class="pic add" for="pk-${t}">${ic('camera',20)}<span>${l.length?'Add':'Add photos'}</span><input id="pk-${t}" type="file" accept="image/jpeg,image/png,image/webp" multiple data-pics="${t}"></label>`:''}</div>`}
 
+async function loadCat(){if(S.cat||S.catLoading)return;S.catLoading=true;
+  try{const [c,d]=await Promise.all([S.sb.from('campuses').select('id,name,college,city,listed'),S.sb.from('campus_domains').select('domain,campus')]);
+    const dm={};for(const r of d.data||[])(dm[r.campus]=dm[r.campus]||[]).push(r.domain);
+    S.cat=(c.data||[]).map(r=>({id:r.id,name:r.name,college:r.college||'',city:r.city||'',domains:dm[r.id]||[],k:(r.name+' '+(r.college||'')+' '+(r.city||'')+' '+(dm[r.id]||[]).join(' ')).toLowerCase()}))}catch(e){console.warn(e)}
+  S.catLoading=false;if(['auth','campus'].includes(S.phase))render()}
+const catById=id=>(S.cat||[]).find(c=>c.id===id);
+function catSearch(q,pool){const t=q.toLowerCase().split(/[\s,]+/).filter(Boolean);const l=pool||S.cat||[];if(!t.length)return pool?l.slice(0,40):[];
+  return l.filter(c=>t.every(w=>c.k.includes(w))).sort((a,b)=>(a.name.toLowerCase().startsWith(t[0])?0:1)-(b.name.toLowerCase().startsWith(t[0])?0:1)||a.name.localeCompare(b.name)).slice(0,40)}
+const domOk=(email,doms)=>{const d=email.split('@')[1]||'';return doms.some(x=>d===x||d.endsWith('.'+x))};
+function colResHTML(q,pool,act){const l=catSearch(q,pool);if(!q.trim()&&!pool)return'';
+  return l.length?l.map(c=>`<button type="button" class="colopt" data-act="${act}" data-id="${esc(c.id)}"><b>${esc(c.name)}</b><span>${esc(c.domains[0]?'@'+c.domains[0]:'')}</span></button>`).join('')
+    :`<p class="note" style="text-align:left;margin:6px 2px">No college matches “${esc(q)}”.</p>`}
+function paintCol(){const r=$('colRes');if(!r)return;const pool=S.phase==='campus'?S.cpick?.opts:null;r.innerHTML=colResHTML(S.phase==='campus'?S.cpick.q:S.form.colq,pool,S.phase==='campus'?'pickBranch':'pickCollege')}
+function collegeField(){const f=S.form,c=f.college?catById(f.college):null;if(!S.cat)loadCat();
+  if(c)return`<div class="stack gap8"><span class="formlabel">Your college</span><div class="colchosen"><span><b>${esc(c.name)}</b><br><span class="muted">Sign up with your ${esc(c.domains.map(d=>'@'+d).join(' or '))} email</span></span><button type="button" class="linkbtn" data-act="clearCollege">Change</button></div></div>`;
+  if(f.notListed)return`<div class="stack gap8"><span class="formlabel">Your college</span>
+    <input id="fNcol" class="inp" maxlength="60" placeholder="College name, e.g. Pearl Academy" value="${esc(f.ncol)}" data-bind="form.ncol">
+    <input id="fNcity" class="inp" maxlength="40" placeholder="City or campus, e.g. Jaipur" value="${esc(f.ncity)}" data-bind="form.ncity">
+    <p class="note" style="text-align:left;margin:0">tack makes a new board for your college. Others from your college join it with the same kind of email.</p>
+    <button type="button" class="linkbtn" style="align-self:flex-start;padding:0" data-act="colList">Search the list instead</button></div>`;
+  return`<div class="stack gap8"><label class="formlabel" for="fCol">Your college</label>
+    <input id="fCol" class="inp" autocomplete="off" placeholder="${S.cat?'Search '+S.cat.length+' colleges: NIFT Bhopal, IIT Bombay…':'Loading colleges…'}" value="${esc(f.colq)}" data-bind="form.colq">
+    <div id="colRes" class="colres">${colResHTML(f.colq,null,'pickCollege')}</div>
+    <button type="button" class="linkbtn" style="align-self:flex-start;padding:0" data-act="colMissing">My college isn’t listed</button></div>`}
 function authHTML(){
   const m=S.authMode,f=S.form;
   const field=(id,label,type,key,ph,ac)=>`<div class="stack gap8"><label class="formlabel" for="${id}">${label}</label>
@@ -640,6 +671,7 @@ function authHTML(){
   if(m==='signup')body=`<form class="stack" id="authForm" data-form="signup" novalidate style="gap:14px">
      ${inviteParam?`<div class="invitebanner">You're invited. Create your account with <b>${esc(inviteParam)}</b>, the address your invite went to.</div>`:codeParam?`<div class="invitebanner">A friend invited you to tack. Sign up with any email you use.</div>`:''}
      ${field('fName','Full name','text','name','Sana Qureshi','name')}
+     ${inviteParam||codeParam?'':collegeField()}
      ${field('fEmail','College email','email','email',inviteParam?'The address you were invited on':'you@college.edu.in','email')}
      ${field('fPw','Password','password','pw','At least 8 characters','new-password')}
      ${S.authErr?`<p class="err" role="alert">${esc(S.authErr)}</p>`:''}
@@ -679,6 +711,20 @@ function gateHTML(){
     <div class="stack gap8"><label class="formlabel" for="fNewPw">New password</label><span class="pwwrap"><input id="fNewPw" class="inp" type="${S.showPw?'text':'password'}" autocomplete="new-password" placeholder="At least 8 characters" value="${esc(S.pw.nw)}" data-bind="pw.nw"><button type="button" class="pwtoggle" data-act="togglePw" aria-label="${S.showPw?'Hide':'Show'} password">${S.showPw?'Hide':'Show'}</button></span></div>
     ${S.err.pw?`<p class="err" role="alert">${esc(S.err.pw)}</p>`:''}
     <button class="cta" type="submit" ${S.busy?'disabled':''}>${S.busy?'Saving…':'Save password'}</button></form></div>`;
+  case'campus':{const c=S.cpick;return`<div class="gatebox"><div class="mark">tack</div>
+    <h1>${c.add?'Name your college':'Pick your campus'}</h1>
+    ${c.add?`<p>You’re the first from <b>@${esc(c.dom)}</b>. Tell us your college and tack makes its board. Everyone with the same kind of email joins you there.</p>
+      <div class="stack gap8"><input id="cpCol" class="inp" maxlength="60" placeholder="College name" value="${esc(c.ncol)}" data-bind="cpick.ncol">
+      <input id="cpCity" class="inp" maxlength="40" placeholder="City or campus" value="${esc(c.ncity)}" data-bind="cpick.ncity"></div>
+      ${c.err?`<p class="err" role="alert">${esc(c.err)}</p>`:''}
+      <button class="cta" data-act="addBranch" ${c.busy?'disabled':''}>${c.busy?'Making your board…':'Create our board'}</button>
+      ${c.opts.length?'<button class="linkbtn" data-act="branchList">Back to the list</button>':''}`
+     :`<p>Your <b>@${esc(c.dom)}</b> email works at ${c.opts.length} campuses. Pick yours to see its board.</p>
+      ${c.opts.length>8?`<input id="cpQ" class="inp" autocomplete="off" placeholder="Search by city" value="${esc(c.q)}" data-bind="cpick.q">`:''}
+      <div id="colRes" class="colres open">${colResHTML(c.q,c.opts,'pickBranch')}</div>
+      ${c.err?`<p class="err" role="alert">${esc(c.err)}</p>`:''}
+      <button class="linkbtn" data-act="branchMissing">My campus isn’t listed</button>`}
+    <button class="linkbtn" data-act="logout">Log out</button></div>`}
   case'notinvited':return`<div class="gatebox"><div class="mark">tack</div><h1>Use your college email</h1>
     <p><b>${email}</b> isn’t a college email tack recognises, and it isn’t on the invite list. Log out and sign up with your college email to join your campus board, or ask the organiser to invite this address.</p>
     <button class="btn2" data-act="logout">Log out</button></div>`;
@@ -1451,7 +1497,7 @@ function render(){
   const a=document.activeElement,fid=a&&a.id;let s0=null,s1=null;try{s0=a.selectionStart;s1=a.selectionEnd}catch{}
   const gate=$('gate'),app=$('app');
   if(S.phase!=='app'){
-    app.hidden=true;gate.hidden=false;document.title='tack';gate.className='gate'+(['onboard','auth'].includes(S.phase)?' scroll':'');gate.innerHTML=gateHTML();$('sheetRoot').innerHTML='';lastView=null;
+    app.hidden=true;gate.hidden=false;document.title='tack';gate.className='gate'+(['onboard','auth','campus'].includes(S.phase)?' scroll':'');gate.innerHTML=gateHTML();$('sheetRoot').innerHTML='';lastView=null;
   }else{
     gate.hidden=true;app.hidden=false;if(gate.innerHTML)gate.innerHTML='';
     const D=derive(),main=$('main');syncDealNames();if(S.me.isOwner)loadNames(D);if(jobParam&&!S.deepDone&&D.jobByKey[jobParam]){S.deepDone=true;S.openJob=jobParam;S.bid={key:null};S.view='job'}if(lastView&&lastView!==S.view)scrollMem[lastView]=main.scrollTop;
@@ -1594,6 +1640,16 @@ const ACT={
   introSkip(){closeIntro()},
   introDone(){closeIntro('board')},
   introPost(){closeIntro('post')},
+  pickCollege(el){S.form.college=el.dataset.id;S.form.notListed=false;S.authErr='';render()},
+  clearCollege(){S.form.college='';render();setTimeout(()=>$('fCol')?.focus(),0)},
+  colMissing(){S.form.notListed=true;S.form.college='';render();setTimeout(()=>$('fNcol')?.focus(),0)},
+  colList(){S.form.notListed=false;render();setTimeout(()=>$('fCol')?.focus(),0)},
+  async pickBranch(el){const c=S.cpick;if(!c||c.busy)return;c.busy=true;c.err='';render();
+    try{await S.fb.rpc('choose_campus',{p_id:el.dataset.id});S.cpick=null;handleUser(S.user)}catch(e){c.busy=false;c.err='Couldn’t join that campus. Try again.';render()}},
+  branchMissing(){S.cpick.add=true;S.cpick.err='';render()},
+  branchList(){S.cpick.add=false;S.cpick.err='';render()},
+  async addBranch(){const c=S.cpick;if(!c||c.busy)return;if(c.ncol.trim().length<2){c.err='Add your college name.';render();return}c.busy=true;c.err='';render();
+    try{await S.fb.rpc('add_my_campus',{p_college:c.ncol.trim(),p_city:c.ncity.trim()});S.cpick=null;handleUser(S.user)}catch(e){c.busy=false;c.err='Couldn’t make the board. Try again.';render()}},
   introPush(){closeIntro('board');setTimeout(enablePush,350)},
   replayIntro(){openIntro(S.view)},
   hideSteps(){savePriv({stepsHidden:true})},
@@ -1804,7 +1860,7 @@ document.addEventListener('submit',e=>{
   if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset,newpw:setNewPw})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
-document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='q')render();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jhue'&&S.draft.white){S.draft.white=false;$('jwhite')?.classList.remove('on')}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
+document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='q')render();else if(e.target.id==='fCol'||e.target.id==='cpQ')paintCol();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jhue'&&S.draft.white){S.draft.white=false;$('jwhite')?.classList.remove('on')}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
 document.addEventListener('change',async e=>{
   bind(e);syncNeed();
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}

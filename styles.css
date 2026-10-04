@@ -1051,3 +1051,13 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 
 /* while typing on a phone the tab bar stays behind the keyboard */
 @media (max-width:899px){.typing .tabbar{display:none}}
+
+/* college search on sign-up and the campus picker */
+.colres{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto}
+.colres:empty{display:none}
+.colopt{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;text-align:left;padding:11px 14px;border-radius:14px;background:var(--surface2);border:1px solid var(--line);color:var(--fg);font-size:var(--t-14)}
+.colopt b{font-weight:600}
+.colopt span{flex-shrink:0;font-size:var(--t-12);color:var(--muted)}
+.colopt:active{background:var(--in)}
+.colchosen{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:rgba(170,226,84,.10);border:1px solid rgba(170,226,84,.35);font-size:var(--t-14);line-height:1.45}
+.colchosen .muted{font-size:var(--t-12)}
