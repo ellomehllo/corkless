@@ -1,6 +1,6 @@
 import firebaseConfig from './firebase-config.js';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610041927';
-import {modHit,MOD_CAT} from './mod.js?v=202610041927';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610041944';
+import {modHit,MOD_CAT} from './mod.js?v=202610041944';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
@@ -324,7 +324,7 @@ function reviewsOf(uid){const v=S.revs[uid];if(v!==undefined)return v;S.revs[uid
     .catch(e=>{console.warn(e);S.revs[uid]=[]}).finally(()=>{if(S.phase==='app')render()});
   return null}
 function reviewList(uid){const l=reviewsOf(uid);if(!l||!l.length)return'';const shown=S.allRevs===uid?l:l.slice(0,5),fn=esc(firstName(uid));
-  return`<div class="stack gap8"><div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">Reviews</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--muted)">${l.length} from posters ${fn} worked for</span></div>
+  return`<div class="stack gap8"><div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">Reviews</h2><span style="font-size:var(--t-12);font-weight:500;color:var(--muted)">${l.length} from posters ${fn} worked for</span></div>
     ${shown.map(r=>`<div class="box stack" style="gap:8px"><span class="revhead">${r.stars?`<b>★${r.stars.toFixed(1)}</b>`:''}<span>${new Date(r.at).toLocaleDateString('en-IN',{month:'short',year:'numeric'})}</span></span>
       <p class="revtext">${esc(r.text)}</p>${picStrip('r:'+r.id,r.pics,'flush')}
       ${S.me.isOwner&&uid!==S.me.id?`<button class="linkbtn" style="align-self:flex-start;padding:0" data-sheet="delReview" data-rid="${esc(r.id)}" data-about="${esc(uid)}">Remove review</button>`:''}</div>`).join('')}
@@ -865,7 +865,7 @@ function viewJob(D){
       <h2 class="h2">${myBid?'Change your bid':'Place your bid'}</h2>
       <div style="display:flex;gap:9px"><label class="field" for="bidAmt"><span class="fl">Your bid ₹</span>
         <input id="bidAmt" type="text" inputmode="numeric" maxlength="6" value="${esc(S.bid.amt)}" data-bind="bid.amt" aria-label="Your bid in rupees"
-         style="font-family:var(--display);font-size:var(--t-19);font-weight:800;letter-spacing:-.035em;font-variant-numeric:tabular-nums"></label>
+         style="font-family:var(--display);font-size:var(--t-19);font-weight:700;letter-spacing:-.035em;font-variant-numeric:tabular-nums"></label>
         ${threadOpen(jobThreadKey(j.key,me))?`<button class="iconbtn" style="width:52px;height:auto;border-radius:999px;background:var(--surface)" data-thread-job aria-label="Message ${esc(firstName(j.owner))}">${ic('chat',20)}</button>`:''}</div>
       <div class="pitchbox"><label class="pitchlabel" for="bidSay">Pitch yourself <span class="labelhint">· only ${esc(firstName(j.owner))} sees this</span></label>
         <textarea id="bidSay" rows="5" maxlength="${SAY_MAX}" placeholder="Why you? Past work, what you'll bring, when you can do it." data-bind="bid.say">${esc(S.bid.say)}</textarea>
@@ -898,8 +898,8 @@ function viewJob(D){
   const hint=hasPh?`${ic('camera',12,2.2)} Tap to see ${jp.length} ${jp.length===1?'photo':'photos'}`:j.pics?'Loading photos…':'No pictures';
   const bidsSec=`<section class="jbids">
    <div class="stack">
-    ${mine?`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">${bids.length} ${bids.length===1?'bid':'bids'}</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--muted)">only you see these</span></div>`
-      :`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">Your bid</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--muted)">only ${esc(firstName(j.owner))} sees who bids</span></div>`}
+    ${mine?`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">${bids.length} ${bids.length===1?'bid':'bids'}</h2><span style="font-size:var(--t-12);font-weight:500;color:var(--muted)">only you see these</span></div>`
+      :`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">Your bid</h2><span style="font-size:var(--t-12);font-weight:500;color:var(--muted)">only ${esc(firstName(j.owner))} sees who bids</span></div>`}
     ${bids.length?bids.map(b=>`<div class="row">
       <button class="rowmain" data-person="${esc(b.by)}">${ring(b.by,42)}<span class="rowtext">
         <span class="t1">${esc(shortName(b.by))}${b.by===me?' (you)':''}${mine&&b.near?' '+nearTag():''} <span class="muted">· ${esc(metaOf(b.by))}${esc(rateLine(b.by,D))}</span></span>
@@ -969,8 +969,8 @@ function viewBids(D){
   const jobLine=j=>{const st=jobState(j),n=bidsFor(D,j.key).length;
     return st==='open'?[`${n} ${n===1?'bid':'bids'} in`,'']:st==='assigned'?[`Picked ${shortName(j.accepted)} · ₹${fmt(j.agreed)}`,'ok']:st==='done'?(payOf(j)?.ok?[j.pick?.ratedDoer?'Done · Paid ✓':'Done · Paid ✓ · rate them','ok']:[`Done · ${payOf(j)?'they haven\u2019t got your payment':'waiting for them to confirm payment'}`,payOf(j)?'warn':'']):st==='expired'?['Time ran out','warn']:['Closed','']};
   const bidLine=({j})=>{const st=jobState(j);return j.accepted===me?(st==='done'?(payOf(j)?.ok?['Done · Paid ✓','ok']:['Done · confirm you got paid','warn']):[`Accepted · ₹${fmt(j.agreed)}`,'ok']):droppedMe(j)?[`${firstName(j.owner)} picked someone else`,'lost']:repicking(j)?[`Waiting for ${firstName(j.owner)} to pick again`,'']:lostBid(j)?['Someone else got picked · keep trying','lost']:st==='open'?[`Waiting for ${firstName(j.owner)} to pick`,'']:st==='expired'?['Time ran out','']:['Closed','']};
-  const row=(j,[line,cls],amt,who)=>`<button class="item" data-job="${esc(j.key)}">${ring(who||j.owner,38)}<span class="itext"><span class="t1" style="font-weight:600;color:var(--fg)">${esc(j.text)}</span>
-    <span style="font-size:var(--t-11);font-weight:700;color:${cls==='ok'?'var(--accent)':cls==='warn'?'var(--coral-ink)':cls==='lost'?'var(--amber-ink)':'var(--muted)'}">${esc(line)}</span></span><span class="amt" style="font-size:var(--t-16);color:${noteOf(j)}">₹${fmt(amt)}</span></button>`;
+  const row=(j,[line,cls],amt,who)=>`<button class="item" data-job="${esc(j.key)}">${ring(who||j.owner,38)}<span class="itext"><span class="t1" style="font-weight:500;color:var(--fg)">${esc(j.text)}</span>
+    <span style="font-size:var(--t-11);font-weight:600;color:${cls==='ok'?'var(--accent)':cls==='warn'?'var(--coral-ink)':cls==='lost'?'var(--amber-ink)':'var(--muted)'}">${esc(line)}</span></span><span class="amt" style="font-size:var(--t-16);color:${noteOf(j)}">₹${fmt(amt)}</span></button>`;
   const oin=offerList(S.offersIn).filter(o=>D.members.includes(o.owner)&&!D.blocked.has(o.owner)&&o.status!=='declined').sort((a,b)=>num(b.at)-num(a.at));
   const oout=offerList(S.offersOut).filter(o=>o.status!=='accepted').sort((a,b)=>num(b.at)-num(a.at));
   const doing=D.jobs.filter(j=>j.accepted===me&&!myBidOn(j.key)&&j.status!=='removed').sort((a,b)=>b.at-a.at);
@@ -1021,7 +1021,7 @@ function dateGroups(list,at){const d0=new Date().setHours(0,0,0,0),grp=t=>!t?'Ea
 function viewChats(D){
   return`<div class="pad narrow"><h1 class="pageh">Chats</h1>
   ${D.threads.length?`<div class="ifeed">${dateGroups(D.threads,t=>t.last?.at||t.job?.at||0).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(t=>`<button class="item" data-thread="${esc(t.key)}">${ring(t.other,46)}
-    <span class="itext"><span class="t1">${esc(shortName(t.other))}${t.job?` <span style="color:${noteOf(t.job)}">· ₹${fmt(t.job.agreed||t.job.price)}</span>`:''}</span><span class="t2" style="${t.unread?'color:var(--fg);font-weight:600':''}">${esc(t.sub)}</span></span>
+    <span class="itext"><span class="t1">${esc(shortName(t.other))}${t.job?` <span style="color:${noteOf(t.job)}">· ₹${fmt(t.job.agreed||t.job.price)}</span>`:''}</span><span class="t2" style="${t.unread?'color:var(--fg);font-weight:500':''}">${esc(t.sub)}</span></span>
     <span class="iend"><span class="time">${t.last?ago(t.last.at):''}</span>${t.unread?'<span class="udot" aria-label="Unread"></span>':''}</span></button>`).join('')}</section>`).join('')}</div>`
    :inviteCard(D,true)}
   ${D.threads.length?`<div style="margin-top:18px">${inviteCard(D,false)}</div>`:''}
@@ -1034,8 +1034,8 @@ function viewChat(D){
   const can=canMessage(c,D);
   return`<div class="pad" style="padding-bottom:10px"><div style="display:flex;align-items:center;gap:10px">
      <button class="back" data-go="chats" aria-label="Back to chats" style="padding:0">${ic('back',20)}</button>
-     <button class="rowmain" data-person="${esc(c.other)}">${ring(c.other,42)}<span class="rowtext"><span style="font-size:var(--t-16);font-weight:700;letter-spacing:-.015em">${esc(shortName(c.other))}</span>
-       <span style="font-size:var(--t-12);font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${j?`<span style="color:${noteOf(j)};font-weight:700">₹${fmt(j.agreed||j.price)}</span> · ${esc(j.text)}`:esc(metaOf(c.other)||campus())}</span></span></button>
+     <button class="rowmain" data-person="${esc(c.other)}">${ring(c.other,42)}<span class="rowtext"><span style="font-size:var(--t-16);font-weight:600;letter-spacing:-.015em">${esc(shortName(c.other))}</span>
+       <span style="font-size:var(--t-12);font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${j?`<span style="color:${noteOf(j)};font-weight:600">₹${fmt(j.agreed||j.price)}</span> · ${esc(j.text)}`:esc(metaOf(c.other)||campus())}</span></span></button>
      <button class="iconbtn" data-sheet="report" data-about="${esc(c.other)}" aria-label="Report or block">${ic('flag',17)}</button></div></div>
   <div class="msgs">
    ${accepted?`<div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${payOf(j)?.ok?`Paid ✓ · ₹${fmt(j.agreed)}`:`Bid accepted · ₹${fmt(j.agreed)} · pay on UPI after`}</div>`:''}
@@ -1060,12 +1060,12 @@ function viewPerson(uid,D){
    <div class="prof ${bn?'hasbanner':''}">${bn?`<div class="pbanner" style="${bannerStyle(bn)}"></div>`:''}${isMe?`<button class="editpen" data-go="edit" aria-label="Edit profile">${ic('edit',17)}</button>`:''}
      <span class="ring${liveOf(uid)?' live':''}" style="width:108px;height:108px">${face(uid,94)}</span>
      <span class="pname">${handleOf(uid)?'@'+esc(handleOf(uid)):esc(shortName(uid))}</span>
-     ${realNameOf(uid)&&handleOf(uid)?`<span class="realname">${esc(realNameOf(uid))}${isMe?' · only people you make a deal with see your name':''}</span>`:''}
-     <div class="chips" style="justify-content:center">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campus())}</span>
-       ${uid===ownerId()?'<span class="chip vio">Organiser</span>':''}${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${free?'<span class="chip on">Free right now</span>':''}</div>
+     ${realNameOf(uid)&&handleOf(uid)?`<span class="realname">${esc(realNameOf(uid))}${isMe?`<span class="privnote">${ic('shield',11)} Only people you make a deal with see this</span>`:''}</span>`:''}
      ${bio?`<p class="pbio">${esc(bio)}</p>`:''}
+     <div class="chips pchips">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campus())}</span>
+       ${uid===ownerId()?'<span class="chip vio">Organiser</span>':''}${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${free?'<span class="chip on">Free right now</span>':''}</div>
    </div>
-   <div class="stats"><div><b style="color:var(--cyan)">${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b style="color:var(--amber)">${st.avg??'New'}</b><span>rating</span></div>${isMe?`<div><b style="color:var(--money)">₹${fmt(st.earned)}</b><span>earned · only you</span></div>`:`<div><b style="color:var(--violet)">${st.poster.n?st.poster.avg.toFixed(1):'–'}</b><span>as a poster</span></div>`}</div>
+   <div class="stats"><div><b>${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b>${st.avg?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.avg}`:'New'}</b><span>rating</span></div>${isMe?`<div><b class="money">₹${fmt(st.earned)}</b><span>earned · only you</span></div>`:`<div><b>${st.poster.n?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.poster.avg.toFixed(1)}`:'–'}</b><span>as a poster</span></div>`}</div>
    ${st.doer.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a doer · from ${st.doer.n} ${st.doer.n===1?'rating':'ratings'}</span>${st.doer.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
    ${isMe?'':reviewList(uid)}
    ${st.poster.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a poster · from ${st.poster.n} ${st.poster.n===1?'rating':'ratings'}</span>${st.poster.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
@@ -1144,7 +1144,7 @@ function viewHelp(D){const h=S.help,me=S.me.id;
     const list=h.kind==='past'?D.jobs.filter(j=>(j.owner===me&&j.accepted)||j.accepted===me).sort((a,b)=>Math.max(b.doneAt||0,b.at)-Math.max(a.doneAt||0,a.at))
       :boardJobs(D).filter(j=>j.owner!==me);
     return head(kt[1],h.kind==='past'?'Which job was it?':'Which job is it about?','helpBack')+(list.length?`<div class="stack gap8">${list.map(j=>{const other=j.owner===me?j.accepted:j.owner;
-      return`<button class="item" data-helpjob="${esc(j.key)}">${ring(other,38)}<span class="itext"><span class="t1" style="font-weight:600;color:var(--fg)">${esc(j.text)}</span><span class="t2">${esc(j.owner===me?'You posted · '+shortName(other)+' did it':shortName(j.owner)+' posted')} · ${since(Math.max(j.doneAt||0,j.at))}</span></span><span class="amt" style="font-size:var(--t-16);color:var(--fg2)">₹${fmt(j.agreed||j.price)}</span></button>`}).join('')}</div>`
+      return`<button class="item" data-helpjob="${esc(j.key)}">${ring(other,38)}<span class="itext"><span class="t1" style="font-weight:500;color:var(--fg)">${esc(j.text)}</span><span class="t2">${esc(j.owner===me?'You posted · '+shortName(other)+' did it':shortName(j.owner)+' posted')} · ${since(Math.max(j.doneAt||0,j.at))}</span></span><span class="amt" style="font-size:var(--t-16);color:var(--fg2)">₹${fmt(j.agreed||j.price)}</span></button>`}).join('')}</div>`
       :`<p class="note" style="text-align:left">${h.kind==='past'?'You don’t have any jobs with someone yet.':'Nothing else is on the board right now.'}</p>`)+tail}
   const j=h.job?D.jobByKey[h.job]:null,other=j?(j.owner===me?j.accepted:j.owner):null;
   return head(kt[1],'',h.job?'helpUnjob':'helpBack')+`${j?`<div class="card">${ring(other,38)}<span class="rowtext"><span class="t1">${esc(j.text)}</span><span class="t2">${esc(j.owner===me?'With '+shortName(other):'Posted by '+shortName(j.owner))}</span></span></div>`:''}
@@ -1210,18 +1210,18 @@ function viewInvites(D){
 function railHTML(D){
   const free=freePeople(D).filter(u=>u!==S.me.id),me=S.me.id;
   const myBids=Object.values(S.pitchMine).filter(p=>p&&num(p.amt)>0).map(p=>({b:{amt:num(p.amt),at:num(p.at)},j:D.jobByKey[p.job]})).filter(x=>x.j&&x.j.owner!==me).sort((a,b)=>num(b.b.at)-num(a.b.at)).slice(0,4);
-  return`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">Free right now</h2><span style="font-size:var(--t-12);font-weight:600;color:var(--dim)">${D.members.length} on the board</span></div>
+  return`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">Free right now</h2><span style="font-size:var(--t-12);font-weight:500;color:var(--dim)">${D.members.length} on the board</span></div>
   <div class="stack gap8">${free.length?free.map(u=>`<div style="display:flex;align-items:center;gap:10px"><button class="rowmain" data-person="${esc(u)}">${ring(u,40)}
-     <span class="rowtext"><span style="font-size:var(--t-14);font-weight:700">${esc(shortName(u))}</span><span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc([metaOf(u),str(pdoc(u).does,40)].filter(Boolean).join(' · '))}</span></span></button>
-     <button data-ask="${esc(u)}" style="background:var(--surface2);border-radius:999px;padding:7px 13px;font-size:var(--t-12);font-weight:700">Ask</button></div>`).join('')
+     <span class="rowtext"><span style="font-size:var(--t-14);font-weight:600">${esc(shortName(u))}</span><span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc([metaOf(u),str(pdoc(u).does,40)].filter(Boolean).join(' · '))}</span></span></button>
+     <button data-ask="${esc(u)}" style="background:var(--surface2);border-radius:999px;padding:7px 13px;font-size:var(--t-12);font-weight:600">Ask</button></div>`).join('')
    :`<p class="note" style="text-align:left">Nobody else is marked free right now.</p>`}
    <button class="btn2" style="padding:10px;font-size:var(--t-12)" data-sheet="free">${num(S.myDoc?.freeUntil)>Date.now()?'You’re free until '+clock(num(S.myDoc.freeUntil)):'I’m free right now'}</button></div>
   <div style="height:1px;background:var(--line)"></div>
   <h2 class="h2">Your bids</h2>
   <div class="stack gap8">${myBids.length?myBids.map(({b,j})=>{const ok=j.accepted===me;return`<button data-job="${esc(j.key)}" style="display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:var(--r-sm);padding:11px 13px;width:100%;text-align:left">
-     <span class="rowtext"><span style="font-size:var(--t-12);font-weight:600;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(j.text)}</span>
-     <span style="font-size:var(--t-11);font-weight:600;color:${ok?'var(--accent)':'var(--muted)'}">${ok?'Accepted · ₹'+fmt(j.agreed):j.accepted?'Went to someone else':jobState(j)==='open'?'Waiting for '+firstName(j.owner)+' to pick':'Closed'}</span></span>
-     <span style="font-family:var(--display);font-size:var(--t-16);font-weight:800;color:var(--fg2);font-variant-numeric:tabular-nums">₹${fmt(b.amt)}</span></button>`}).join('')
+     <span class="rowtext"><span style="font-size:var(--t-12);font-weight:500;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(j.text)}</span>
+     <span style="font-size:var(--t-11);font-weight:500;color:${ok?'var(--accent)':'var(--muted)'}">${ok?'Accepted · ₹'+fmt(j.agreed):j.accepted?'Went to someone else':jobState(j)==='open'?'Waiting for '+firstName(j.owner)+' to pick':'Closed'}</span></span>
+     <span style="font-family:var(--display);font-size:var(--t-16);font-weight:700;color:var(--fg2);font-variant-numeric:tabular-nums">₹${fmt(b.amt)}</span></button>`}).join('')
    :'<p class="note" style="text-align:left">Bids you place show up here.</p>'}</div>`;
 }
 
@@ -1423,7 +1423,7 @@ function render(){
       <button class="cta" data-go="post" style="padding:13px 10px;font-size:var(--t-16)">+ Pin a job</button>
       <nav style="display:flex;flex-direction:column;gap:3px" aria-label="Sections">${[['board','Board','board'],['bids','Activity','bids'],['chats','Chats','chat'],['saved','Saved','bookmark']].concat(S.me.isOwner?[['invites','Invites','users']]:[])
         .map(([v,l,i])=>`<button class="navitem ${navOn(v)?'on':''}" data-go="${v}" ${navOn(v)?'aria-current="page"':''}>${ic(i,18)} ${l}${v==='chats'&&D.unread?'<span class="udot" aria-label="Unread"></span>':''}${v==='bids'&&(D.toConfirm||D.offersWaiting||D.newNotes)?'<span class="udot" aria-label="New activity"></span>':''}</button>`).join('')}</nav>
-      <button class="card" style="margin-top:auto;padding:10px 12px;border-radius:var(--r-sm)" data-go="me">${ring(S.me.id,38)}<span class="rowtext"><span style="font-size:var(--t-12);font-weight:700">${esc(shortName(S.me.id))}</span>
+      <button class="card" style="margin-top:auto;padding:10px 12px;border-radius:var(--r-sm)" data-go="me">${ring(S.me.id,38)}<span class="rowtext"><span style="font-size:var(--t-12);font-weight:600">${esc(shortName(S.me.id))}</span>
         <span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc(metaOf(S.me.id)||campus())}</span></span></button>`;
     $('tabbar').innerHTML=[['board','Board','board'],['bids','Activity','bids'],['post','','plus'],['chats','Chats','chat'],['saved','Saved','bookmark']].map(([v,l,i])=>v==='post'
       ?`<button class="tab" data-go="post" aria-label="Pin a job"><span class="fab">${ic('plus',24,3,'#fff')}</span></button>`
