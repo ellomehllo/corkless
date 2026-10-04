@@ -1067,8 +1067,11 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 
 /* job page: the job is the headline, the poster and price support it */
 .jhead .h1{font-size:clamp(28px,7.6vw,40px);line-height:1.1;letter-spacing:-.035em;font-weight:700}
-.jhero{min-height:300px;padding-bottom:70px}
-.jposter{margin-top:-46px;gap:4px}
+.jhero{min-height:280px;padding:64px 20px 64px}
+.jhead{max-width:min(100%,640px);width:100%}
+.jhead .h1{text-wrap:pretty}
+.jhint{position:absolute;left:14px;bottom:14px;z-index:2;pointer-events:none}
+.jposter{margin-top:-52px;gap:4px}
 .jposter .pname{font-size:var(--fs-b);font-weight:600;letter-spacing:-.01em}
 .jposter .jmeta{font-size:var(--fs-c)}
 .jcard .big{font-size:30px}
