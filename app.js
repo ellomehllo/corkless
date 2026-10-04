@@ -1,8 +1,11 @@
 import firebaseConfig from './firebase-config.js';
+import supaConfig from './supabase-config.js';
+import {makeDb} from './db.js?v=202610042228';
 import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610042228';
 import {modHit,MOD_CAT} from './mod.js?v=202610042228';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
+const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
 
 const RINGS=['#C6F24E','#A18CFF','#FF5B6E','#4FE3E0','#FF7AD1','#FFC53D'];
@@ -116,17 +119,17 @@ function handleCheck(raw){const h=String(raw||'').trim().replace(/^@/,'').toLowe
   if(h.length<4)return{h,st:'short'};if(!HANDLE_RE.test(h))return{h,st:'chars'};if(HANDLE_RESERVED.includes(h)||modHit(h,h.replace(/[._]/g,'')))return{h,st:'taken'};return{h,st:'check'}}
 let handleT=null;
 function checkHandle(raw){const r=handleCheck(raw);S.hcheck={...r};clearTimeout(handleT);
-  if(r.st==='check'){if(r.h===handleOf(S.me.id)){S.hcheck.st='mine';return}handleT=setTimeout(()=>{S.fb.getDoc(S.fb.doc(S.db,'usernames',r.h)).then(d=>{if(S.hcheck.h!==r.h)return;S.hcheck.st=d.exists()&&d.data().uid!==S.me.id?'taken':'ok';paintHandle()}).catch(()=>{S.hcheck.st='ok';paintHandle()})},350)}}
+  if(r.st==='check'){if(r.h===handleOf(S.me.id)){S.hcheck.st='mine';return}handleT=setTimeout(()=>{handleOwner(r.h).then(u=>{if(S.hcheck.h!==r.h)return;S.hcheck.st=u&&u!==S.me.id?'taken':'ok';paintHandle()}).catch(()=>{S.hcheck.st='ok';paintHandle()})},350)}}
 function handleMsg(){const c=S.hcheck||{};return{empty:'',short:'At least 4 characters',chars:'Letters, numbers, . and _ only',taken:'Not available',check:'Checking…',ok:'Available ✓',mine:'This is your username'}[c.st]||''}
 function paintHandle(){const el=$('hMsg');if(el){el.textContent=handleMsg();el.className='hmsg '+(S.hcheck?.st||'')}syncNeed()}
 function handleLockedUntil(){const at=num(S.myDoc?.handleAt);return handleOf(S.me.id)&&at&&Date.now()<at+HANDLE_DAYS*864e5?at+HANDLE_DAYS*864e5:0}
 function handleField(locked){const h=S.onb.handle||'';return`<div class="stack gap8"><label class="formlabel" for="ohd">Username <span class="muted">· what people see on the board</span></label>
   <label class="field hfield ${locked?'locked':''}" for="ohd"><span class="hat">@</span><input id="ohd" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" value="${esc(h)}" data-bind="onb.handle" ${locked?'disabled':''} aria-describedby="hMsg"></label>
   <span id="hMsg" class="hmsg ${S.hcheck?.st||''}">${locked?esc(locked):handleMsg()}</span></div>`}
-async function claimHandle(h){const {doc,writeBatch}=S.fb,me=S.me.id,b=writeBatch(S.db),old=handleOf(me);
-  b.set(doc(S.db,'usernames',h),{uid:me,at:Date.now()});if(old&&old!==h)b.delete(doc(S.db,'usernames',old));
-  if(!S.myNameSaved){const n=myRealName();if(n.length>=2)b.set(doc(S.db,'names',me),{name:n.slice(0,60)})}
-  await b.commit();S.myNameSaved=true}
+async function handleOwner(h){const {data,error}=await S.sb.from('people').select('id').eq('handle',h).maybeSingle();if(error)throw error;return data?data.id:null}
+async function claimHandle(h){const me=S.me.id,u=await handleOwner(h);if(u&&u!==me)throw new Error('taken');
+  if(!S.myNameSaved){const n=myRealName();if(n.length>=2){const {error}=await S.sb.from('names').insert({id:me,name:n.slice(0,60)});if(error&&error.code!=='23505')throw error}}
+  S.myNameSaved=true}
 function loadNames(D){S.names=S.names||{};for(const u of D.members){if(u in S.names||!handleOf(u))continue;S.names[u]='';S.fb.getDoc(S.fb.doc(S.db,'names',u)).then(d=>{if(d.exists()){S.names[u]=str(d.data().name,60);render()}}).catch(()=>{})}}
 function syncDealNames(){const me=S.me?.id,n=myRealName();if(!me||!n||S.dealSync)return;
   for(const[k,p]of Object.entries(S.picks||{})){if(!p)continue;const f=p.doer===me&&typeof p.doerName!=='string'?'doerName':p.owner===me&&typeof p.posterName!=='string'?'posterName':'';if(!f||(S.dealFail||{})[k+f])continue;
@@ -216,9 +219,7 @@ function tackFace(s){return`<span class="tackav" style="width:${s}px;height:${s}
 const HOLD_AT=5;
 const held=uid=>{const x=(S.strikes||{})[uid];return!!x&&num(x.n)-num(x.cleared)>=HOLD_AT};
 const hiddenFor=j=>held(j.owner)&&j.owner!==S.me?.id&&!S.me?.isOwner;
-function strikeAdd(about){const me=S.me.id;if(!about||about===me||!ID_RE.test(about))return;const {doc,writeBatch}=S.fb,cur=(S.strikes||{})[about]||{},b=writeBatch(S.db);
-  b.set(doc(S.db,'reportmarks',about+'~'+me),{about,at:Date.now()});b.set(doc(S.db,'strikes',about),{n:Math.round(num(cur.n))+1,cleared:Math.round(num(cur.cleared))});
-  b.commit().catch(()=>{})}
+function strikeAdd(about){const me=S.me.id;if(!about||about===me||!ID_RE.test(about))return;S.fb.rpc('strike',{p_about:about}).catch(()=>{})}
 function boardJobs(D){
   const now=Date.now();
   const l=D.jobs.filter(j=>j.status==='open'&&j.deadline>now&&!D.blocked.has(j.owner)&&!hiddenFor(j));
@@ -293,30 +294,15 @@ function writeErr(e){
   console.warn(e);
 }
 function prune(d){
-  const jobs=Object.entries(d.jobs||{});const live=jobs.filter(([,j])=>j.status==='open'||j.status==='assigned');
-  const rest=jobs.filter(([,j])=>!(j.status==='open'||j.status==='assigned')).sort((a,b)=>num(b[1].at)-num(a[1].at)).slice(0,80);
-  d.jobs=Object.fromEntries([...live,...rest]);delete d.paid;delete d.bids;
+  delete d.paid;delete d.bids;
   return d;
 }
 async function rateBatch(pickKey,about,side,vals,pickPatch){
-  const {doc,writeBatch}=S.fb,me=S.me.id,t=Array.from(crypto.getRandomValues(new Uint8Array(12)),x=>x.toString(16).padStart(2,'0')).join('');
-  const cur=S.repDocs[about]||{},sideCur=cur[side]&&typeof cur[side]==='object'?cur[side]:{},next={n:Math.round(num(sideCur.n))+1};
-  for(const[k]of CRIT[side])next[k]=Math.round(num(sideCur[k]))+vals[k];
-  const other=side==='d'?'p':'d',repDoc={[side]:next,proof:t};if(cur[other])repDoc[other]=cur[other];
-  const b=writeBatch(S.db);
-  b.update(doc(S.db,'picks',pickKey),pickPatch);
-  b.set(doc(S.db,'tokens',t),{by:me,about,pick:pickKey,role:side});
-  b.set(doc(S.db,'rep',about),repDoc);
-  await b.commit();
+  const [owner,job]=pickKey.split('~');
+  await S.fb.rpc('rate',{p_owner:owner,p_job:job,p_side:side,p_vals:vals,p_note:(side==='d'?pickPatch.noteToDoer:pickPatch.noteToPoster)||null});
 }
 async function reviewBatch(pickKey,about,text,pics,stars){
-  const {doc,writeBatch}=S.fb,me=S.me.id,rid=Array.from(crypto.getRandomValues(new Uint8Array(12)),x=>x.toString(16).padStart(2,'0')).join(''),now=new Date();
-  const b=writeBatch(S.db);
-  b.set(doc(S.db,'tokens',rid),{by:me,about,pick:pickKey,role:'r'});
-  b.set(doc(S.db,'reviews',rid),{about,text,at:new Date(now.getFullYear(),now.getMonth(),1).getTime(),...(stars?{stars:Math.round(stars*10)/10}:{}),...(pics.length?{pics:pics.length}:{})});
-  if(pics.length)b.set(doc(S.db,'reviewpics',rid),{pics});
-  b.update(doc(S.db,'picks',pickKey),{review:rid});
-  await b.commit();
+  const rid=await S.fb.rpc('post_review',{p_job:pickKey.split('~')[1],p_text:text,p_stars:stars?Math.round(stars*10)/10:null,p_pics:pics.length?pics:null});
   S.picks={...S.picks,[pickKey]:{...S.picks[pickKey],review:rid}};if(pics.length)S.pics['r:'+rid]=pics;delete S.revs[about];
 }
 function reviewsOf(uid){const v=S.revs[uid];if(v!==undefined)return v;S.revs[uid]=null;const {collection,query,where,limit,getDocs}=S.fb;
@@ -359,7 +345,7 @@ const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator
 const pushReady=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
 function pushOn(){try{return pushReady()&&Notification.permission==='granted'&&!!localStorage.getItem(PUSH_KEY)}catch{return false}}
 async function pushToken(){const reg=await navigator.serviceWorker.register('sw.js');await navigator.serviceWorker.ready;
-  const m=await import(FB+'firebase-messaging.js');S.msg=S.msg||m.getMessaging(S.fbApp);return{m,token:await m.getToken(S.msg,{serviceWorkerRegistration:reg})}}
+  const m=await import(FB+'firebase-messaging.js');S.msg=S.msg||m.getMessaging(await fcmApp());return{m,token:await m.getToken(S.msg,{serviceWorkerRegistration:reg})}}
 function dropPushField(t){const {doc,updateDoc,FieldPath,deleteField}=S.fb;return updateDoc(doc(S.db,'private',S.me.id),new FieldPath('push',t),deleteField()).catch(e=>console.warn(e))}
 async function enablePush(){
   if(!pushReady()){if(isIOS()&&!standalone()){S.sheet={type:'iosPush'};render()}else toast('This browser can\u2019t show notifications.');return}
@@ -374,7 +360,7 @@ async function enablePush(){
 async function disablePush(){
   let t=null;try{t=localStorage.getItem(PUSH_KEY);localStorage.removeItem(PUSH_KEY)}catch{}
   if(t){const p={...(S.priv.push||{})};delete p[t];S.priv={...S.priv,push:p};dropPushField(t);
-    try{const m=await import(FB+'firebase-messaging.js');S.msg=S.msg||m.getMessaging(S.fbApp);await m.deleteToken(S.msg)}catch{}}
+    try{const m=await import(FB+'firebase-messaging.js');S.msg=S.msg||m.getMessaging(await fcmApp());await m.deleteToken(S.msg)}catch{}}
   toast('Notifications are off');render()}
 async function syncPush(){
   if(!pushOn())return;
@@ -390,47 +376,55 @@ function savePriv(patch){
   return enqueue('priv',()=>setDoc(doc(S.db,'private',S.me.id),patch,{merge:true})).catch(writeErr);
 }
 
+async function fcmApp(){if(S.fbApp)return S.fbApp;const app=await import(FB+'firebase-app.js');S.fbApp=app.initializeApp(firebaseConfig);return S.fbApp}
+const userOf=u=>u?{uid:u.id,email:(u.email||'').toLowerCase(),emailVerified:!!u.email_confirmed_at,displayName:str(u.user_metadata?.name,60)}:null;
 async function boot(){
   render();
-  if(!firebaseConfig||!firebaseConfig.apiKey){S.phase='setup';render();return}
+  if(!supaConfig||!supaConfig.url||!supaConfig.key){S.phase='setup';render();return}
   try{
-    const [app,auth,fs]=await Promise.all([import(FB+'firebase-app.js'),import(FB+'firebase-auth.js'),import(FB+'firebase-firestore.js')]);
-    S.fb={...app,...auth,...fs};
-    const fbApp=app.initializeApp(firebaseConfig);S.fbApp=fbApp;
-    S.auth=auth.getAuth(fbApp);S.db=fs.getFirestore(fbApp);
+    const {createClient}=await import(SB);
+    S.sb=createClient(supaConfig.url,supaConfig.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'implicit'}});
+    S.fb=makeDb(S.sb);S.db=null;
   }catch(e){console.error(e);S.phase='offline';render();return}
-  S.fb.onAuthStateChanged(S.auth,u=>{handleUser(u)});
+  let last;
+  S.sb.auth.onAuthStateChange((ev,session)=>{
+    if(ev==='PASSWORD_RECOVERY'){S.recovery=true;S.pw={cur:'',nw:''};S.err={};S.phase='newpw';render();return}
+    const u=session?.user||null,k=u?u.id+':'+!!u.email_confirmed_at:'';
+    if(k===last&&ev!=='SIGNED_OUT')return;last=k;
+    setTimeout(()=>{if(!S.recovery)handleUser(userOf(u))},0)});
 }
 function stopSubs(){S.subs.forEach(u=>{try{u()}catch{}});S.subs=[];closeThread()}
 let verifyTimer=null;
 function stopVerifyPoll(){clearInterval(verifyTimer);verifyTimer=null}
 async function handleUser(user){
-  stopSubs();stopVerifyPoll();S.user=user;S.me=null;S.myName=null;S.myNameSaved=false;S.names={};S.dealFail={};S.dealSync=false;S.hcheck=null;firstLoadDone=false;
+  stopSubs();stopVerifyPoll();S.user=user;S.sb.__uid=user?.uid||null;S.me=null;S.myName=null;S.myNameSaved=false;S.names={};S.dealFail={};S.dealSync=false;S.hcheck=null;firstLoadDone=false;
   if(S.signingUp)return;
   if(!user){if(!S.erased)S.phase='auth';render();return}
   if(!user.emailVerified){S.phase='verify';render();verifyTimer=setInterval(checkVerified,5000);return}
   S.phase='loading';render();
-  try{await user.getIdToken(true)}catch{}
   const {doc,getDoc}=S.fb,email=(user.email||'').toLowerCase();
   let isOwner=false;
-  try{await getDoc(doc(S.db,'adminCheck','probe'));isOwner=true}catch{}
+  try{isOwner=(await S.fb.rpc('am_admin'))===true}catch{}
   if(!isOwner){
     let inv=null;try{inv=await getDoc(doc(S.db,'invites',email))}catch{}
+    if((!inv||!inv.exists())&&savedCode()){try{if(await S.fb.rpc('use_invite_code',{p_code:savedCode()})){inv=await getDoc(doc(S.db,'invites',email))}}catch(e){console.warn(e)}}
     if(!inv||!inv.exists()){S.phase='notinvited';render();return}
+    try{localStorage.removeItem('tack.code')}catch{}
     S.myInvite=inv.data();
   }
   S.me={id:user.uid,email,isOwner};
   startSubs();
 }
 async function checkVerified(){
-  const u=S.auth.currentUser;if(!u)return;
-  try{await S.fb.reload(u)}catch{return}
-  if(u.emailVerified){stopVerifyPoll();await u.getIdToken(true);handleUser(u)}
+  const {data}=await S.sb.auth.getSession();const u=userOf(data?.session?.user);
+  if(u&&u.emailVerified){stopVerifyPoll();handleUser(u);return}
+  if(!data?.session&&S.phase==='verify'){stopVerifyPoll();S.authMode='login';S.form.email=S.user?.email||S.form.email;S.authMsg='Confirmed it? Log in with your email and password.';S.phase='auth';render()}
 }
+const savedCode=()=>{try{return localStorage.getItem('tack.code')||''}catch{return''}};
 let retried=false;
 function lostAccess(){if(S.phase==='notinvited')return;stopSubs();
-  const u=S.auth.currentUser;
-  if(u&&!retried){retried=true;u.getIdToken(true).then(()=>handleUser(u),()=>{S.phase='notinvited';render()});return}
+  const u=S.user;
+  if(u&&!retried){retried=true;S.sb.auth.refreshSession().then(()=>handleUser(u),()=>{S.phase='notinvited';render()});return}
   S.phase='notinvited';render()}
 function startSubs(){
   const {doc,collection,onSnapshot,query,where,orderBy,limit}=S.fb,db=S.db,me=S.me.id;
@@ -484,65 +478,62 @@ function computePhase(){
 }
 function seedOnb(){const d=S.myDoc||{};S.onb={handle:str(d.handle,20),name:str(d.name,60)||S.myName||S.user?.displayName||'',photo:PHOTO_RE.test(d.photo||'')?d.photo:'',year:str(d.year,12),branch:str(d.branch,24),does:str(d.bio,BIO_MAX)||str(d.does,60),banner:bannerOk(d.banner)?d.banner:'',ring:RINGS.includes(d.ring)?d.ring:ringOf(S.me.id),adult:!!d.adult,rules:!!d.adult}}
 
+const AUTH_CODE={invalid_credentials:'auth/invalid-credential',user_already_exists:'auth/email-already-in-use',email_exists:'auth/email-already-in-use',weak_password:'auth/weak-password',
+  validation_failed:'auth/invalid-email',over_request_rate_limit:'auth/too-many-requests',over_email_send_rate_limit:'auth/too-many-requests',email_not_confirmed:'auth/email-not-confirmed',same_password:'auth/same-password'};
+const authErr=e=>{const x=new Error(e?.message||'auth');x.code=AUTH_CODE[e?.code]||(e?.status===429?'auth/too-many-requests':/fetch/i.test(e?.message||'')?'auth/network-request-failed':'auth/'+(e?.code||'unknown'));return x};
 const AUTH_ERR={
   'auth/invalid-credential':'Wrong email or password.','auth/wrong-password':'Wrong email or password.','auth/user-not-found':'Wrong email or password.',
   'auth/email-already-in-use':'That email already has an account. Log in instead.','auth/weak-password':'Use a longer password: at least 8 characters.',
   'auth/invalid-email':'That doesn’t look like an email address.','auth/too-many-requests':'Too many tries. Wait a few minutes and try again.',
   'auth/network-request-failed':'You look offline. Check your connection.','auth/requires-recent-login':'For safety, log in again first.',
-  'auth/password-does-not-meet-requirements':'That password is too simple. Use at least 8 characters.'
+  'auth/password-does-not-meet-requirements':'That password is too simple. Use at least 8 characters.',
+  'auth/email-not-confirmed':'Confirm your email first. Open the link we sent you.','auth/same-password':'That\u2019s your current password. Pick a new one.'
 };
 const authMsg=e=>AUTH_ERR[e&&e.code]||'Something went wrong. Try again.';
-const verifySettings=()=>({url:SITE});
-async function sendVerify(u){try{await S.fb.sendEmailVerification(u,verifySettings())}catch(e){if(String(e.code).includes('continue-uri')||String(e.code).includes('unauthorized'))await S.fb.sendEmailVerification(u);else throw e}}
+async function sendVerify(u){const {error}=await S.sb.auth.resend({type:'signup',email:u.email,options:{emailRedirectTo:SITE}});if(error)throw authErr(error)}
 async function doSignup(){
   const f=S.form,name=f.name.trim(),email=f.email.trim().toLowerCase();
   if(name.length<2)return authFail('Add your full name.');
   if(!validEmail(email))return authFail('That doesn’t look like an email address.');
   if(f.pw.length<8)return authFail('Use a password of at least 8 characters.');
-  const {createUserWithEmailAndPassword,updateProfile,deleteUser,signOut,doc,getDoc}=S.fb;
   S.busy=true;S.authErr='';S.signingUp=true;render();
-  let cred;
-  try{cred=await createUserWithEmailAndPassword(S.auth,email,f.pw)}catch(e){S.signingUp=false;S.busy=false;return authFail(authMsg(e))}
-  let ok=false;
-  try{ok=(await getDoc(doc(S.db,'invites',email))).exists()}catch{}
-  if(!ok){try{await getDoc(doc(S.db,'adminCheck','probe'));ok=true}catch{}}
-  let codeMsg='';
-  if(!ok&&codeParam){
-    try{const cs=await getDoc(doc(S.db,'invcodes',codeParam));
-      if(cs.exists()&&!cs.data().usedBy){const b=S.fb.writeBatch(S.db),now=Date.now();
-        b.set(doc(S.db,'invites',email),{code:codeParam,by:cs.data().by,at:now});
-        b.update(doc(S.db,'invcodes',codeParam),{usedBy:cred.user.uid,usedAt:now});
-        await b.commit();ok=true}
-      else codeMsg=cs.exists()?'This invite link has already been used. Ask your friend for a new one.':'This invite link isn\u2019t valid. Check you copied all of it, or ask your friend for a new one.'}
-    catch{codeMsg='This invite link didn\u2019t work. Ask your friend for a new one.'}
-  }
-  if(!ok){
-    try{await deleteUser(cred.user)}catch{try{await signOut(S.auth)}catch{}}
-    S.signingUp=false;S.busy=false;S.phase='auth';
-    return authFail(codeMsg||`${email} isn’t on the invite list. Use the email address your invite was sent to, or ask the organiser to invite you.`);
-  }
-  try{await updateProfile(cred.user,{displayName:name})}catch{}
-  try{await sendVerify(cred.user)}catch{}
-  S.onb.name=name;S.form.pw='';S.signingUp=false;S.busy=false;
-  handleUser(S.auth.currentUser);
+  let can='';
+  try{can=await S.fb.rpc('can_join',{p_email:email,p_code:codeParam||null})}catch(e){S.signingUp=false;return authFail('Couldn\u2019t reach tack. Check your connection and try again.')}
+  if(can!=='invited'&&can!=='code'){S.signingUp=false;S.busy=false;S.phase='auth';
+    return authFail(can==='usedcode'?'This invite link has already been used. Ask your friend for a new one.':can==='badcode'?'This invite link isn\u2019t valid. Check you copied all of it, or ask your friend for a new one.'
+      :`${email} isn’t on the invite list. Use the email address your invite was sent to, or ask the organiser to invite you.`)}
+  if(can==='code')try{localStorage.setItem('tack.code',codeParam)}catch{}
+  const {data,error}=await S.sb.auth.signUp({email,password:f.pw,options:{data:{name},emailRedirectTo:SITE}});
+  S.signingUp=false;S.busy=false;
+  if(error)return authFail(authMsg(authErr(error)));
+  if(data?.user&&Array.isArray(data.user.identities)&&!data.user.identities.length)return authFail(AUTH_ERR['auth/email-already-in-use']);
+  S.onb.name=name;S.form.pw='';
+  if(data?.session)handleUser(userOf(data.user));
+  else{S.user={email,displayName:name,emailVerified:false};S.phase='verify';render();stopVerifyPoll();verifyTimer=setInterval(checkVerified,5000)}
 }
 async function doLogin(){
   const f=S.form,email=f.email.trim().toLowerCase();
   if(!validEmail(email))return authFail('That doesn’t look like an email address.');
   if(!f.pw)return authFail('Enter your password.');
   S.busy=true;S.authErr='';render();
-  try{await S.fb.signInWithEmailAndPassword(S.auth,email,f.pw);S.form.pw=''}catch(e){authFail(authMsg(e))}
+  const {error}=await S.sb.auth.signInWithPassword({email,password:f.pw});
+  if(error){const e=authErr(error);if(e.code==='auth/email-not-confirmed'){S.user={email,emailVerified:false};S.phase='verify';S.busy=false;render();return}authFail(authMsg(e))}else{S.form.pw='';S.authMsg=''}
   S.busy=false;render();
 }
 async function doReset(){
   const email=S.form.email.trim().toLowerCase();
   if(!validEmail(email))return authFail('Enter the email you signed up with.');
   S.busy=true;S.authErr='';render();
-  try{await S.fb.sendPasswordResetEmail(S.auth,email,{url:SITE})}catch(e){if(e.code==='auth/too-many-requests'){S.busy=false;return authFail(authMsg(e))}}
+  const {error}=await S.sb.auth.resetPasswordForEmail(email,{redirectTo:SITE});if(error&&authErr(error).code==='auth/too-many-requests'){S.busy=false;return authFail(authMsg(authErr(error)))}
   S.busy=false;S.authMsg=`If ${email} has an account, a reset link is on its way. Check spam too.`;render();
 }
 function authFail(m){S.authErr=m;S.busy=false;render();return false}
-async function logOut(){stopSubs();firstLoadDone=false;S.view='board';S.myDoc=null;S.authMode='login';S.authErr='';S.authMsg='';S.form.pw='';try{await S.fb.signOut(S.auth)}catch{}}
+async function logOut(){stopSubs();firstLoadDone=false;S.view='board';S.myDoc=null;S.authMode='login';S.authErr='';S.authMsg='';S.form.pw='';try{await S.sb.auth.signOut()}catch{}}
+async function setNewPw(){if(!need(S.pw.nw.length>=8,'pw','Use a new password of at least 8 characters.'))return;
+  S.busy=true;render();const {data,error}=await S.sb.auth.updateUser({password:S.pw.nw});S.busy=false;
+  if(error){S.err={pw:authMsg(authErr(error))};render();return}
+  S.recovery=false;S.pw={cur:'',nw:''};S.err={};toast('Password set');handleUser(userOf(data.user))}
+async function checkPw(pw){const {error}=await S.sb.auth.signInWithPassword({email:S.user.email,password:pw});if(error)throw authErr(error)}
 
 function closeThread(){if(S.chat.unsub)try{S.chat.unsub()}catch{};S.chat={key:null}}
 function openThread(t){
@@ -562,16 +553,15 @@ function markSeen(){
   const c=S.chat;if(!c.key||S.view!=='chat')return;
   const last=Math.max(0,...c.msgs.filter(m=>m.by!==S.me.id).map(m=>m.at));
   if(last>num((S.priv.seen||{})[c.key]))savePriv({seen:{[c.key]:last}});
-  if(pref('receipts')&&threadOpen(c.key)&&last>num(((S.threadDocs[c.key]||{}).read||{})[S.me.id]))S.fb.setDoc(S.fb.doc(S.db,'threads',c.key),{read:{[S.me.id]:last}},{merge:true}).catch(()=>{});
+  if(pref('receipts')&&threadOpen(c.key)&&last>num(((S.threadDocs[c.key]||{}).read||{})[S.me.id]))S.fb.rpc('thread_read',{p_thread:c.key,p_at:last}).catch(()=>{});
 }
 function sendMsg(){
   const c=S.chat,t=S.chatDraft.text.trim();if(!c.key||!t)return;
   if(modBlock('chat',t))return;
   if(!canMessage(c,derive())){toast('You can\u2019t message them yet.');return}
-  const {collection,addDoc,doc,setDoc}=S.fb,me=S.me.id,at=Date.now();
+  const at=Date.now();
   S.chatDraft.text='';
-  addDoc(collection(S.db,'threads',c.key,'msgs'),{by:me,t:t.slice(0,1000),at}).catch(writeErr);
-  setDoc(doc(S.db,'threads',c.key),{members:[me,c.other],job:c.jobKey||null,open:true,lastText:t.slice(0,80),lastAt:at,lastBy:me},{merge:true}).catch(writeErr);
+  S.fb.rpc('send_msg',{p_thread:c.key,p_job:c.jobKey||null,p_other:c.other,p_text:t.slice(0,1000)}).catch(writeErr);
   savePriv({seen:{[c.key]:at}});
   requestAnimationFrame(()=>{$('msg')?.focus()});
 }
@@ -669,7 +659,7 @@ function gateHTML(){
   const email=esc(S.user?.email||'');
   switch(S.phase){
   case'loading':return`<div class="loading"><div class="mark">tack</div></div>`;
-  case'setup':return`<div class="gatebox"><div class="mark">tack</div><h1>Almost ready</h1><p>This site isn't connected to its database yet. Add the Firebase web config to <b>firebase-config.js</b> and reload.</p></div>`;
+  case'setup':return`<div class="gatebox"><div class="mark">tack</div><h1>Almost ready</h1><p>This site isn't connected to its database yet. Add the Supabase project URL and key to <b>supabase-config.js</b> and reload.</p></div>`;
   case'offline':return`<div class="gatebox"><div class="mark">tack</div><h1>Can't reach tack</h1><p>Check your connection and reload the page.</p><button class="cta" data-act="reload">Reload</button></div>`;
   case'auth':return authHTML();
   case'verify':return`<div class="gatebox"><div class="mark">tack</div><h1>Confirm your email</h1>
@@ -677,6 +667,11 @@ function gateHTML(){
     <button class="cta" data-act="checkVerified">I've confirmed it</button>
     <button class="btn2" data-act="resendVerify">Send the email again</button>
     <button class="linkbtn" data-act="logout">Use a different email</button></div>`;
+  case'newpw':return`<div class="gatebox"><div class="mark">tack</div><h1>Set a new password</h1>
+    <form class="stack" id="authForm" data-form="newpw" novalidate style="gap:14px">
+    <div class="stack gap8"><label class="formlabel" for="fNewPw">New password</label><span class="pwwrap"><input id="fNewPw" class="inp" type="${S.showPw?'text':'password'}" autocomplete="new-password" placeholder="At least 8 characters" value="${esc(S.pw.nw)}" data-bind="pw.nw"><button type="button" class="pwtoggle" data-act="togglePw" aria-label="${S.showPw?'Hide':'Show'} password">${S.showPw?'Hide':'Show'}</button></span></div>
+    ${S.err.pw?`<p class="err" role="alert">${esc(S.err.pw)}</p>`:''}
+    <button class="cta" type="submit" ${S.busy?'disabled':''}>${S.busy?'Saving…':'Save password'}</button></form></div>`;
   case'notinvited':return`<div class="gatebox"><div class="mark">tack</div><h1>This email isn't on the invite list</h1>
     <p><b>${email}</b> hasn't been invited to tack, or its invite was removed. Ask the organiser to invite this address, then log in again.</p>
     <button class="btn2" data-act="logout">Log out</button></div>`;
@@ -1488,7 +1483,7 @@ const ACT={
   pushOff(){disablePush()},
   hideBanner(el){try{localStorage.setItem(el.dataset.k,'1')}catch{}render()},
   checkVerified(){checkVerified().then(()=>{if(S.phase==='verify')toast('Not confirmed yet. Open the link in the email first.')})},
-  async resendVerify(){try{await sendVerify(S.auth.currentUser);toast('Sent. Check your inbox and spam.')}catch(e){toast(authMsg(e))}},
+  async resendVerify(){try{await sendVerify(S.user);toast('Sent. Check your inbox and spam.')}catch(e){toast(authMsg(e))}},
   clearPhoto(){S.onb.photo='';render()},
   cropUse(){cropDone()},
   cropCancel(){if(S.crop)URL.revokeObjectURL(S.crop.url);S.crop=null;S.cropImg=null;S.sheet=null;render()},
@@ -1545,8 +1540,7 @@ const ACT={
     try{await reviewBatch(j.key,j.accepted,text,cleanPics(S.rate.pics),num((S.priv.gave||{})[j.key]));S.sheet=null;toast('Review posted')}
     catch(e){console.warn(e);S.err={rate:'Couldn\u2019t post your review. Try again.'}}
     S.busy=false;render()},
-  confirmDelReview(){const s=S.sheet;if(!s?.rid)return;const {doc,deleteDoc}=S.fb;
-    deleteDoc(doc(S.db,'reviewpics',s.rid)).catch(()=>{});deleteDoc(doc(S.db,'reviews',s.rid)).then(()=>{delete S.revs[s.about];toast('Review deleted');render()}).catch(writeErr);
+  confirmDelReview(){const s=S.sheet;if(!s?.rid)return;S.fb.rpc('delete_review',{p_id:s.rid}).then(()=>{delete S.revs[s.about];toast('Review deleted');render()}).catch(writeErr);
     S.sheet=null;render()},
   allReviews(el){S.allRevs=el.dataset.uid;render()},
   introNext(){if(S.intro.i>=INTRO.length-1)return closeIntro();introStep(1)},
@@ -1559,11 +1553,12 @@ const ACT={
     if(!S.introChecked){S.introChecked=true;if(!S.priv.introSeen)setTimeout(()=>{if(!S.intro.on)openIntro()},400)}},
   closeDoc(){closeDoc()},
   togglePwForm(){S.pwOpen=!S.pwOpen;S.pw={cur:'',nw:''};S.err={};render();if(S.pwOpen)$('pwCur')?.focus()},
-  async changePw(){const {EmailAuthProvider,reauthenticateWithCredential,updatePassword}=S.fb,u=S.auth.currentUser;
+  setNewPw(){setNewPw()},
+  async changePw(){
     if(!need(S.pw.cur,'pw','Enter your current password.')||!need(S.pw.nw.length>=8,'pw','Use a new password of at least 8 characters.'))return;
     S.busy=true;render();
-    try{await reauthenticateWithCredential(u,EmailAuthProvider.credential(u.email,S.pw.cur))}catch(e){S.busy=false;S.err={pw:e.code==='auth/too-many-requests'?authMsg(e):'That isn\u2019t your current password.'};render();return}
-    try{await updatePassword(u,S.pw.nw);S.pwOpen=false;S.pw={cur:'',nw:''};S.err={};toast('Password changed')}catch(e){S.err={pw:authMsg(e)}}
+    try{await checkPw(S.pw.cur)}catch(e){S.busy=false;S.err={pw:e.code==='auth/too-many-requests'?authMsg(e):'That isn\u2019t your current password.'};render();return}
+    {const {error}=await S.sb.auth.updateUser({password:S.pw.nw});if(error)S.err={pw:authMsg(authErr(error))};else{S.pwOpen=false;S.pw={cur:'',nw:''};S.err={};toast('Password changed')}}
     S.busy=false;render()},
   unblock(el){savePriv({blocked:arr(S.priv.blocked).filter(u=>u!==el.dataset.uid)});toast('Unblocked')},
   toggleLocPref(){if(locOptIn()){try{localStorage.removeItem('tack.loc')}catch{}LOC.pos=null;S.near=false;if(S.draft)S.draft.useLoc=false;render();toast('Location off')}
@@ -1624,21 +1619,21 @@ const ACT={
     S.sheet=null;toast(S.rep.block?'Reported and blocked':'Report sent to '+organiser());if(S.rep.block)go('board');else render()},
   blockOnly(){const s=S.sheet;savePriv({blocked:[...new Set([...arr(S.priv.blocked),s.about])]});S.sheet=null;toast('Blocked');go('board')},
   async confirmErase(){
-    const {doc,deleteDoc,collection,query,where,getDocs,deleteUser,EmailAuthProvider,reauthenticateWithCredential}=S.fb,me=S.me.id,user=S.auth.currentUser;
+    const {doc,deleteDoc,collection,query,where,getDocs}=S.fb,me=S.me.id;
     if(!need(S.erase.pw,'erase','Enter your password to confirm.'))return;
     S.busy=true;S.err={};render();
-    try{await reauthenticateWithCredential(user,EmailAuthProvider.credential(user.email,S.erase.pw))}
+    try{await checkPw(S.erase.pw)}
     catch(e){S.busy=false;S.err={erase:e.code==='auth/too-many-requests'?authMsg(e):'That password isn\u2019t right.'};render();return}
     try{
       for(const[k,t]of Object.entries(S.threadDocs)){const q=await getDocs(query(collection(S.db,'threads',k,'msgs'),where('by','==',me)));for(const m of q.docs)await deleteDoc(m.ref);
-        if(t&&t.lastBy===me)await S.fb.setDoc(doc(S.db,'threads',k),{lastText:'Message deleted'},{merge:true}).catch(()=>{})}
+        if(t&&t.lastBy===me)await S.fb.updateDoc(doc(S.db,'threads',k),{lastText:'Message deleted'}).catch(()=>{})}
       for(const[id,p]of Object.entries(S.pitchMine)){if(num(p?.pics))await deleteDoc(doc(S.db,'bidpics',id)).catch(()=>{});await deleteDoc(doc(S.db,'pitches',id))}
       for(const pk of Object.values(S.picks))if(pk&&pk.owner===me&&typeof pk.review==='string'){await deleteDoc(doc(S.db,'reviewpics',pk.review)).catch(()=>{});await deleteDoc(doc(S.db,'reviews',pk.review)).catch(()=>{})}
       for(const[id,j]of Object.entries(S.myDoc?.jobs||{}))if(num(j?.pics))await deleteDoc(doc(S.db,'jobpics',me+'~'+id)).catch(()=>{});
       for(const id of Object.keys(S.offersOut))await deleteDoc(doc(S.db,'offers',id)).catch(()=>{});
       for(const[id,c]of Object.entries(S.myCodes))if(!c.usedBy)await deleteDoc(doc(S.db,'invcodes',id)).catch(()=>{});
       await deleteDoc(doc(S.db,'people',me));await deleteDoc(doc(S.db,'private',me));
-      S.erased=true;stopSubs();await deleteUser(user);
+      S.erased=true;stopSubs();await S.fb.rpc('delete_me');await S.sb.auth.signOut({scope:'local'}).catch(()=>{});
       S.busy=false;S.sheet=null;S.erase={pw:''};S.phase='erased';render();
     }catch(e){S.busy=false;S.err={erase:'Couldn\u2019t delete everything. Check your connection and try again.'};render();console.warn(e)}},
   paid(el){const j=derive().jobByKey[S.openJob];if(!j||j.accepted!==S.me.id)return;const ok=el.dataset.val==='yes';
@@ -1757,7 +1752,7 @@ document.addEventListener('click',e=>{if(lp&&lp.until>Date.now()){lp=null;e.stop
 document.addEventListener('contextmenu',e=>{const t=e.target.closest('.tile[data-job]');if(!t)return;e.preventDefault();if(lp?.fired||lp?.until>Date.now())return;if(lp)clearTimeout(lp.t);openJobMenu(t.dataset.job)});
 document.addEventListener('submit',e=>{
   const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();
-  if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset})[f.dataset.form]?.();
+  if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset,newpw:setNewPw})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
 document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='q')render();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jhue'&&S.draft.white){S.draft.white=false;$('jwhite')?.classList.remove('on')}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
