@@ -892,3 +892,22 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .tile.ntile .by{margin-top:14px;color:rgba(255,255,255,.8)}
 .tile.ntile .by .n{color:rgba(255,255,255,.56)}
 .wcol{gap:22px}
+
+/* plain notes; the note colour only tints the pin and the note text */
+.tile.ntile,.bignote.tile.ntile{background:var(--tile);border-color:var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 14px 28px -16px rgba(0,0,0,.9)}
+.tile.ntile .tbg:not(.ph){display:none}
+.tile.ntile p,.bignote .bntext{color:var(--nc)}
+.bignote .bntext::placeholder{color:color-mix(in srgb,var(--nc) 45%,transparent)}
+.tile.ntile .pin{box-shadow:0 0 8px color-mix(in srgb,var(--nc) 70%,transparent)}
+.tile.ntile .where{color:var(--muted)}
+.tile.ntile .by{color:var(--fg2)}
+.tile.ntile .by .n{color:var(--dim)}
+/* thin colour bar with no visible knob; thickens while held; grey x for white text */
+.huewrap{align-items:center;gap:10px;width:48%;min-width:170px}
+.huebar{height:4px;transition:height .18s cubic-bezier(.2,.8,.2,1)}
+.huebar:active,.notewrap.straight .huebar{height:10px}
+.huebar::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;background:transparent;border:0;box-shadow:none;opacity:0}
+.huebar::-moz-range-thumb{width:28px;height:28px;background:transparent;border:0;box-shadow:none;opacity:0}
+.hueclear{flex-shrink:0;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;color:var(--dim);transition:color .15s,background-color .15s}
+.hueclear:hover{color:var(--fg2);background:var(--surface2)}
+.hueclear.on{color:var(--fg);background:var(--surface2)}

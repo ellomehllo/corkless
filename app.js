@@ -1,6 +1,6 @@
 import firebaseConfig from './firebase-config.js';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610041952';
-import {modHit,MOD_CAT} from './mod.js?v=202610041952';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610042004';
+import {modHit,MOD_CAT} from './mod.js?v=202610042004';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
@@ -928,7 +928,8 @@ function viewJob(D){
   ${!mine?`<div class="reportrow"><button class="linkbtn" data-sheet="report" data-about="${esc(j.owner)}">Report this job</button>${mod}</div>`:''}`;
 }
 const NOTE_MAX=100,noteCount=t=>`${String(t||'').length} / ${NOTE_MAX}`;
-function noteTone(){return{c:hueHex(S.draft.hue),g:false}}
+const NOTE_WHITE='#FFFFFF';
+function noteTone(){return{c:S.draft.white?NOTE_WHITE:hueHex(S.draft.hue),g:false}}
 function syncNoteTone(){const hb=$('jhue');if(hb)hb.style.setProperty('--thumb',hueHex(S.draft.hue));const n=$('bignote');if(!n)return;const {c,g}=noteTone();n.style.setProperty('--nc',c);n.classList.toggle('gnote',g);
   if(g){n.style.setProperty('--nc1','var(--g1)');n.style.setProperty('--nc2','var(--g2)')}else{n.style.removeProperty('--nc1');n.style.removeProperty('--nc2')}
   const pr=$('bnPrice');if(pr)pr.classList.toggle('blank',!digits(S.draft.price))}
@@ -946,7 +947,7 @@ function viewPost(){
      <div class="bnpics">${picEdit('draft',d.pics)}</div>
      <span class="bnfoot"><span class="by">${face(me,22)}<span class="nm">${esc(firstName(me))}</span></span><span class="wc ${d.text.length>=NOTE_MAX?'full':''}" id="jtWc">${noteCount(d.text)}</span></span>
    </div>
-   <div class="huewrap"><input type="range" id="jhue" class="huebar" min="0" max="359" step="1" value="${num(d.hue)}" data-bind="draft.hue" aria-label="Note colour" title="Slide to pick the note colour" style="--thumb:${c}"></div></div>
+   <div class="huewrap"><input type="range" id="jhue" class="huebar" min="0" max="359" step="1" value="${num(d.hue)}" data-bind="draft.hue" aria-label="Note colour" title="Slide to pick the note colour" style="--thumb:${c}"><button type="button" class="hueclear${d.white?' on':''}" id="jwhite" data-act="noteWhite" aria-label="No colour, white text" aria-pressed="${!!d.white}">${ic('x',12,2)}</button></div></div>
    <div class="bnbump"><span class="formlabel">You'll pay</span><button class="pill" data-bump="50">+₹50</button><button class="pill" data-bump="100">+₹100</button></div>
    <div class="stack postsec"><h2 class="h2">Tags</h2>
      ${group('By when','when',WHENS)}${group('Where','where',WHERES)}
@@ -1476,6 +1477,7 @@ function closeSheet(){
 
 function need(ok,key,msg){if(!ok){S.err={[key]:msg};render();return false}return true}
 const ACT={
+  noteWhite(){S.draft.white=true;$('jwhite')?.classList.add('on');syncNoteTone()},
   reload(){location.reload()},
   togglePw(){S.showPw=!S.showPw;render();$('fPw')?.focus()},
   logout(){logOut()},
@@ -1508,10 +1510,10 @@ const ACT={
     if(modBlock('job',text,d.more,d.whereText))return;
     const id=rid(),at=Date.now(),where=(d.whereText.trim()||d.where).slice(0,40);
     const pics=cleanPics(d.pics),geo=d.useLoc&&LOC.pos?{lat:Math.round(LOC.pos.lat*1e3)/1e3,lng:Math.round(LOC.pos.lng*1e3)/1e3}:null;
-    saveMine(x=>{x.jobs={...(x.jobs||{}),[id]:{text:text.slice(0,400),more:d.more.trim().slice(0,600),price,kind:d.kind,when:d.when,where,at,deadline:deadlineFor(d.when,at),status:'open',color:hueHex(d.hue),...(pics.length?{pics:pics.length}:{}),...(geo?{geo}:{})}};return x});
+    saveMine(x=>{x.jobs={...(x.jobs||{}),[id]:{text:text.slice(0,400),more:d.more.trim().slice(0,600),price,kind:d.kind,when:d.when,where,at,deadline:deadlineFor(d.when,at),status:'open',color:d.white?NOTE_WHITE:hueHex(d.hue),...(pics.length?{pics:pics.length}:{}),...(geo?{geo}:{})}};return x});
     if(pics.length){S.pics['j:'+S.me.id+'~'+id]=pics;S.fb.setDoc(S.fb.doc(S.db,'jobpics',S.me.id+'~'+id),{owner:S.me.id,job:id,pics,at}).catch(e=>{console.warn(e);toast('Your job is up, but the photos didn\u2019t upload.')})}
     S.draft=blankDraft();S.sort='newest';S.fresh=S.me.id+'~'+id;go('board');moment('Pinned.','Classmates can bid on it now.',1100);setTimeout(()=>{S.fresh=null},4000)},
-  repost(){const j=derive().jobByKey[S.openJob];if(!j)return;S.draft={...blankDraft(),hue:hexHue(noteOf(j)),text:j.text,price:String(j.price),kind:KINDS.includes(j.kind)?j.kind:'Other',where:WHERES.includes(j.where)?j.where:'Gate 1',whereText:WHERES.includes(j.where)?'':j.where,more:j.more,pics:[...(S.pics['j:'+j.key]||[])]};
+  repost(){const j=derive().jobByKey[S.openJob];if(!j)return;S.draft={...blankDraft(),hue:hexHue(noteOf(j)),white:noteOf(j)===NOTE_WHITE,text:j.text,price:String(j.price),kind:KINDS.includes(j.kind)?j.kind:'Other',where:WHERES.includes(j.where)?j.where:'Gate 1',whereText:WHERES.includes(j.where)?'':j.where,more:j.more,pics:[...(S.pics['j:'+j.key]||[])]};
     saveMine(x=>{if(x.jobs?.[j.id])x.jobs[j.id].status='closed';return x});go('post')},
   bid(){const j=derive().jobByKey[S.openJob];if(!j)return;const amt=digits(S.bid.amt);
     if(!need(amt>=1&&amt<=50000,'bid','Enter a bid in rupees.'))return;if(!need(!sayOver(S.bid.say),'bid',SAY_MAX<1000?'Keep your pitch under '+SAY_MAX+' characters.':'Keep your pitch under '+SAY_WORDS+' words.'))return;if(modBlock('bid',S.bid.say))return;const had=!!myBidOn(j.key);
@@ -1744,7 +1746,7 @@ document.addEventListener('submit',e=>{
   if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
-document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='q')render();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
+document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='q')render();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jhue'&&S.draft.white){S.draft.white=false;$('jwhite')?.classList.remove('on')}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
 document.addEventListener('change',async e=>{
   bind(e);syncNeed();
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}
