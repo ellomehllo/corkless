@@ -692,3 +692,10 @@ a.cta{text-decoration:none}
 .ebtn{top:10px;bottom:auto}
 .eprev .bannerpick{flex-wrap:nowrap;width:100%;gap:6px}
 .eprev .bsw{flex:1;min-width:0;width:auto;height:28px}
+.mark{font-family:Unbounded,var(--display);font-weight:800;letter-spacing:-.035em;gap:0;color:var(--fg);text-shadow:none;
+  -webkit-mask:radial-gradient(circle at .235em .4em,transparent max(.048em,1.8px),#000 calc(max(.048em,1.8px) + .6px));
+  mask:radial-gradient(circle at .235em .4em,transparent max(.048em,1.8px),#000 calc(max(.048em,1.8px) + .6px))}
+.mark::before{content:none;display:none}
+.tackav{border:0;background:url(favicon.png) center/cover}
+.bigpin{width:88px;height:88px;border-radius:24px;background:url(icon-192.png) center/cover;filter:drop-shadow(0 14px 30px rgba(53,103,224,.45))}
+.appicon{width:76px;height:76px;border-radius:20px;display:block;box-shadow:0 14px 34px -10px rgba(53,103,224,.6)}
