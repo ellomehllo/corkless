@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050117';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050117';
-import {modHit,MOD_CAT} from './mod.js?v=202610050117';
+import {makeDb} from './db.js?v=202610050129';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050129';
+import {modHit,MOD_CAT} from './mod.js?v=202610050129';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -466,7 +466,7 @@ function afterData(){
     if(S.myDoc&&S.myDoc.removed)saveMine(d=>{delete d.removed;return d});
   }
   computePhase();render();
-  if(S.phase==='app'&&!S.introChecked&&!S.joining&&!needTerms()){S.introChecked=true;if(!S.priv.introSeen)setTimeout(()=>{if(!S.intro.on&&S.phase==='app'&&!S.priv.introSeen)openIntro()},700)}
+  if(S.phase==='app'&&!S.introChecked&&!S.joining&&!needTerms()){S.introChecked=true;if(!S.priv.introSeen)setTimeout(()=>{if(!S.intro.on&&S.phase==='app'&&!S.priv.introSeen&&!S.joining)openIntro()},700)}
 }
 function computePhase(){
   if(!S.me)return;
@@ -1333,44 +1333,71 @@ function sheetHTML(D){
 const VIEWS={board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewSettings,settings:viewSettings,help:viewHelp,invites:viewInvites,saved:viewSaved,reviews:viewReviews,review:viewReview,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
 let lastView=null,lastSheet=null;const scrollMem={};
 const INTRO=[
-  {k:'board',t:'This is the board.',b:'Classmates pin small jobs here. A print run, a lift down four floors, an hour of help before a deadline.'},
-  {k:'bid',t:'Bid what it\u2019s worth.',b:'Name your price and pitch yourself in one line. Only the poster sees your bid.'},
-  {k:'pick',t:'Get picked. Sort it in chat.',b:'The poster picks one person and you plan it together. You pay each other on UPI or cash. tack never touches the money.'},
-  {k:'rate',t:'Rate each other.',b:'When it\u2019s done, you both rate the other. Profiles show the averages, never who gave them.'},
+  {k:'board',t:'This is the board.',b:'Classmates pin small jobs here. A print run, a lift down four floors, an hour of help before a deadline. Tap + when you’re free and people can ask you directly.'},
+  {k:'pin',t:'Need something? Pin it.',b:'Write it on a note, set a price, pick a colour. It goes up for everyone on campus to see.'},
+  {k:'bid',t:'Bid what it’s worth.',b:'Name your price and pitch yourself in a line. Only the poster sees your bid.'},
+  {k:'pick',t:'Get picked. Pay safely.',b:'The poster picks one person and you plan it in chat. Pay on UPI or cash and confirm it in tack. tack never touches the money.'},
+  {k:'safe',t:'Keep it safe.',b:'tack is for students who are 18 or older. No assignments or exam work. Report or block anyone in two taps, and abusive posts never go up.'},
+  {k:'rate',t:'Rate each other.',b:'When it’s done, you both rate the other. Profiles show the averages, never who gave them.'},
   {k:'end'}];
+const inote=(h,p,t,meta,cls='',st='')=>`<span class="inote ${cls}" style="--h:${h};${st}"><span class="ipinhead"></span><b>${p}</b><i>${t}</i>${meta?`<em>${meta}</em>`:''}</span>`;
 function introScene(k){const me=S.me?.id;
-  if(k==='board')return`<div class="sc sc-board" aria-hidden="true">${[['₹120','Print 40 pages at Sai Xerox','#A18CFF'],['₹60','Parcel from Gate 1','#FF7AD1'],['₹300','20 photos at golden hour','#4FE3E0']].map(([p,t,c],i)=>`<span class="sct" style="--i:${i}"><span class="pin" style="background:${c};box-shadow:0 0 10px ${c}"></span><b>${p}</b><i>${t}</i></span>`).join('')}</div>`;
-  if(k==='bid')return`<div class="sc sc-bid" aria-hidden="true"><span class="sct" style="--i:0"><span class="pin" style="background:#FFC53D;box-shadow:0 0 10px #FFC53D"></span><b>₹150</b><i>Help me move a cupboard</i></span>
-    <span class="bubble" style="--i:1">${me?face(me,26):''}<b>₹120</b><span>I can do it by 5</span></span><span class="lock" style="--i:2">${ic('shield',13,2.2)} Only the poster sees this</span></div>`;
-  if(k==='pick')return`<div class="sc sc-pick" aria-hidden="true"><span class="who" style="--i:0">${me?ring(me,56):''}</span><span class="link" style="--i:1"></span><span class="who" style="--i:0"><span class="ring live" style="width:56px;height:56px"><span class="av av-empty" style="background:#4FE3E02e;color:#4FE3E0;width:48px;height:48px;font-size:19px">S</span></span></span>
-    <span class="bubble b2" style="--i:2">On my way. 10 minutes.</span><span class="lock" style="--i:3">UPI or cash, between you two</span></div>`;
-  if(k==='rate')return`<div class="sc sc-rate" aria-hidden="true"><span class="stars">${[0,1,2,3,4].map(i=>`<span class="st" style="--i:${i}">${ic('star',30,2,'currentColor','currentColor')}</span>`).join('')}</span><span class="lock" style="--i:6">${ic('shield',13,2.2)} Anonymous, always</span></div>`;
-  return`<div class="sc sc-end" aria-hidden="true"><span class="bigpin"></span></div>`}
-function introBodyHTML(i){const sl=INTRO[i],last=sl.k==='end',fn=esc(S.me?firstName(S.me.id):'');
-  return`${introScene(sl.k)}<div class="introtext">${last?`<h1 id="introT" class="ia">You’re in${fn?', '+fn:''}.</h1><p class="ib">Pin something you need, or find something to do. The board is yours.</p>`
-    :`<span class="ik">${i+1} of ${INTRO.length-1}</span><h1 id="introT" class="ia">${sl.t}</h1><p class="ib">${sl.b}</p>`}</div>`}
-function renderIntro(){let r=$('introRoot');
-  if(!S.intro.on){if(r)r.remove();return}
+  if(k==='board')return`<div class="isc isc-board" aria-hidden="true">
+    ${inote(128,'₹120','Print 40 pages at Sai Xerox','Gate 1 · Today','n1')}${inote(262,'₹300','20 photos at golden hour','Lawn · Tomorrow','n2')}${inote(350,'₹60','Parcel from Gate 1','Hostel B · Now','n3')}
+    <span class="ichip c1"><span class="ilive"></span>Free right now</span></div>`;
+  if(k==='pin')return`<div class="isc isc-pin" aria-hidden="true">
+    <span class="inote ibig"><span class="ipinhead"></span><b class="iprice">₹150</b><i class="itype">Xerox 40 pages by 5</i><em>Design block · Now</em></span>
+    <span class="ihue"><span class="ithumb"></span></span><span class="ipinit">Pin it</span></div>`;
+  if(k==='bid')return`<div class="isc isc-bid" aria-hidden="true">${inote(75,'₹150','Help me move a cupboard','','n1')}
+    <span class="ibubble c1">${me?face(me,28):''}<b>₹120</b><span>I can do it by 5</span></span><span class="ichip c2">${ic('shield',13,2.2)} Only the poster sees this</span></div>`;
+  if(k==='pick')return`<div class="isc isc-pick" aria-hidden="true">
+    <span class="iwho w1">${me?face(me,52):''}</span><span class="ilink"></span><span class="iwho w2"><span class="av av-empty" style="width:52px;height:52px;font-size:20px">S</span></span>
+    <span class="ibubble c1 msg">On my way. 10 minutes.</span>
+    <span class="ipay c2"><span class="ipayrow"><span>UPI · ₹120 sent</span><span class="iok">${ic('tick',13,3)} Confirmed</span></span></span></div>`;
+  if(k==='safe')return`<div class="isc isc-safe" aria-hidden="true"><span class="ishield">${ic('shield',44,1.8)}</span>
+    <span class="irules"><span class="ichip r1">18+ only</span><span class="ichip r2">No assignments or exams</span><span class="ichip r3">${ic('flag',12,2.2)} Report or block in two taps</span></span></div>`;
+  if(k==='rate')return`<div class="isc isc-rate" aria-hidden="true"><span class="istars">${[0,1,2,3,4].map(i=>`<span class="ist" style="--i:${i}">${ic('star',30,2,'currentColor','currentColor')}</span>`).join('')}</span>
+    <span class="ichip c2">${ic('shield',13,2.2)} Anonymous, always</span></div>`;
+  return`<div class="isc isc-end" aria-hidden="true"><span class="iicon"></span></div>`}
+function introPushState(){if(pushOn())return'on';if(isIOS()&&!standalone())return'ios';return pushReady()?'ask':'none'}
+function introSlideHTML(i){const sl=INTRO[i],fn=esc(S.me?firstName(S.me.id):'');
+  if(sl.k!=='end')return`${introScene(sl.k)}<div class="itext"><span class="ik">${i+1} of ${INTRO.length-1}</span><h1 class="ia">${sl.t}</h1><p class="ib">${sl.b}</p></div>`;
+  const ps=introPushState();
+  return`${introScene('end')}<div class="itext"><h1 class="ia">You’re in${fn?', '+fn:''}.</h1>
+    <p class="ib">${ps==='on'?'Pin something you need, or find something to do. The board is yours.':ps==='ios'?'One last thing. To get a ping when someone bids or picks you, add tack to your Home Screen: tap Share, then Add to Home Screen, and open tack from there.':ps==='ask'?'One last thing. Turn on notifications so you know the moment someone bids, picks you or messages.':'Pin something you need, or find something to do. The board is yours.'}</p></div>`}
+function introFoot(i){const last=INTRO[i].k==='end',ps=introPushState();
+  if(!last)return`<button class="cta inext" data-act="introNext">${i===INTRO.length-2?'Got it':'Next'}</button>`;
+  return ps==='ask'?`<button class="cta inext" data-act="introPush">${ic('bell',16)} Turn on notifications</button><button class="btn2 inext2" data-act="introPost">Pin my first job</button><button class="linkbtn inow" data-act="introDone">Not now</button>`
+    :`<button class="cta inext" data-act="introDone">Show me the board</button><button class="btn2 inext2" data-act="introPost">Pin my first job</button>`}
+let introAnim=null;
+function renderIntro(dir=1){let r=$('introRoot');
+  if(!S.intro.on){if(r){const w=r.firstElementChild;if(reduceMotion.matches||!w)r.remove();else w.animate([{opacity:1},{opacity:0}],{duration:220,easing:'ease',fill:'forwards'}).finished.then(()=>r.remove(),()=>r.remove())}return}
   const i=S.intro.i,last=INTRO[i].k==='end';
   if(!r){r=document.createElement('div');r.id='introRoot';document.body.appendChild(r);
     let x0=null;r.addEventListener('touchstart',e=>{x0=e.touches[0].clientX},{passive:true});
     r.addEventListener('touchend',e=>{if(x0==null)return;const dx=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(dx)>50)introStep(dx<0?1:-1)},{passive:true});
-    r.innerHTML=`<div class="intro" role="dialog" aria-modal="true" aria-labelledby="introT">
-      <div class="introtop"><span class="mark">tack</span><button class="linkbtn iskip" data-act="introSkip">Skip</button></div>
-      <div class="introbody">${introBodyHTML(i)}</div>
-      <div class="introfoot"><div class="idots" aria-hidden="true">${INTRO.slice(0,-1).map(()=>'<span></span>').join('')}</div>
-        <button class="cta inext" data-act="introNext"></button><button class="btn2 inext2" data-act="introPost" hidden>Pin my first job</button></div></div>`;
+    r.innerHTML=`<div class="iw" role="dialog" aria-modal="true" aria-label="How tack works">
+      <div class="itop"><span class="mark">tack</span><button class="linkbtn iskip" data-act="introSkip">Skip</button></div>
+      <div class="istage"><div class="islide">${introSlideHTML(i)}</div></div>
+      <div class="ifoot"><div class="idots" aria-hidden="true">${INTRO.slice(0,-1).map(()=>'<span></span>').join('')}</div><div class="ibtns">${introFoot(i)}</div></div></div>`;
+    if(!reduceMotion.matches)r.firstElementChild.animate([{opacity:0},{opacity:1}],{duration:260,easing:'ease'});
     r.dataset.i=i}
-  else if(+r.dataset.i!==i){r.dataset.i=i;const old=r.querySelector('.introbody'),nb=document.createElement('div');nb.className='introbody';nb.innerHTML=introBodyHTML(i);
-    if(reduceMotion.matches)old.replaceWith(nb);else{old.classList.add('leaving');old.after(nb);setTimeout(()=>old.remove(),220)}}
+  else if(+r.dataset.i!==i){r.dataset.i=i;const stage=r.querySelector('.istage');
+    if(introAnim){introAnim.finish()}
+    const old=stage.querySelector('.islide:not(.gone)'),nx=document.createElement('div');nx.className='islide';nx.innerHTML=introSlideHTML(i);
+    if(reduceMotion.matches||!old){old?.remove();stage.appendChild(nx)}
+    else{old.classList.add('gone');nx.classList.add('wait');nx.style.opacity='0';stage.appendChild(nx);
+      const a=old.animate([{opacity:1,transform:'translateX(0)'},{opacity:0,transform:`translateX(${-28*dir}px)`}],{duration:180,easing:'cubic-bezier(.4,0,1,1)',fill:'forwards'});
+      const done=()=>{old.remove();nx.style.opacity='';nx.classList.remove('wait');introAnim=null};
+      introAnim={finish:()=>{a.cancel();done()}};
+      a.finished.then(()=>{if(!introAnim)return;done();nx.animate([{opacity:0,transform:`translateX(${28*dir}px)`},{opacity:1,transform:'translateX(0)'}],{duration:280,easing:'cubic-bezier(.2,.8,.2,1)'})},()=>{})}}
   r.querySelectorAll('.idots span').forEach((d,j)=>d.classList.toggle('on',j===i));
   r.querySelector('.idots').style.visibility=last?'hidden':'';
   r.querySelector('.iskip').style.visibility=last?'hidden':'';
-  const nx=r.querySelector('.inext');nx.textContent=last?'Show me the board':i===INTRO.length-2?'Got it':'Next';nx.dataset.act=last?'introDone':'introNext';
-  r.querySelector('.inext2').hidden=!last;
-  requestAnimationFrame(()=>nx.focus({preventScroll:true}))}
-function openIntro(back){S.intro={on:true,i:0,back:back||null};renderIntro()}
-function introStep(d){const i=S.intro.i+d;if(i<0||i>=INTRO.length)return;S.intro.i=i;renderIntro()}
+  const fb=r.querySelector('.ibtns'),fh=introFoot(i);if(fb.dataset.h!==fh){const had=!!fb.dataset.h;fb.dataset.h=fh;fb.innerHTML=fh;if(had&&last&&!reduceMotion.matches)fb.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'none'}],{duration:320,delay:250,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'})}
+  requestAnimationFrame(()=>r.querySelector('.inext')?.focus({preventScroll:true}))}
+function openIntro(back){if(S.intro.on)return;if(S.momentOn||S.joining){setTimeout(()=>openIntro(back),200);return}S.intro={on:true,i:0,back:back||null};renderIntro()}
+function introStep(d){const i=S.intro.i+d;if(i<0||i>=INTRO.length)return;S.intro.i=i;renderIntro(d)}
 function closeIntro(to){const back=S.intro.back;S.intro={on:false,i:0};renderIntro();if(!S.priv.introSeen)savePriv({introSeen:Date.now()});go(to||back||'board')}
 function moment(title,sub,ms=1300){
   const r=document.createElement('div');r.className='momentroot';r.setAttribute('role','status');
@@ -1547,6 +1574,7 @@ const ACT={
   introSkip(){closeIntro()},
   introDone(){closeIntro('board')},
   introPost(){closeIntro('post')},
+  introPush(){closeIntro('board');setTimeout(enablePush,350)},
   replayIntro(){openIntro(S.view)},
   hideSteps(){savePriv({stepsHidden:true})},
   acceptTerms(){savePriv({terms:{v:TERMS_V,at:Date.now()}});$('termsRoot')?.remove();
