@@ -1,12 +1,12 @@
 import firebaseConfig from './firebase-config.js';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610042220';
-import {modHit,MOD_CAT} from './mod.js?v=202610042220';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610042228';
+import {modHit,MOD_CAT} from './mod.js?v=202610042228';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
 
 const RINGS=['#C6F24E','#A18CFF','#FF5B6E','#4FE3E0','#FF7AD1','#FFC53D'];
-const GLOW={'#A18CFF':'rgba(161,140,255,.45)','#FF5B6E':'rgba(255,91,110,.5)','#FFC53D':'rgba(255,197,61,.35)','#4FE3E0':'rgba(79,227,224,.4)','#FF7AD1':'rgba(255,122,209,.38)','#C6F24E':'rgba(29,125,252,.32)'};
+const GLOW={'#A18CFF':'rgba(161,140,255,.45)','#FF5B6E':'rgba(255,91,110,.5)','#FFC53D':'rgba(255,197,61,.35)','#4FE3E0':'rgba(79,227,224,.4)','#FF7AD1':'rgba(255,122,209,.38)','#C6F24E':'rgba(170,226,84,.32)'};
 const KINDS=['Errand','Lifting','Ride','Print','Teach','Photo','Notes','Music','Other'];
 const WHENS=['Next hour','Today','Tomorrow','This week','No rush'];
 const WHERES=['Gate 1','Hostel B','Canteen','Library','Off campus'];
@@ -880,7 +880,7 @@ function viewJob(D){
           ${j.pick?.ratedPoster?`<p class="note">You rated ${pn}${(S.priv.gave||{})[j.key]?' ★'+num(S.priv.gave[j.key]).toFixed(1):''}.</p>`:`<button class="cta" data-sheet="ratePoster">Rate ${pn}</button>`}
           ${j.pick?.noteToDoer?`<div class="box stack" style="gap:4px"><span class="formlabel">${pn}'s private note to you</span><span class="t2" style="color:var(--fg)">${esc(str(j.pick.noteToDoer,200))}</span></div>`:''}
           <button class="linkbtn" data-act="paid" data-val="no">I marked this by mistake</button></div>`
-        :`<div class="foot"><div class="stack gap8 box" style="border:1px solid rgba(29,125,252,.3)">
+        :`<div class="foot"><div class="stack gap8 box" style="border:1px solid rgba(170,226,84,.3)">
           <span class="t1" style="font-size:var(--t-16)">Did ${pn} pay you ₹${fmt(j.agreed)}?</span>
           <span class="t2">${sentOf(j)?`${pn} says they sent it ${since(sentOf(j).at)}${sentOf(j).ref==='cash'?' in cash':sentOf(j).ref?' (UPI ref '+esc(sentOf(j).ref)+')':''}. `:''}${pay?'You said not yet. Tap Yes once the money reaches you.':`${pn} marked this job done. Confirm once the money reaches you.`}</span></div>${doerPay(j)}
           <button class="cta" data-act="paid" data-val="yes">Yes, I got it</button>
@@ -976,7 +976,7 @@ function viewBids(D){
   const oin=offerList(S.offersIn).filter(o=>D.members.includes(o.owner)&&!D.blocked.has(o.owner)&&o.status!=='declined').sort((a,b)=>num(b.at)-num(a.at));
   const oout=offerList(S.offersOut).filter(o=>o.status!=='accepted').sort((a,b)=>num(b.at)-num(a.at));
   const doing=D.jobs.filter(j=>j.accepted===me&&!myBidOn(j.key)&&j.status!=='removed').sort((a,b)=>b.at-a.at);
-  const offerCard=o=>`<div class="box stack" style="gap:10px;border:1px solid rgba(29,125,252,.3)">
+  const offerCard=o=>`<div class="box stack" style="gap:10px;border:1px solid rgba(170,226,84,.3)">
     <div style="display:flex;align-items:center;gap:10px">${ring(o.owner,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.owner))} asked you</span><span class="t2">${esc([o.where,o.when].filter(Boolean).join(' · '))}</span></span><span class="amt" style="color:var(--accent)">₹${fmt(o.price)}</span></div>
     <span style="font-size:var(--t-14);line-height:1.4;color:var(--fg);overflow-wrap:anywhere">${esc(o.text)}</span>
     ${o.status==='pending'?`<div class="offeracts"><button class="ghostbtn" data-act="declineOffer" data-key="${esc(o.key)}">Can't do it</button><button class="pick" data-act="acceptOffer" data-key="${esc(o.key)}">Accept</button></div>`
@@ -1050,13 +1050,13 @@ function viewChat(D){
   ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats now happen inside jobs: ask ${esc(firstName(c.other))} for a favour when they're free, or hire them again from their profile.`}</p></div>`:`
   <div class="foot" style="position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%)"><div style="display:flex;gap:9px">
     <label class="field" for="msg"><input id="msg" type="text" maxlength="1000" placeholder="Message…" value="${esc(S.chatDraft.text)}" data-bind="chatDraft.text" aria-label="Message ${esc(firstName(c.other))}" autocomplete="off"></label>
-    <button data-act="send" aria-label="Send" style="width:50px;height:50px;flex-shrink:0;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(29,125,252,.35)">${ic('send',19,2,'#fff')}</button>
+    <button data-act="send" aria-label="Send" style="width:50px;height:50px;flex-shrink:0;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(170,226,84,.35)">${ic('send',19,2,'var(--on-grad)')}</button>
   </div></div>`}`;
 }
 function viewPerson(uid,D){
   const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,free=num(d.freeUntil)>Date.now();
   const bio=str(d.bio,BIO_MAX)||str(d.does,60),bn=bannerOk(d.banner)?d.banner:'';
-  const tints=[['rgba(79,227,224,.16)','var(--cyan-ink)'],['rgba(255,122,209,.16)','var(--pink-ink)'],['rgba(255,197,61,.16)','var(--amber-ink)'],['rgba(29,125,252,.18)','var(--violet-ink)']];
+  const tints=[['rgba(79,227,224,.16)','var(--cyan-ink)'],['rgba(255,122,209,.16)','var(--pink-ink)'],['rgba(255,197,61,.16)','var(--amber-ink)'],['rgba(170,226,84,.18)','var(--violet-ink)']];
   return`<div class="pad">${isMe?'':back('board','Back to the board')}
   <div class="stack narrow" style="margin:6px auto 0;gap:18px">
    <div class="prof ${bn?'hasbanner':''}">${bn?`<div class="pbanner" style="${bannerStyle(bn)}"></div>`:''}${isMe?`<button class="editpen" data-go="edit" aria-label="Edit profile">${ic('edit',17)}</button>`:''}
@@ -1189,7 +1189,7 @@ function viewInvites(D){
      <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="invE" class="inp" style="flex:1;min-width:200px" type="email" inputmode="email" autocapitalize="off" spellcheck="false" autocomplete="off" placeholder="name@college.edu.in" value="${esc(S.inv.email)}" data-bind="inv.email">
      <button class="pick" style="padding:12px 18px;font-size:var(--t-14)" data-act="invite" data-need="invite">Add invite</button></div>
      ${S.err.inv?`<p class="err">${esc(S.err.inv)}</p>`:''}</div>
-   ${li?`<div class="box stack" style="gap:10px;border:1px solid rgba(29,125,252,.35)">
+   ${li?`<div class="box stack" style="gap:10px;border:1px solid rgba(170,226,84,.35)">
      <span class="t1" style="font-size:var(--t-14)">${esc(li)} can sign up now. Send them the invite:</span>${shareButtons(li)}
      <p class="note" style="text-align:left">The invite has a link to the sign-up page with their email filled in.</p></div>`:''}
    <div class="stack gap8"><div class="sect"><h2 class="h2">Invited</h2><span class="time">${list.length}</span></div>
@@ -1429,7 +1429,7 @@ function render(){
       <button class="card" style="margin-top:auto;padding:10px 12px;border-radius:var(--r-sm)" data-go="me">${ring(S.me.id,38)}<span class="rowtext"><span style="font-size:var(--t-12);font-weight:600">${esc(shortName(S.me.id))}</span>
         <span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc(metaOf(S.me.id)||campus())}</span></span></button>`;
     $('tabbar').innerHTML=[['board','Board','board'],['bids','Activity','bids'],['post','','plus'],['chats','Chats','chat'],['saved','Saved','bookmark']].map(([v,l,i])=>v==='post'
-      ?`<button class="tab" data-go="post" aria-label="Pin a job"><span class="fab">${ic('plus',24,3,'#fff')}</span></button>`
+      ?`<button class="tab" data-go="post" aria-label="Pin a job"><span class="fab">${ic('plus',24,3)}</span></button>`
       :`<button class="tab ${navOn(v)?'on':''}" data-go="${v}">${ic(i,20)}<span>${l}</span>${(v==='chats'&&D.unread)||(v==='bids'&&(D.toConfirm||D.offersWaiting||D.newNotes))?'<span class="udot"></span>':''}</button>`).join('');
     const attn=D.unread+D.offersWaiting+D.toConfirm+D.newNotes;document.title=attn?`(${attn}) tack`:'tack';
     const st=S.sheet?S.sheet.type:null;$('sheetRoot').innerHTML=sheetHTML(D);if(S.sheet?.type==='crop')requestAnimationFrame(cropApply);
