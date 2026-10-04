@@ -1,6 +1,6 @@
 import firebaseConfig from './firebase-config.js';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610041850';
-import {modHit,MOD_CAT} from './mod.js?v=202610041850';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610041903';
+import {modHit,MOD_CAT} from './mod.js?v=202610041903';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
@@ -945,7 +945,7 @@ function viewBids(D){
   const offerCard=o=>`<div class="box stack" style="gap:10px;border:1px solid rgba(29,125,252,.3)">
     <div style="display:flex;align-items:center;gap:10px">${ring(o.owner,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.owner))} asked you</span><span class="t2">${esc([o.where,o.when].filter(Boolean).join(' · '))}</span></span><span class="amt" style="color:var(--accent)">₹${fmt(o.price)}</span></div>
     <span style="font-size:var(--t-14);line-height:1.4;color:var(--fg);overflow-wrap:anywhere">${esc(o.text)}</span>
-    ${o.status==='pending'?`<div style="display:flex;gap:8px"><button class="pick" style="flex:1;padding:11px" data-act="acceptOffer" data-key="${esc(o.key)}">Accept</button><button class="btn2" style="flex:1;padding:11px" data-act="declineOffer" data-key="${esc(o.key)}">Can't do it</button></div>`
+    ${o.status==='pending'?`<div class="offeracts"><button class="ghostbtn" data-act="declineOffer" data-key="${esc(o.key)}">Can't do it</button><button class="pick" data-act="acceptOffer" data-key="${esc(o.key)}">Accept</button></div>`
       :`<p class="okmsg">Accepted. ${esc(firstName(o.owner))} will message you here.</p>`}</div>`;
   return`<div class="pad narrow"><h1 class="pageh">Activity</h1>
    <div class="stack">

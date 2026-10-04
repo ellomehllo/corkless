@@ -794,3 +794,11 @@ a.cta{text-decoration:none}
 .allfeed .item:not(.notif) .t1{font-weight:400!important;color:var(--soft)!important}
 .allfeed .item:not(.notif) .amt{display:none}
 .allfeed .item:not(.notif) .t2 span{font-weight:500!important}
+
+/* compact, tonal action buttons */
+.pick{background:color-mix(in srgb,var(--g1) 22%,transparent);color:var(--accent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent);border-radius:999px;padding:7px 14px;font-size:var(--t-12);font-weight:700;letter-spacing:.01em}
+.pick:hover{background:color-mix(in srgb,var(--g1) 32%,transparent)}
+.offeracts{display:flex;justify-content:flex-end;align-items:center;gap:8px}
+.offeracts .pick{padding:8px 18px}
+.ghostbtn{border-radius:999px;padding:8px 14px;font-size:var(--t-12);font-weight:600;color:var(--fg2);box-shadow:inset 0 0 0 1px var(--line)}
+.ghostbtn:hover{color:var(--fg);background:var(--surface2)}
