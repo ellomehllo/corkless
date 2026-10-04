@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050434';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050434';
-import {modHit,MOD_CAT} from './mod.js?v=202610050434';
+import {makeDb} from './db.js?v=202610050443';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050443';
+import {modHit,MOD_CAT} from './mod.js?v=202610050443';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -139,7 +139,8 @@ function ringOf(uid){const r=uid===S.me?.id&&S.onb.ring&&(S.phase==='onboard'||S
 function metaOf(uid){const d=pdoc(uid);return [str(d.year,12),str(d.branch,24)].filter(Boolean).join(' ')}
 function face(uid,s){const src=photoOf(uid);return src?`<img class="av" src="${src}" width="${s}" height="${s}" alt="">`:`<span class="av av-empty" style="width:${s}px;height:${s}px;font-size:${Math.round(s*.4)}px">${esc((firstName(uid).replace(/^@/,'')[0]||'?').toUpperCase())}</span>`}
 function liveOf(uid){const n=Date.now();return Object.values(pdoc(uid).jobs||{}).some(j=>j&&j.status==='open'&&num(j.deadline)>n)}
-function ring(uid,s){return `<span class="ring${liveOf(uid)?' live':''}" style="width:${s}px;height:${s}px">${face(uid,s-8)}</span>`}
+const freeNow=uid=>num(pdoc(uid).freeUntil)>Date.now();
+function ring(uid,s){return `<span class="ring${freeNow(uid)?' live':''}" style="width:${s}px;height:${s}px">${face(uid,s-8)}</span>`}
 const campusName=id=>str(S.campuses?.[id]?.name,60)||(id&&id===S.myCampus?.id?str(S.myCampus.name,60):'')||DEFAULT_CAMPUS;
 const curCampus=()=>(S.me?.isOwner&&S.viewCampus&&S.campuses[S.viewCampus]?S.viewCampus:S.myCampus?.id)||'mit-wpu';
 const campusOf=uid=>str(pdoc(uid).campus,40)||'mit-wpu';
