@@ -1036,3 +1036,8 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 @media (prefers-reduced-motion:reduce){
   .iw *,.iw{animation:none!important}
   .isc-pin .itype{width:auto}.isc-pin .ibig{--h:128}.ithumb{left:34%}.ist{color:var(--amber)}}
+
+/* no Android tap highlight or selection box on any control, including the note colour bar */
+*{-webkit-tap-highlight-color:transparent}
+.huebar{-webkit-user-select:none;user-select:none;touch-action:none}
+.huebar:focus:not(:focus-visible){outline:none}
