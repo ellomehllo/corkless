@@ -738,3 +738,9 @@ a.cta{text-decoration:none}
 .wc.full{color:var(--coral-ink);animation:wcfull .4s ease}
 @keyframes wcfull{20%,60%{transform:translateX(-3px)}40%,80%{transform:translateX(3px)}}
 @media (prefers-reduced-motion:reduce){.wc.full{animation:none}}
+
+/* note text scales with the note: short 100-character notes read big */
+.tile.ntile{container-type:inline-size}
+.tile.ntile p{font-size:clamp(16.5px,10.4cqw,21px);line-height:1.28;letter-spacing:-.005em}
+.bignote{container-type:inline-size}
+.bntext{font-size:clamp(22px,7.4cqw,30px);line-height:1.28;min-height:120px}

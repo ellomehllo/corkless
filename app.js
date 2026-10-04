@@ -852,7 +852,7 @@ function viewJob(D){
   </div>
   ${!mine?`<div class="reportrow"><button class="linkbtn" data-sheet="report" data-about="${esc(j.owner)}">Report this job</button>${mod}</div>`:''}`;
 }
-const NOTE_MAX=400,noteCount=t=>`${String(t||'').length} / ${NOTE_MAX}`;
+const NOTE_MAX=100,noteCount=t=>`${String(t||'').length} / ${NOTE_MAX}`;
 function noteTone(){return{c:hueHex(S.draft.hue),g:false}}
 function syncNoteTone(){const hb=$('jhue');if(hb)hb.style.setProperty('--thumb',hueHex(S.draft.hue));const n=$('bignote');if(!n)return;const {c,g}=noteTone();n.style.setProperty('--nc',c);n.classList.toggle('gnote',g);
   if(g){n.style.setProperty('--nc1','var(--g1)');n.style.setProperty('--nc2','var(--g2)')}else{n.style.removeProperty('--nc1');n.style.removeProperty('--nc2')}
@@ -867,7 +867,7 @@ function viewPost(){
      <span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span>
      <span class="pin" aria-hidden="true"></span>
      <label class="bnprice ${digits(d.price)?'':'blank'}" id="bnPrice" for="jp"><span>₹</span><input id="jp" type="text" inputmode="numeric" maxlength="5" placeholder="150" value="${esc(d.price)}" data-bind="draft.price" aria-label="You'll pay, in rupees"></label>
-     <textarea id="jt" class="bntext" rows="4" maxlength="400" placeholder="What do you need? Pick up my print-outs from Sai Xerox before 4." data-bind="draft.text" aria-label="What do you need?">${esc(d.text)}</textarea>
+     <textarea id="jt" class="bntext" rows="3" maxlength="${NOTE_MAX}" placeholder="What do you need? Pick up my print-outs from Sai Xerox before 4." data-bind="draft.text" aria-label="What do you need?">${esc(d.text)}</textarea>
      <div class="bnpics">${picEdit('draft',d.pics)}</div>
      <span class="bnfoot"><span class="by">${face(me,22)}<span class="nm">${esc(firstName(me))}</span></span><span class="wc ${d.text.length>=NOTE_MAX?'full':''}" id="jtWc">${noteCount(d.text)}</span></span>
    </div>
