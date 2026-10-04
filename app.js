@@ -616,7 +616,7 @@ function authHTML(){
 function gateHTML(){
   const email=esc(S.user?.email||'');
   switch(S.phase){
-  case'loading':return`<div class="loading"><div class="mark">tack</div><span>Opening the board…</span></div>`;
+  case'loading':return`<div class="loading"><div class="mark">tack</div></div>`;
   case'setup':return`<div class="gatebox"><div class="mark">tack</div><h1>Almost ready</h1><p>This site isn't connected to its database yet. Add the Firebase web config to <b>firebase-config.js</b> and reload.</p></div>`;
   case'offline':return`<div class="gatebox"><div class="mark">tack</div><h1>Can't reach tack</h1><p>Check your connection and reload the page.</p><button class="cta" data-act="reload">Reload</button></div>`;
   case'auth':return authHTML();
@@ -863,7 +863,7 @@ function viewPost(){
   return`<div class="pad postpage">${back('board','Close')}
    <h1 class="pageh" style="margin:6px 0 2px">Pin a job</h1>
    <p class="note" style="text-align:left;margin:0 0 14px">Write it on the note. This is exactly how it shows on the board.</p>
-   <div class="bignote tile ntile${g?' gnote':''}" id="bignote" style="--nc:${c}${g?';--nc1:var(--g1);--nc2:var(--g2)':''};--d:0s">
+   <div class="notewrap" id="notewrap"><div class="bignote tile ntile${g?' gnote':''}" id="bignote" style="--nc:${c}${g?';--nc1:var(--g1);--nc2:var(--g2)':''};--d:0s">
      <span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span>
      <span class="pin" aria-hidden="true"></span>
      <label class="bnprice ${digits(d.price)?'':'blank'}" id="bnPrice" for="jp"><span>₹</span><input id="jp" type="text" inputmode="numeric" maxlength="5" placeholder="150" value="${esc(d.price)}" data-bind="draft.price" aria-label="You'll pay, in rupees"></label>
@@ -871,7 +871,7 @@ function viewPost(){
      <div class="bnpics">${picEdit('draft',d.pics)}</div>
      <span class="bnfoot"><span class="by">${face(me,22)}<span class="nm">${esc(firstName(me))}</span></span><span class="wc ${words(d.text)>NOTE_WORDS?'over':''}" id="jtWc">${noteCount(d.text)}</span></span>
    </div>
-   <div class="huewrap"><input type="range" id="jhue" class="huebar" min="0" max="359" step="1" value="${num(d.hue)}" data-bind="draft.hue" aria-label="Note colour" style="--thumb:${c}"><span class="formlabel">Slide to pick the note colour</span></div>
+   <div class="huewrap"><input type="range" id="jhue" class="huebar" min="0" max="359" step="1" value="${num(d.hue)}" data-bind="draft.hue" aria-label="Note colour" title="Slide to pick the note colour" style="--thumb:${c}"></div></div>
    <div class="bnbump"><span class="formlabel">You'll pay</span><button class="pill" data-bump="50">+₹50</button><button class="pill" data-bump="100">+₹100</button></div>
    <div class="stack postsec"><h2 class="h2">Tags</h2>
      ${group('By when','when',WHENS)}${group('Where','where',WHERES)}
@@ -1626,6 +1626,8 @@ document.addEventListener('change',async e=>{
     S.err=bad?{[ek]:'One photo didn\u2019t work. Use a JPG or PNG.'}:{};render();return}
   if(e.target.matches('[data-photo]')||e.target.matches('[data-bannerfile]')){const f=e.target.files&&e.target.files[0];e.target.value='';openCrop(f,e.target.matches('[data-bannerfile]')?'banner':'photo');return}
 });
+document.addEventListener('pointerdown',e=>{if(e.target.id==='jhue')$('notewrap')?.classList.add('straight')});
+['pointerup','pointercancel'].forEach(t=>document.addEventListener(t,()=>$('notewrap')?.classList.remove('straight')));
 document.addEventListener('keydown',e=>{
   if($('docRoot')){if(e.key==='Escape')closeDoc();return}
   if(S.intro.on){if(e.key==='ArrowRight'){e.preventDefault();introStep(1)}else if(e.key==='ArrowLeft'){e.preventDefault();introStep(-1)}else if(e.key==='Escape')closeIntro();return}

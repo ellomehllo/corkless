@@ -718,10 +718,19 @@ a.cta{text-decoration:none}
 .bnpics .pic.add{width:auto;height:36px;padding:0 13px;flex-direction:row;gap:7px;border-radius:999px;border:1px solid rgba(255,255,255,.22);background:rgba(6,6,8,.35);color:var(--fg);font-size:var(--t-12);align-self:center}
 
 /* note colour bar under the note while pinning */
-.huewrap{display:flex;flex-direction:column;gap:8px;margin:18px 2px 0}
-.huebar{-webkit-appearance:none;appearance:none;width:100%;height:24px;border-radius:999px;cursor:pointer;outline-offset:3px;
+.huewrap{display:flex;justify-content:center;margin:16px auto 0;width:34%;min-width:120px}
+.huebar{-webkit-appearance:none;appearance:none;width:100%;height:10px;border-radius:999px;cursor:pointer;outline-offset:4px;touch-action:none;
   background:linear-gradient(90deg,hsl(0 85% 60%),hsl(45 85% 60%),hsl(90 85% 60%),hsl(135 85% 60%),hsl(180 85% 60%),hsl(225 85% 60%),hsl(270 85% 60%),hsl(315 85% 60%),hsl(359 85% 60%));
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
-.huebar::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;border-radius:50%;background:var(--thumb,#3CC9FF);border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.6)}
-.huebar::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:var(--thumb,#3CC9FF);border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.6)}
+.huebar::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--thumb,#3CC9FF);border:2.5px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.6)}
+.huebar::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--thumb,#3CC9FF);border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.6)}
 .huebar::-moz-range-track{background:transparent}
+
+/* note and its colour bar tilt together; touching the bar or typing straightens both */
+.notewrap{transform:rotate(-1.2deg);transform-origin:50% 40%;transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+.notewrap.straight,.notewrap:has(.bntext:focus),.notewrap:has(#jp:focus){transform:none}
+.notewrap .bignote,.notewrap .bignote:hover,.notewrap .bignote:active{transform:none}
+.notewrap .bignote:focus-within{transform:translateY(-3px)}
+.notewrap.straight .bignote{box-shadow:0 34px 60px -26px rgba(0,0,0,.95),0 0 60px -10px var(--glow,transparent)}
+.loading .mark{font-size:var(--t-48)}
+@media (prefers-reduced-motion:reduce){.notewrap{transition:none}}
