@@ -1,6 +1,6 @@
 import firebaseConfig from './firebase-config.js';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610040739';
-import {modHit,MOD_CAT} from './mod.js?v=202610040739';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610040746';
+import {modHit,MOD_CAT} from './mod.js?v=202610040746';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
@@ -178,9 +178,15 @@ function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str
   return out.sort((a,b)=>b.at-a.at).slice(0,80);
 }
 function tackFace(s){return`<span class="tackav" style="width:${s}px;height:${s}px" role="img" aria-label="tack"></span>`}
+const HOLD_AT=5;
+const held=uid=>{const x=(S.strikes||{})[uid];return!!x&&num(x.n)-num(x.cleared)>=HOLD_AT};
+const hiddenFor=j=>held(j.owner)&&j.owner!==S.me?.id&&!S.me?.isOwner;
+function strikeAdd(about){const me=S.me.id;if(!about||about===me||!ID_RE.test(about))return;const {doc,writeBatch}=S.fb,cur=(S.strikes||{})[about]||{},b=writeBatch(S.db);
+  b.set(doc(S.db,'reportmarks',about+'~'+me),{about,at:Date.now()});b.set(doc(S.db,'strikes',about),{n:Math.round(num(cur.n))+1,cleared:Math.round(num(cur.cleared))});
+  b.commit().catch(()=>{})}
 function boardJobs(D){
   const now=Date.now();
-  const l=D.jobs.filter(j=>j.status==='open'&&j.deadline>now&&!D.blocked.has(j.owner));
+  const l=D.jobs.filter(j=>j.status==='open'&&j.deadline>now&&!D.blocked.has(j.owner)&&!hiddenFor(j));
   return sortJobs(l);
 }
 function findJobs(l){const q=S.find.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -404,6 +410,7 @@ function startSubs(){
   const pk={own:{},doer:{}},mergePicks=()=>{S.picks={...pk.doer,...pk.own};if(S.phase==='app')render()};
   S.subs.push(onSnapshot(query(collection(db,'picks'),where('owner','==',me)),snap=>{pk.own={};snap.forEach(x=>{pk.own[x.id]=x.data()});mergePicks()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'picks'),where('doer','==',me)),snap=>{pk.doer={};snap.forEach(x=>{pk.doer[x.id]=x.data()});mergePicks()},e=>console.warn(e)));
+  S.subs.push(onSnapshot(collection(db,'strikes'),snap=>{const r={};snap.forEach(x=>{r[x.id]=x.data()});S.strikes=r;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(collection(db,'rep'),snap=>{const r={};snap.forEach(x=>{r[x.id]=x.data()});S.repDocs=r;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'offers'),where('to','==',me)),snap=>{const o={};snap.forEach(x=>{o[x.id]=x.data()});S.offersIn=o;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'offers'),where('owner','==',me)),snap=>{const o={};snap.forEach(x=>{o[x.id]=x.data()});S.offersOut=o;convertOffers();if(S.phase==='app')render()},e=>console.warn(e)));
@@ -739,7 +746,7 @@ function tile(j,D,i=0){
   const ph=j.pics?(picsOf('j:'+j.key)||[])[0]:'',d=-((Date.now()/1000+i*2.3)%32).toFixed(2);
   return`<button class="tile ntile${gcls(j)} r${i%3} ${S.fresh===j.key?'fresh':''}" data-job="${esc(j.key)}" style="--nc:${c};--i:${i};--d:${d}s${gvars(j)}">
     <span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span>
-    <span class="pin"></span>
+    <span class="pin"></span>${S.me?.isOwner&&held(j.owner)?'<span class="heldtag">Held</span>':''}
     <span class="price">₹${fmt(j.price)}</span>
     ${left<36e5?`<span class="flag">${Math.max(1,Math.round(left/6e4))} min left</span>`:''}${nearMe(j)?nearTag():''}
     <p>${esc(j.text)}</p>
@@ -773,7 +780,7 @@ function viewBoard(D){
     :`<div class="empty"><b>Nothing pinned yet</b><p>Pin the first job: a xerox run, a lift down four floors, an hour of help before a submission.</p><button class="cta" data-go="post">Pin a job</button></div>`}</div></div>`;
 }
 function viewJob(D){
-  const j=D.jobByKey[S.openJob];
+  const j0=D.jobByKey[S.openJob],j=j0&&hiddenFor(j0)&&j0.accepted!==S.me.id&&!myBidOn(j0.key)?null:j0;
   if(!j)return`<div class="pad">${back('board','Back to the board')}<div class="empty" style="margin:18px 0"><b>This job is gone</b><p>The poster closed it or it was taken off the board.</p></div></div>`;
   const me=S.me.id,mine=j.owner===me,st=jobState(j),bids=bidsFor(D,j.key).sort((a,b)=>a.amt-b.amt||a.at-b.at);
   const myBid=myBidOn(j.key);
@@ -1465,6 +1472,7 @@ const ACT={
     if(h.kind==='past'||h.kind==='board'){if(!need(j,'help','Pick the job first.')||!need(h.why,'help','Pick what happened.'))return}
     else if(!need(h.note.trim().length>=10,'help','Write a little more so we can help.'))return;
     const about=j?(j.owner===me?j.accepted:j.owner):null;
+    if(about)strikeAdd(about);
     S.fb.addDoc(S.fb.collection(S.db,'reports'),{by:me,kind:h.kind,...(about?{about}:{}),...(j?{job:j.key}:{}),...(h.why?{why:h.why}:{}),note:h.note.trim().slice(0,1000),at:Date.now()}).catch(writeErr);
     S.help={kind:null,job:null,why:'',note:'',sent:h.kind};S.err={};render()},
   toggleNear(){if(S.near){S.near=false;render();return}
@@ -1503,7 +1511,7 @@ const ACT={
     updateDoc(doc(S.db,'people',j.owner),new FieldPath('jobs',j.id,'status'),'removed').catch(writeErr);
     if(j.pics){delete S.pics['j:'+j.key];S.fb.deleteDoc(doc(S.db,'jobpics',j.key)).catch(()=>{})}S.sheet=null;toast('Job removed from the board');go('board')},
   confirmReport(){const s=S.sheet;if(!need(S.rep.why,'rep','Pick a reason.'))return;const {collection,addDoc}=S.fb;
-    addDoc(collection(S.db,'reports'),{by:S.me.id,about:s.about,why:S.rep.why,note:S.rep.note.trim().slice(0,200),at:Date.now()}).catch(writeErr);
+    addDoc(collection(S.db,'reports'),{by:S.me.id,about:s.about,why:S.rep.why,note:S.rep.note.trim().slice(0,200),at:Date.now()}).catch(writeErr);strikeAdd(s.about);
     if(S.rep.block)savePriv({blocked:[...new Set([...arr(S.priv.blocked),s.about])]});
     S.sheet=null;toast(S.rep.block?'Reported and blocked':'Report sent to '+organiser());if(S.rep.block)go('board');else render()},
   blockOnly(){const s=S.sheet;savePriv({blocked:[...new Set([...arr(S.priv.blocked),s.about])]});S.sheet=null;toast('Blocked');go('board')},
