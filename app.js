@@ -1,6 +1,6 @@
 import firebaseConfig from './firebase-config.js';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610042004';
-import {modHit,MOD_CAT} from './mod.js?v=202610042004';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610042220';
+import {modHit,MOD_CAT} from './mod.js?v=202610042220';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
@@ -145,7 +145,7 @@ const isMember=uid=>{const d=pdoc(uid);return !!d.adult&&!d.removed};
 function normJob(id,j,uid){
   return{id,owner:uid,key:uid+'~'+id,text:str(j.text,400),more:str(j.more,600),price:num(j.price),kind:str(j.kind,20),
     when:str(j.when,20),where:str(j.where,40),at:num(j.at),deadline:num(j.deadline),
-    status:STATUSES.includes(j.status)?j.status:'open',doneAt:num(j.doneAt),takenAt:num(j.takenAt),repickAt:num(j.repickAt),dropped:arr(j.dropped).filter(u=>typeof u==='string').slice(0,5),pics:Math.min(MAX_PICS,Math.max(0,Math.floor(num(j.pics)))),geo:geoOk(j.geo),color:COLOR_RE.test(str(j.color,7))?str(j.color,7):'',accepted:null,agreed:0,pick:null};
+    status:STATUSES.includes(j.status)?j.status:'open',doneAt:num(j.doneAt),takenAt:num(j.takenAt),repickAt:num(j.repickAt),editedAt:num(j.editedAt),dropped:arr(j.dropped).filter(u=>typeof u==='string').slice(0,5),pics:Math.min(MAX_PICS,Math.max(0,Math.floor(num(j.pics)))),geo:geoOk(j.geo),color:COLOR_RE.test(str(j.color,7))?str(j.color,7):'',accepted:null,agreed:0,pick:null};
 }
 function jobState(j){return j.status==='open'&&j.deadline<Date.now()?'expired':j.status}
 function derive(){
@@ -205,6 +205,7 @@ function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str
       if(typeof pk.review==='string')add(num(pk.doneAt)+2,j.owner,`${nm(j.owner)} left you a review. Tap to see it.`,{rev:pk.review});
     }else if(ok(j.owner)){const b=myBidOn(j.key);
       if(b&&lostBid(j))add(lostAt(j,b.at),j.owner,`${nm(j.owner)} picked someone else for ${t(j)}`,{job:j.key});
+      else if(b&&jobState(j)==='open'&&j.editedAt>b.at)add(j.editedAt,j.owner,`${nm(j.owner)} updated ${t(j)}. Check it still works for you.`,{job:j.key});
     }
   }
   for(const o of offerList(S.offersIn))if(ok(o.owner))add(num(o.at),o.owner,`${nm(o.owner)} asked you: ${esc(str(o.text,60))}`,{go:'bids'});
@@ -844,7 +845,7 @@ function viewJob(D){
     assigned:repicking(j)?(mine?'<span class="tag warn">Choose someone else</span>':droppedMe(j)?'<span class="tag">Taken</span>':'<span class="tag">Choosing again</span>'):mine||j.accepted===me?`<span class="tag ok">Picked ${esc(shortName(j.accepted))}</span>`:'<span class="tag">Taken</span>',done:payOf(j)?.ok?'<span class="tag ok">Done · Paid ✓</span>':'<span class="tag ok">Done</span>'}[st]||'';
   let foot='';
   if(mine){
-    if(st==='open')foot=`<div class="foot"><button class="btn2" data-sheet="close">Close this job</button><p class="note">Pick someone from the bids to take it off the board.</p></div>`;
+    if(st==='open')foot=`<div class="foot"><button class="btn2" data-act="editJob" data-key="${esc(j.key)}">Edit job</button><button class="btn2" data-sheet="close">Close this job</button><p class="note">Pick someone from the bids to take it off the board.</p></div>`;
     else if(st==='assigned'&&!j.accepted){const left=bids.filter(b=>!j.dropped.includes(b.by)).length;
       foot=`<div class="foot"><div class="banner warnbanner">${left?'Pick someone else from the bids':'Nobody else has bid yet'}</div>
       <p class="note">${left?'The job stays off the board while you choose.':'Put it back on the board so others can bid, or close it.'}</p>
@@ -913,11 +914,11 @@ function viewJob(D){
    </div>
   </section>`;
   return`<div class="pad jobpage${gcls(j)}" style="--nc:${noteOf(j)}${gvars(j)}">
-  <div class="jhero">${cover}${back('board','Board')}<div class="jtools"><button class="jtool" data-act="openShare" data-key="${esc(j.key)}" aria-label="Share this job">${ic('share',18)}</button>${mine?'':`<button class="jtool ${isSaved(j.key)?'on':''}" data-act="toggleSave" data-key="${esc(j.key)}" aria-label="${isSaved(j.key)?'Remove from saved':'Save this job'}" aria-pressed="${isSaved(j.key)}">${ic('bookmark',18,2,'currentColor',isSaved(j.key)?'currentColor':'none')}</button>`}</div>
+  <div class="jhero">${cover}${back('board','Board')}<div class="jtools">${mine&&st==='open'?`<button class="jtool" data-act="editJob" data-key="${esc(j.key)}" aria-label="Edit this job">${ic('edit',18)}</button>`:''}<button class="jtool" data-act="openShare" data-key="${esc(j.key)}" aria-label="Share this job">${ic('share',18)}</button>${mine?'':`<button class="jtool ${isSaved(j.key)?'on':''}" data-act="toggleSave" data-key="${esc(j.key)}" aria-label="${isSaved(j.key)?'Remove from saved':'Save this job'}" aria-pressed="${isSaved(j.key)}">${ic('bookmark',18,2,'currentColor',isSaved(j.key)?'currentColor':'none')}</button>`}</div>
     <div class="jhead"><h1 class="h1">${esc(j.text)}</h1><span class="jhint">${hint}</span></div></div>
   <button class="jposter" data-person="${esc(j.owner)}"><span class="javwrap"><span class="ring${liveOf(j.owner)?' live':''}" style="width:108px;height:108px">${face(j.owner,94)}</span>${online?'<span class="onl"><i></i>Online</span>':''}</span>
     <span class="pname">${esc(shortName(j.owner))}${mine?' <span class="muted">(you)</span>':''}</span>
-    <span class="jmeta">${esc(metaOf(j.owner)||campus())}${esc(posterLine(j.owner))} · posted ${since(j.at)}${esc(payLine(j.owner))}</span></button>
+    <span class="jmeta">${esc(metaOf(j.owner)||campus())}${esc(posterLine(j.owner))} · posted ${since(j.at)}${j.editedAt?' · edited':''}${esc(payLine(j.owner))}</span></button>
   <div class="jcard stack">
     <span class="big" style="view-transition-name:jp">₹${fmt(j.price)}</span>
     <div class="chips">${[j.when,online?'':j.where].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${nearMe(j)?nearTag():''}${stTag}</div>
@@ -936,8 +937,8 @@ function syncNoteTone(){const hb=$('jhue');if(hb)hb.style.setProperty('--thumb',
 function viewPost(){
   const d=S.draft,{c,g}=noteTone(),me=S.me.id,ph=(d.pics||[])[0]||'';
   const group=(t,k,list)=>`<div class="stack gap8"><span class="formlabel" id="g-${k}">${t}</span><div class="chips" role="group" aria-labelledby="g-${k}">${list.map(v=>`<button class="chip ${d[k]===v&&!(k==='where'&&d.whereText.trim())?'on':''}" data-set="${k}" data-val="${esc(v)}" aria-pressed="${d[k]===v&&!(k==='where'&&d.whereText.trim())}">${esc(v)}</button>`).join('')}</div></div>`;
-  return`<div class="pad postpage">${back('board','Close')}
-   <h1 class="pageh" style="margin:6px 0 2px">Pin a job</h1>
+  return`<div class="pad postpage">${d.editId?back('job','Cancel'):back('board','Close')}
+   <h1 class="pageh" style="margin:6px 0 2px">${d.editId?'Edit your job':'Pin a job'}</h1>
    <p class="note" style="text-align:left;margin:0 0 14px">Write it on the note. This is exactly how it shows on the board.</p>
    <div class="notewrap" id="notewrap"><div class="bignote tile ntile${g?' gnote':''}" id="bignote" style="--nc:${c}${g?';--nc1:var(--g1);--nc2:var(--g2)':''};--d:0s">
      <span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span>
@@ -959,7 +960,7 @@ function viewPost(){
        <textarea id="jm" rows="5" maxlength="600" placeholder="Anything the person doing it should know: roll number, floor, what to bring, how you'll pay." data-bind="draft.more">${esc(d.more)}</textarea>
        <div class="pitchfoot" style="justify-content:flex-end"><span class="wc">${d.more.length} / 600</span></div></div>
    </div>
-   <div class="foot">${S.err.post?`<p class="err">${esc(S.err.post)}</p>`:''}<button class="cta" data-act="post" data-need="post">Pin it to the board</button>
+   <div class="foot">${S.err.post?`<p class="err">${esc(S.err.post)}</p>`:''}<button class="cta" data-act="post" data-need="post">${d.editId?'Save changes':'Pin it to the board'}</button>
      <p class="note">Your photo and first name show on the note. No assignment or exam work, nothing illegal or unsafe.</p></div>
   </div><div style="height:24px"></div>`;
 }
@@ -1310,6 +1311,7 @@ function sheetHTML(D){
     b=`<div class="jmhead${gcls(mj)}" style="--nc:${noteOf(mj)}"><span class="jmprice">₹${fmt(mj.price)}</span><h2 id="sheetT">${esc(mj.text.length>70?mj.text.slice(0,70)+'…':mj.text)}</h2></div>
     <div class="menu"><button data-act="openShare" data-key="${esc(mj.key)}">${ic('share',18)} Share</button>
       ${own?'':`<button data-act="toggleSave" data-key="${esc(mj.key)}">${ic('bookmark',18,2,'currentColor',sv?'currentColor':'none')} ${sv?'Remove from saved':'Save for later'}</button>`}
+      ${own&&jobState(mj)==='open'?`<button data-act="editJob" data-key="${esc(mj.key)}">${ic('edit',18)} Edit</button>`:''}
       <button data-job="${esc(mj.key)}">${ic('chev',18)} Open job</button>
       ${own?'':`<button class="danger" data-sheet="report" data-about="${esc(mj.owner)}">${ic('flag',18)} Report</button>`}</div>`;break}
   case'invitefriend':{const off=S.config.memberInvites===false&&!S.me.isOwner,c=S.lastCode;
@@ -1460,7 +1462,7 @@ const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
 function go(v,keepThread){
   const from=S.view;
   if(v!=='chat'&&!keepThread)closeThread();
-  const apply=()=>{if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}S.view=v;S.sheet=null;S.err={};if(v==='help'&&from!=='help')S.help={kind:null,job:null,why:'',note:'',sent:null};if(v==='settings'){S.pwOpen=false}if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit'){seedOnb();S.hcheck={h:handleOf(S.me.id),st:'mine'}}if(v==='invites')S.inv.campus='';render();
+  const apply=()=>{if(v==='post'&&from!=='post'&&S.draft.editId&&!S.editEnter)S.draft=blankDraft();S.editEnter=false;if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}S.view=v;S.sheet=null;S.err={};if(v==='help'&&from!=='help')S.help={kind:null,job:null,why:'',note:'',sent:null};if(v==='settings'){S.pwOpen=false}if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit'){seedOnb();S.hcheck={h:handleOf(S.me.id),st:'mine'}}if(v==='invites')S.inv.campus='';render();
     if(v==='board'&&from==='job'&&S.openJob){const p=document.querySelector(`.tile[data-job="${CSS.escape(S.openJob)}"] .price`);if(p)p.style.viewTransitionName='jp'}};
   if(from===v||S.phase!=='app'||!document.startViewTransition||reduceMotion.matches){apply();return}
   const d=(DEPTH[v]??1)-(DEPTH[from]??1),root=document.documentElement;
@@ -1508,11 +1510,23 @@ const ACT={
   post(){const d=S.draft,text=d.text.trim(),price=digits(d.price);
     if(!need(text.length<=NOTE_MAX,'post','Keep the note to '+NOTE_MAX+' characters. Put the rest in the details.')||!need(text.length>=8,'post','Say what you need in a few more words.')||!need(price>=10&&price<=20000,'post','Set a price between ₹10 and ₹20,000.'))return;
     if(modBlock('job',text,d.more,d.whereText))return;
+    if(d.editId){const id=d.editId,key=S.me.id+'~'+id,old=(S.myDoc?.jobs||{})[id];if(!old||old.status!=='open'){toast('This job can\u2019t be edited any more.');S.draft=blankDraft();go('job');return}
+      const where=(d.whereText.trim()||d.where).slice(0,40),pics=cleanPics(d.pics),now=Date.now(),hadPics=num(old.pics)>0;
+      saveMine(x=>{const o={...((x.jobs||{})[id]||old)},n={...o,text:text.slice(0,400),more:d.more.trim().slice(0,600),price,when:d.when,where,color:d.white?NOTE_WHITE:hueHex(d.hue),editedAt:now,
+        deadline:d.when!==o.when?deadlineFor(d.when,now):o.deadline};if(pics.length)n.pics=pics.length;else delete n.pics;x.jobs={...(x.jobs||{}),[id]:n};return x});
+      if(pics.length){S.pics['j:'+key]=pics;S.fb.setDoc(S.fb.doc(S.db,'jobpics',key),{owner:S.me.id,job:id,pics,at:now}).catch(e=>{console.warn(e);toast('Saved, but the photos didn\u2019t upload.')})}
+      else if(hadPics){S.pics['j:'+key]=[];S.fb.deleteDoc(S.fb.doc(S.db,'jobpics',key)).catch(()=>{})}
+      S.draft=blankDraft();S.openJob=key;go('job');toast('Changes saved');return}
     const id=rid(),at=Date.now(),where=(d.whereText.trim()||d.where).slice(0,40);
     const pics=cleanPics(d.pics),geo=d.useLoc&&LOC.pos?{lat:Math.round(LOC.pos.lat*1e3)/1e3,lng:Math.round(LOC.pos.lng*1e3)/1e3}:null;
     saveMine(x=>{x.jobs={...(x.jobs||{}),[id]:{text:text.slice(0,400),more:d.more.trim().slice(0,600),price,kind:d.kind,when:d.when,where,at,deadline:deadlineFor(d.when,at),status:'open',color:d.white?NOTE_WHITE:hueHex(d.hue),...(pics.length?{pics:pics.length}:{}),...(geo?{geo}:{})}};return x});
     if(pics.length){S.pics['j:'+S.me.id+'~'+id]=pics;S.fb.setDoc(S.fb.doc(S.db,'jobpics',S.me.id+'~'+id),{owner:S.me.id,job:id,pics,at}).catch(e=>{console.warn(e);toast('Your job is up, but the photos didn\u2019t upload.')})}
     S.draft=blankDraft();S.sort='newest';S.fresh=S.me.id+'~'+id;go('board');moment('Pinned.','Classmates can bid on it now.',1100);setTimeout(()=>{S.fresh=null},4000)},
+  async editJob(el){const k=el?.dataset?.key||S.openJob,j=derive().jobByKey[k];if(!j||j.owner!==S.me.id||jobState(j)!=='open')return;
+    let pics=S.pics['j:'+j.key];if(j.pics&&!Array.isArray(pics)){try{const x=await S.fb.getDoc(S.fb.doc(S.db,'jobpics',j.key));pics=x.exists()?cleanPics(x.data().pics):[]}catch{pics=[]}S.pics['j:'+j.key]=pics}
+    const c=noteOf(j);S.draft={...blankDraft(),editId:j.id,hue:hexHue(c),white:c===NOTE_WHITE,text:j.text,price:String(j.price),kind:j.kind||'Errand',when:WHENS.includes(j.when)?j.when:'Today',
+      where:WHERES.includes(j.where)?j.where:'Gate 1',whereText:WHERES.includes(j.where)?'':j.where,more:j.more,pics:[...(pics||[])],useLoc:false};
+    S.openJob=j.key;S.editEnter=true;S.sheet=null;go('post')},
   repost(){const j=derive().jobByKey[S.openJob];if(!j)return;S.draft={...blankDraft(),hue:hexHue(noteOf(j)),white:noteOf(j)===NOTE_WHITE,text:j.text,price:String(j.price),kind:KINDS.includes(j.kind)?j.kind:'Other',where:WHERES.includes(j.where)?j.where:'Gate 1',whereText:WHERES.includes(j.where)?'':j.where,more:j.more,pics:[...(S.pics['j:'+j.key]||[])]};
     saveMine(x=>{if(x.jobs?.[j.id])x.jobs[j.id].status='closed';return x});go('post')},
   bid(){const j=derive().jobByKey[S.openJob];if(!j)return;const amt=digits(S.bid.amt);
