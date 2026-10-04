@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050140';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050140';
-import {modHit,MOD_CAT} from './mod.js?v=202610050140';
+import {makeDb} from './db.js?v=202610050148';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050148';
+import {modHit,MOD_CAT} from './mod.js?v=202610050148';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -373,7 +373,8 @@ function bannerHTML(){const b=S.config.banner;if(!b||!b.on||typeof b.text!=='str
 function savePriv(patch){
   const {doc,setDoc}=S.fb;
   S.priv={...S.priv,...patch,seen:{...(S.priv.seen||{}),...(patch.seen||{})}};render();
-  return enqueue('priv',()=>setDoc(doc(S.db,'private',S.me.id),patch,{merge:true})).catch(writeErr);
+  S.privPend=(S.privPend||0)+1;
+  return enqueue('priv',()=>setDoc(doc(S.db,'private',S.me.id),patch,{merge:true})).catch(writeErr).finally(()=>{S.privPend--;if(!S.privPend&&S.privLast){S.priv={...S.privLast,seen:{...(S.privLast.seen||{}),...(S.priv.seen||{})}};S.privLast=null;if(S.phase==='app')render()}});
 }
 
 async function fcmApp(){if(S.fbApp)return S.fbApp;const app=await import(FB+'firebase-app.js');S.fbApp=app.initializeApp(firebaseConfig);return S.fbApp}
@@ -435,7 +436,7 @@ function startSubs(){
     const d={};snap.forEach(x=>{d[x.id]=x.data()});
     S.peopleDocs=d;if(!S.pendingMine)S.myDoc=d[me]?clone(d[me]):null;S.ready.people=true;afterData();
   },fail));
-  S.subs.push(onSnapshot(doc(db,'private',me),s=>{S.priv=s.exists()?s.data():{};S.ready.priv=true;afterData()},fail));
+  S.subs.push(onSnapshot(doc(db,'private',me),s=>{const d=s.exists()?s.data():{};if(S.privPend>0){S.privLast=d;return}S.priv=d;S.ready.priv=true;afterData()},fail));
   const pk={own:{},doer:{}},mergePicks=()=>{S.picks={...pk.doer,...pk.own};if(S.phase==='app')render()};
   S.subs.push(onSnapshot(query(collection(db,'picks'),where('owner','==',me)),snap=>{pk.own={};snap.forEach(x=>{pk.own[x.id]=x.data()});mergePicks()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'picks'),where('doer','==',me)),snap=>{pk.doer={};snap.forEach(x=>{pk.doer[x.id]=x.data()});mergePicks()},e=>console.warn(e)));
@@ -1481,6 +1482,9 @@ let toastT;
 function toast(msg){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},2800)}
 const DEPTH={board:0,bids:0,chats:0,me:0,saved:0,invites:1,post:1,job:1,person:1,chat:1,privacy:1,settings:1,help:2,edit:2,reviews:1,review:2};
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
+const typingEl=e=>e&&(e.tagName==='TEXTAREA'||e.isContentEditable||(e.tagName==='INPUT'&&!['range','checkbox','radio','button','submit','file','color'].includes(e.type)));
+let kbT=null;document.addEventListener('focusin',e=>{if(typingEl(e.target)){clearTimeout(kbT);document.documentElement.classList.add('typing')}});
+document.addEventListener('focusout',()=>{clearTimeout(kbT);kbT=setTimeout(()=>{if(!typingEl(document.activeElement))document.documentElement.classList.remove('typing')},120)});
 function go(v,keepThread){
   const from=S.view;
   if(v!=='chat'&&!keepThread)closeThread();
