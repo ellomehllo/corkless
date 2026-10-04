@@ -696,8 +696,8 @@ a.cta{text-decoration:none}
   -webkit-mask:radial-gradient(circle at .235em .4em,transparent max(.048em,1.8px),#000 calc(max(.048em,1.8px) + .6px));
   mask:radial-gradient(circle at .235em .4em,transparent max(.048em,1.8px),#000 calc(max(.048em,1.8px) + .6px))}
 .mark::before{content:none;display:none}
-.tackav{border:0;background:url(favicon.png) center/cover}
-.bigpin{width:88px;height:88px;border-radius:24px;background:url(icon-192.png) center/cover;filter:drop-shadow(0 14px 30px rgba(170,226,84,.45))}
+.tackav{border:0;background:url(favicon.png?v=202610050117) center/cover}
+.bigpin{width:88px;height:88px;border-radius:24px;background:url(icon-192.png?v=202610050117) center/cover;filter:drop-shadow(0 14px 30px rgba(170,226,84,.45))}
 .appicon{width:76px;height:76px;border-radius:20px;display:block;box-shadow:0 14px 34px -10px rgba(170,226,84,.6)}
 
 /* dotted board background on posting and job pages, animated on the startup screen */
