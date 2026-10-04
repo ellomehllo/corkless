@@ -1,6 +1,6 @@
 import firebaseConfig from './firebase-config.js';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610041944';
-import {modHit,MOD_CAT} from './mod.js?v=202610041944';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610041952';
+import {modHit,MOD_CAT} from './mod.js?v=202610041952';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
