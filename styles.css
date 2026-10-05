@@ -1185,3 +1185,14 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .tile.ntile:has(.tbg.ph) .price,.tile.ntile:has(.tbg.ph) p,.tile.ntile:has(.tbg.ph) .where,.tile.ntile:has(.tbg.ph) .by{text-shadow:0 1px 10px rgba(0,0,0,.75),0 0 2px rgba(0,0,0,.5)}
 .jcover .tbg.ph img{filter:blur(1.5px) saturate(.85) brightness(.92)}
 .jcover .tbg.ph::after{background:linear-gradient(180deg,rgba(8,16,44,.55) 0%,rgba(8,16,44,.2) 35%,rgba(8,16,44,.45) 70%,var(--bg) 100%)}
+
+/* a tiny tilted copy of your note at the end of notifications about it */
+.mininote{position:relative;flex-shrink:0;display:flex;flex-direction:column;gap:3px;width:40px;height:44px;padding:9px 6px 6px;margin-left:auto;border-radius:8px;
+  background:linear-gradient(165deg,color-mix(in oklab,var(--nc) 42%,#0b0c12),color-mix(in oklab,var(--nc) 22%,#08090d));border:1px solid color-mix(in srgb,var(--nc) 45%,transparent);
+  transform:rotate(-7deg);box-shadow:0 6px 12px -6px rgba(0,0,0,.9)}
+.mininote .mnpin{position:absolute;top:-3px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:var(--nc);box-shadow:0 0 6px color-mix(in srgb,var(--nc) 70%,transparent)}
+.mininote b{font-family:var(--display);font-size:9px;font-weight:700;line-height:1;color:#fff;letter-spacing:-.02em;white-space:nowrap;overflow:hidden}
+.mininote .mnl{display:block;height:2.5px;border-radius:2px;background:rgba(255,255,255,.55)}
+.mininote .mnl.s{width:65%;background:rgba(255,255,255,.35)}
+.notif .mininote+.udot,.nbanner .mininote{margin-left:8px}
+.notif .mininote{margin-right:2px}

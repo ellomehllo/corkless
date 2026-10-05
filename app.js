@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050747';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050747';
-import {modHit,MOD_CAT} from './mod.js?v=202610050747';
+import {makeDb} from './db.js?v=202610050752';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050752';
+import {modHit,MOD_CAT} from './mod.js?v=202610050752';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -222,6 +222,8 @@ function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str
   for(const o of offerList(S.offersOut))if(ok(o.to)&&o.status!=='pending')add(num(o.respondedAt),o.to,o.status==='accepted'?`${nm(o.to)} ${A('said yes')} to ${esc(str(o.text,60))}`:`${nm(o.to)} ${A('can\u2019t do')} ${esc(str(o.text,60))} this time`,{go:'bids'});
   return out.sort((a,b)=>b.at-a.at).slice(0,80);
 }
+function miniNote(j){if(!j||j.owner!==S.me?.id)return'';const c=noteOf(j);
+  return`<span class="mininote" style="--nc:${c}" aria-hidden="true"><i class="mnpin"></i><b>₹${fmt(j.price)}</b><span class="mnl"></span><span class="mnl s"></span></span>`}
 function tackFace(s){return`<span class="tackav" style="width:${s}px;height:${s}px" role="img" aria-label="tack"></span>`}
 const HOLD_AT=5;
 const held=uid=>{const x=(S.strikes||{})[uid];return!!x&&num(x.n)-num(x.cleared)>=HOLD_AT};
@@ -1090,7 +1092,7 @@ function viewBids(D){
       ${S.actTab==='all'?(()=>{const feed=[...D.notes.map(n=>({...n,kind:'n'})),...jobsNow.map(j=>({kind:'j',j,at:j.at})),...[...active,...waiting,...notPicked].map(y=>({kind:'b',y,at:y.at||y.j.at}))].sort((a,b)=>b.at-a.at);
         const np=([l,c])=>[String(l).replace(/\s*·\s*₹[\d,]+/g,'').replace(/₹[\d,]+\s*·\s*/g,''),c];
         const one=f=>f.kind==='j'?row(f.j,np(jobLine(f.j)),f.j.price,me):f.kind==='b'?row(f.y.j,np(bidLine(f.y.x||{j:f.y.j})),f.y.amt)
-          :`<button class="item notif ${f.at>S.actSeenAt?'new':''}${f.earn?' earned':''}" ${f.rev?`data-review="${esc(f.rev)}"`:f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span></span>${f.earn?`<b class="earn">+₹${fmt(f.earn)}</b>`:''}${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`;
+          :`<button class="item notif ${f.at>S.actSeenAt?'new':''}${f.earn?' earned':''}" ${f.rev?`data-review="${esc(f.rev)}"`:f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span></span>${f.earn?`<b class="earn">+₹${fmt(f.earn)}</b>`:''}${miniNote(f.job&&D.jobByKey[f.job])}${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`;
         return feed.length?`<div class="ifeed allfeed">${dateGroups(feed,f=>f.at).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(one).join('')}</section>`).join('')}</div>`:empty('Bids, picks and payments show up here.')})()
       :S.actTab==='jobs'?`${jobsNow.length?`<div class="ifeed"><section class="igroup">${jobsNow.map(j=>row(j,jobLine(j),j.price,me)).join('')}</section></div>`:empty('Nothing pinned right now.')}
         <button class="linkbtn" data-go="post" style="align-self:flex-start;padding:0">Pin a job</button>`
@@ -1584,7 +1586,7 @@ function nbCheck(D){const now=Date.now();
   if(!NB.on)nbNext()}
 function nbRoot(){let r=$('nbanners');if(!r){r=document.createElement('div');r.id='nbanners';r.className='nbanners';r.setAttribute('aria-live','polite');document.body.appendChild(r)}return r}
 function nbNext(){const n=NB.q.shift();if(!n){NB.on=null;return}NB.on=n;const r=nbRoot(),go2=n.rev?`data-review="${esc(n.rev)}"`:n.job?`data-job="${esc(n.job)}"`:n.person?`data-person="${esc(n.person)}"`:`data-go="${n.go}"`;
-  r.innerHTML=`<button class="nbanner" ${go2}>${n.who==='tack'?tackFace(36):ring(n.who,36)}<span class="ntext">${n.html}</span>${n.earn?`<b class="earn">+\u20b9${fmt(n.earn)}</b>`:''}</button>`;
+  r.innerHTML=`<button class="nbanner" ${go2}>${n.who==='tack'?tackFace(36):ring(n.who,36)}<span class="ntext">${n.html}</span>${n.earn?`<b class="earn">+\u20b9${fmt(n.earn)}</b>`:''}${miniNote(n.job&&derive().jobByKey[n.job])}</button>`;
   const el=r.firstChild;let y0=null;
   el.addEventListener('pointerdown',e=>{y0=e.clientY});el.addEventListener('pointermove',e=>{if(y0!=null&&e.clientY-y0<-18){y0=null;nbHide()}});
   el.addEventListener('click',()=>{clearTimeout(NB.t);nbHide(true)});
