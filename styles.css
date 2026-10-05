@@ -1360,3 +1360,6 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .whomenu .t1{font-weight:600}
 .whomenu .t2{font-size:var(--t-12);font-weight:500;line-height:1.4;color:var(--muted);white-space:normal}
 [data-hold]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+/* Late-night safety note on the I'm free sheet */
+.nightnote{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:var(--r-sm);background:var(--surface2);font-size:var(--t-12);font-weight:500;line-height:1.45;color:var(--fg2);text-align:left}
+.nightnote svg{flex:none;margin-top:1px;color:var(--accent)}

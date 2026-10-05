@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610052245';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610052245';
-import {modHit,MOD_CAT} from './mod.js?v=202610052245';
+import {makeDb} from './db.js?v=202610052330';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610052330';
+import {modHit,MOD_CAT} from './mod.js?v=202610052330';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -146,9 +146,9 @@ function metaOf(uid){const d=pdoc(uid);return [str(d.year,12),str(d.branch,24)].
 function face(uid,s){if(isOrg(uid))return tackFace(s);const src=photoOf(uid);return src?`<img class="av" src="${src}" width="${s}" height="${s}" alt="">`:`<span class="av av-empty" style="width:${s}px;height:${s}px;font-size:${Math.round(s*.4)}px">${esc((firstName(uid).replace(/^@/,'')[0]||'?').toUpperCase())}</span>`}
 function liveOf(uid){const n=Date.now();return Object.values(pdoc(uid).jobs||{}).some(j=>j&&j.status==='open'&&num(j.deadline)>n)}
 const freeUntilOf=uid=>num(S.freeDocs?.[uid]?.until),freeNow=uid=>freeUntilOf(uid)>Date.now();
-// Quiet hours are 11 pm to 7 am, India time. Free always ends by 11 pm and lasts at most 3 hours.
-const IST=198e5,quietNow=()=>{const h=new Date(Date.now()+IST).getUTCHours();return h>=23||h<7},
-  quietFrom=()=>{const d=new Date(Date.now()+IST);d.setUTCHours(23,0,0,0);return +d-IST},freeEnd=h=>Math.min(Date.now()+h*36e5,quietFrom());
+// Free lasts at most 3 hours. Quiet hours are 11 pm to 7 am, India time: you can still be free (with a safety note),
+// but asks then only reach people who are free.
+const IST=198e5,quietNow=()=>{const h=new Date(Date.now()+IST).getUTCHours();return h>=23||h<7},freeEnd=h=>Date.now()+h*36e5;
 const restricted=()=>arr(S.priv.restricted).filter(u=>typeof u==='string');
 const freeAudience=()=>({all:'Anyone on your campus can see it and ask you for a favour.',none:'Nobody can ask you for favours right now. You can change this in Settings.'})[asksOf(S.me.id)]||'People you’ve finished a job with can see it and ask you for a favour.';
 // An ask with no yes after 3 hours reads the same whether it was declined or ignored.
@@ -1439,12 +1439,10 @@ function sheetHTML(D){
   const s=S.sheet;if(!s)return'';let b='';
   const j=S.openJob?D.jobByKey[S.openJob]:null;
   switch(s.type){
-  case'free':{const f=freeNow(S.me.id),q=quietNow(),seen=new Set();
-    const opts=q?[]:[1,2,3].map(h=>({h,end:freeEnd(h)})).filter(o=>o.end-Date.now()>6e5&&!seen.has(o.end)&&seen.add(o.end));
-    b=q?`<h2 id="sheetT">Quiet hours</h2><p>tack is quiet from 11 pm to 7 am. You can mark yourself free again in the morning.</p>`
-      :`<h2 id="sheetT">I’m free</h2><p>For up to 3 hours. ${freeAudience()}</p>`;
-    b+=`<div class="stack gap8">${opts.map(o=>`<button class="btn2" data-free="${o.h}">${o.end<Date.now()+o.h*36e5-6e4?'Until 11 pm':o.h===1?'For the next hour':`For the next ${o.h} hours`}</button>`).join('')}
-    ${!q&&!opts.length?'<p class="note">It’s nearly 11 pm. Try again in the morning.</p>':''}
+  case'free':{const f=freeNow(S.me.id);
+    b=`<h2 id="sheetT">I’m free</h2><p>For up to 3 hours. ${freeAudience()}</p>
+    ${quietNow()?`<div class="nightnote">${ic('shield',16,2.2)}<span>It’s late. If you meet anyone, stay in well-lit, busy parts of campus and let a friend know where you are. It’s always fine to say no.</span></div>`:''}
+    <div class="stack gap8">${[1,2,3].map(h=>`<button class="btn2" data-free="${h}">${h===1?'For the next hour':`For the next ${h} hours`}</button>`).join('')}
     ${f?'<button class="btn2 danger" data-free="off">I’m not free any more</button>':''}</div>`;break}
   case'who':{const u=s.about,rs=restricted().includes(u),bl=arr(S.priv.blocked).includes(u),fn=esc(firstName(u));
     b=`<h2 id="sheetT">${esc(shortName(u))}</h2>
@@ -1990,12 +1988,11 @@ const ACT={
   sendOffer(){const o=S.offer,text=o.text.trim(),price=digits(o.price),me=S.me.id;
     if(!need(text.length>=6,'offer','Say what you need in a few more words.')||!need(price>=10&&price<=20000,'offer','Set a price between ₹10 and ₹20,000.'))return;
     if(modBlock('offer',text,o.where))return;
-    if(quietNow()){need(false,'offer','tack is quiet from 11 pm to 7 am. Ask again in the morning.');return}
     const id=rid(),key=`${me}~${id}~${o.to}`,d={owner:me,to:o.to,job:id,text:text.slice(0,200),price,when:o.when,where:o.where.trim().slice(0,40),at:Date.now(),status:'pending',...(o.prevJob?{prevJob:o.prevJob}:{})};
     S.offersOut={...S.offersOut,[key]:d};S.sheet=null;render();
     S.fb.setDoc(S.fb.doc(S.db,'offers',key),d).then(()=>toast('Sent to '+firstName(o.to)+'. You\u2019ll see their answer in Activity.')).catch(e=>{const m={...S.offersOut};delete m[key];S.offersOut=m;render();
       if(!(e&&e.code==='permission-denied')){toast('Couldn\u2019t send it. Try again.');return}
-      S.sb.rpc('ask_block_reason',{p_to:o.to,p_prev:o.prevJob||null}).then(({data})=>toast({quiet:'tack is quiet from 11 pm to 7 am. Ask again in the morning.',limit:'You can ask up to 5 people a day. Try again tomorrow.',
+      S.sb.rpc('ask_block_reason',{p_to:o.to,p_prev:o.prevJob||null}).then(({data})=>toast({quiet:'It\u2019s quiet hours (11 pm to 7 am). You can only ask people who are marked free.',limit:'You can ask up to 5 people a day. Try again tomorrow.',
         again:'You\u2019ve already asked '+firstName(o.to)+' today.'}[data]||firstName(o.to)+' isn\u2019t free any more.'),()=>toast('Couldn\u2019t send it. Try again.'))})},
   acceptOffer(el){const k=el.dataset.key;S.fb.updateDoc(S.fb.doc(S.db,'offers',k),{status:'accepted',respondedAt:Date.now()}).then(()=>toast('Accepted. It\u2019s now a job between you two.')).catch(writeErr)},
   declineOffer(el){const k=el.dataset.key;S.fb.updateDoc(S.fb.doc(S.db,'offers',k),{status:'declined',respondedAt:Date.now()}).then(()=>toast('Declined. They won\u2019t be told.')).catch(writeErr)},
@@ -2068,11 +2065,11 @@ document.addEventListener('click',e=>{
   if(ds.onb!==undefined){S.onb[ds.onb]=ds.val;render();return}
   if(ds.pick!==undefined){const b=bidsFor(derive(),S.openJob).find(x=>x.by===ds.pick);if(b){S.sheet={type:'pick',uid:b.by,amt:b.amt};render()}return}
   if(ds.sheet!==undefined){if(ds.sheet==='invitefriend')S.lastCode=null;S.err={};S.erase={pw:''};if(ds.sheet==='done'||ds.sheet==='ratePoster'||ds.sheet==='review')S.rate={a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]};if(ds.sheet==='report')S.rep={why:ds.prewhy||'',note:'',block:false};S.sheet={type:ds.sheet,about:ds.about,rid:ds.rid};render();return}
-  if(ds.free!==undefined){const me=S.me.id;if(ds.free!=='off'&&quietNow()){toast('tack is quiet from 11 pm to 7 am.');return}
+  if(ds.free!==undefined){const me=S.me.id;
     const t=ds.free==='off'?0:freeEnd(+ds.free||1),prev=S.freeDocs[me];
     S.freeDocs={...S.freeDocs,[me]:{until:t}};S.freeSaving=true;S.sheet=null;render();
-    S.fb.setDoc(S.fb.doc(S.db,'free',me),{until:t}).then(()=>toast(t?'You’re free until '+clock(t):'You’re not marked free any more'),
-      e=>{const f={...S.freeDocs};if(prev)f[me]=prev;else delete f[me];S.freeDocs=f;render();toast(quietNow()?'tack is quiet from 11 pm to 7 am.':'Couldn\u2019t save that. Try again.')}).finally(()=>{S.freeSaving=false});return}
+    S.fb.setDoc(S.fb.doc(S.db,'free',me),{until:t}).then(()=>toast(t?'You’re free until '+clock(t)+(quietNow()?'. Stay safe.':''):'You’re not marked free any more'),
+      e=>{const f={...S.freeDocs};if(prev)f[me]=prev;else delete f[me];S.freeDocs=f;render();toast('Couldn\u2019t save that. Try again.')}).finally(()=>{S.freeSaving=false});return}
   if(ds.review!==undefined){S.openRev=ds.review;go('review');return}
   if(ds.com!==undefined){openCom(ds.com);return}
   if(ds.cnote!==undefined){S.cnote=ds.cnote;go('cnote');return}
