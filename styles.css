@@ -1173,3 +1173,8 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .mdur{font-size:var(--fs-c);font-variant-numeric:tabular-nums;opacity:.8}
 .media.pending{opacity:.6;font-size:var(--fs-c)}
 @media (prefers-reduced-motion:reduce){.recdot{animation:none}}
+
+/* blurred photo behind a note reads cold: muted photo colours under a deep blue wash */
+.tbg.ph img,.tile.ntile .tbg.ph img{filter:blur(14px) saturate(.45) brightness(.78) contrast(1.05)}
+.tbg.ph::after,.tile.ntile .tbg.ph::after{background:linear-gradient(160deg,rgba(14,26,78,.62),rgba(10,20,58,.5) 45%,color-mix(in srgb,var(--nc) 16%,rgba(6,12,34,.72)));mix-blend-mode:normal}
+.tbg.ph{background:#0A1230}
