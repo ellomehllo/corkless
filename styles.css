@@ -1281,3 +1281,15 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .tkbg .tb1,.tkbg .tb2,.tkbg .tb3{animation-delay:var(--t,0s)}
 .tkcard .tkli{display:flex;gap:12px;align-items:flex-start}
 .tkcard .tkli i{flex-shrink:0;width:8px;height:8px;margin-top:9px;border-radius:50%;background:var(--grad);box-shadow:0 0 8px rgba(198,242,78,.6)}
+
+/* tack page: animated gradient card, plain list lines, bid area on the glow */
+.tkcard{background:linear-gradient(120deg,rgba(59,84,20,.5),rgba(36,57,122,.55),rgba(46,96,60,.5),rgba(43,70,156,.55)) padding-box,linear-gradient(120deg,rgba(210,245,94,.6),rgba(74,114,214,.7),rgba(159,219,116,.6),rgba(74,114,214,.7)) border-box;
+  background-size:300% 300%,300% 300%;animation:tkup .6s .55s cubic-bezier(.2,.8,.2,1) both,tkshift 12s ease-in-out infinite alternate}
+.tackpage:not(.enter) .tkcard{animation:tkshift 12s ease-in-out infinite alternate}
+@keyframes tkshift{0%{background-position:0% 50%,0% 50%}100%{background-position:100% 50%,100% 50%}}
+.tkcard .tkli{display:block;padding-left:14px;border-left:2px solid rgba(210,245,94,.35)}
+.tkbids{display:flex;flex-direction:column;gap:14px}
+.tkbids:empty{display:none}
+.tkbids .foot,.tkbids .jbids{padding:0;max-width:none}
+.tkbids .bidcard,.tkbids .pitchbox,.tkbids .field,.tkbids .row{background:rgba(10,12,20,.55);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+@media (prefers-reduced-motion:reduce){.tkcard{animation:none!important}}
