@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050813';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050813';
-import {modHit,MOD_CAT} from './mod.js?v=202610050813';
+import {makeDb} from './db.js?v=202610050815';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050815';
+import {modHit,MOD_CAT} from './mod.js?v=202610050815';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -111,13 +111,14 @@ function pdoc(uid){return uid===S.me?.id?(S.myDoc||{}):(S.peopleDocs[uid]||{})}
 const HANDLE_RE=/^(?![.])(?!.*[.]{2})[a-z0-9._]{4,20}(?<![.])$/,HANDLE_DAYS=30,HANDLE_RESERVED=['tack','admin','organiser','organizer','support','official','moderator','staff','help','team','system','root','null','undefined','everyone'];
 function handleOf(uid){const h=str(pdoc(uid).handle,20).toLowerCase();return HANDLE_RE.test(h)?h:''}
 function myRealName(){return str(S.myName||S.myDoc?.name||S.onb.name||S.user?.displayName,60).trim()}
-function realNameOf(uid){const me=S.me?.id;if(!uid)return'';if(uid===me)return myRealName();
+const isOrg=uid=>!!uid&&uid===ownerId();
+function realNameOf(uid){const me=S.me?.id;if(!uid)return'';if(isOrg(uid))return'tack';if(uid===me)return myRealName();
   for(const p of Object.values(S.picks||{})){if(!p)continue;if(p.owner===me&&p.doer===uid&&typeof p.doerName==='string')return str(p.doerName,60).trim();if(p.doer===me&&p.owner===uid&&typeof p.posterName==='string')return str(p.posterName,60).trim()}
   if(S.me?.isOwner&&S.names&&S.names[uid])return S.names[uid];
   return handleOf(uid)?'':str(pdoc(uid).name,60).trim()}
 function fullName(uid){return realNameOf(uid)}
-function shortName(uid){const n=uid===S.me?.id&&handleOf(uid)?'':realNameOf(uid);if(n){const p=n.split(/\s+/);return p.length>1?`${p[0]} ${p[p.length-1][0].toUpperCase()}.`:p[0]}const h=handleOf(uid);return h?'@'+h:(uid===S.me?.id?'You':'Someone')}
-function firstName(uid){const n=uid===S.me?.id&&handleOf(uid)?'':realNameOf(uid);if(n)return n.split(/\s+/)[0];const h=handleOf(uid);return h?'@'+h:(uid===S.me?.id?'You':'Someone')}
+function shortName(uid){if(isOrg(uid))return'tack';const n=uid===S.me?.id&&handleOf(uid)?'':realNameOf(uid);if(n){const p=n.split(/\s+/);return p.length>1?`${p[0]} ${p[p.length-1][0].toUpperCase()}.`:p[0]}const h=handleOf(uid);return h?'@'+h:(uid===S.me?.id?'You':'Someone')}
+function firstName(uid){if(isOrg(uid))return'tack';const n=uid===S.me?.id&&handleOf(uid)?'':realNameOf(uid);if(n)return n.split(/\s+/)[0];const h=handleOf(uid);return h?'@'+h:(uid===S.me?.id?'You':'Someone')}
 function handleCheck(raw){const h=String(raw||'').trim().replace(/^@/,'').toLowerCase();if(!h)return{h,st:'empty'};
   if(h.length<4)return{h,st:'short'};if(!HANDLE_RE.test(h))return{h,st:'chars'};if(HANDLE_RESERVED.includes(h)||modHit(h,h.replace(/[._]/g,'')))return{h,st:'taken'};return{h,st:'check'}}
 let handleT=null;
@@ -140,7 +141,7 @@ function syncDealNames(){const me=S.me?.id,n=myRealName();if(!me||!n||S.dealSync
 function photoOf(uid){const p=uid===S.me?.id&&(S.phase==='onboard'||S.view==='edit')?S.onb.photo:pdoc(uid).photo;return typeof p==='string'&&p.length<300000&&PHOTO_RE.test(p)?p:''}
 function ringOf(uid){const r=uid===S.me?.id&&S.onb.ring&&(S.phase==='onboard'||S.view==='edit')?S.onb.ring:pdoc(uid).ring;if(RINGS.includes(r))return r;let h=0;for(const c of String(uid))h=(h*31+c.charCodeAt(0))|0;return RINGS[Math.abs(h)%RINGS.length]}
 function metaOf(uid){const d=pdoc(uid);return [str(d.year,12),str(d.branch,24)].filter(Boolean).join(' ')}
-function face(uid,s){const src=photoOf(uid);return src?`<img class="av" src="${src}" width="${s}" height="${s}" alt="">`:`<span class="av av-empty" style="width:${s}px;height:${s}px;font-size:${Math.round(s*.4)}px">${esc((firstName(uid).replace(/^@/,'')[0]||'?').toUpperCase())}</span>`}
+function face(uid,s){if(isOrg(uid))return tackFace(s);const src=photoOf(uid);return src?`<img class="av" src="${src}" width="${s}" height="${s}" alt="">`:`<span class="av av-empty" style="width:${s}px;height:${s}px;font-size:${Math.round(s*.4)}px">${esc((firstName(uid).replace(/^@/,'')[0]||'?').toUpperCase())}</span>`}
 function liveOf(uid){const n=Date.now();return Object.values(pdoc(uid).jobs||{}).some(j=>j&&j.status==='open'&&num(j.deadline)>n)}
 const freeNow=uid=>num(pdoc(uid).freeUntil)>Date.now();
 function ring(uid,s){return `<span class="ring${freeNow(uid)?' live':''}" style="width:${s}px;height:${s}px">${face(uid,s-8)}</span>`}
@@ -241,10 +242,11 @@ function findJobs(l){const q=S.find.q.trim().toLowerCase().split(/\s+/).filter(B
   return l;
 }
 function sortJobs(l){
+  const o=ownerId();
   if(S.sort==='high')l.sort((a,b)=>b.price-a.price||b.at-a.at);
   else if(S.sort==='closing')l.sort((a,b)=>a.deadline-b.deadline);
   else l.sort((a,b)=>b.at-a.at);
-  return l;
+  return o?[...l.filter(j=>j.owner===o),...l.filter(j=>j.owner!==o)]:l;
 }
 const pref=(k,d=true)=>{const v=(S.priv.prefs||{})[k];return typeof v==='boolean'?v:d};
 const asksOf=u=>{const a=pdoc(u).asks;return a==='past'||a==='none'?a:'all'};
@@ -1161,8 +1163,8 @@ function viewPerson(uid,D){
   <div class="stack narrow" style="margin:6px auto 0;gap:18px">
    <div class="prof ${bn?'hasbanner':''}">${bn?`<div class="pbanner" style="${bannerStyle(bn)}"></div>`:''}${isMe?`<button class="editpen" data-go="edit" aria-label="Edit profile">${ic('edit',17)}</button>`:''}
      <span class="ring${liveOf(uid)?' live':''}" style="width:108px;height:108px">${face(uid,94)}</span>
-     <span class="pname">${handleOf(uid)?'@'+esc(handleOf(uid)):esc(shortName(uid))}</span>
-     ${realNameOf(uid)&&handleOf(uid)?`<span class="realname">${esc(realNameOf(uid))}</span>`:''}
+     <span class="pname">${isOrg(uid)?'tack':handleOf(uid)?'@'+esc(handleOf(uid)):esc(shortName(uid))}</span>
+     ${!isOrg(uid)&&realNameOf(uid)&&handleOf(uid)?`<span class="realname">${esc(realNameOf(uid))}</span>`:''}
      ${bio?`<p class="pbio">${esc(bio)}</p>`:''}
      <div class="chips pchips">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campusName(campusOf(uid)))}</span>
        ${uid===ownerId()?'<span class="chip vio">Organiser</span>':''}${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${free?'<span class="chip on">Free right now</span>':''}</div>
