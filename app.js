@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610051030';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610051030';
-import {modHit,MOD_CAT} from './mod.js?v=202610051030';
+import {makeDb} from './db.js?v=202610052245';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610052245';
+import {modHit,MOD_CAT} from './mod.js?v=202610052245';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -62,7 +62,9 @@ const I={
  play:'<polygon points="7 4 20 12 7 20 7 4"/>',
  pause:'<line x1="8" y1="5" x2="8" y2="19"/><line x1="16" y1="5" x2="16" y2="19"/>',
  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
- camera:'<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.5" r="3.5"/>'
+ camera:'<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.5" r="3.5"/>',
+ eyeoff:'<path d="M10.6 5.1A9.7 9.7 0 0 1 12 5c6.5 0 10 7 10 7a17.4 17.4 0 0 1-2.4 3.3M6.6 6.6C3.6 8.5 2 12 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="m3 3 18 18"/>',
+ ban:'<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>'
 };
 const SAY_MAX=3500,SAY_WORDS=500,words=t=>(String(t||'').trim().match(/\S+/g)||[]).length,sayOver=t=>SAY_MAX<1000?String(t||'').length>SAY_MAX:words(t)>SAY_WORDS,sayCount=t=>SAY_MAX<1000?`${String(t||'').length} / ${SAY_MAX} characters`:`${words(t)} / ${SAY_WORDS} words`;
 const ic=(n,s=20,w=2,c='currentColor',fill='none')=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="${fill}" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
@@ -76,7 +78,7 @@ const S={
   authMode:inviteParam||codeParam?'signup':'login', authErr:'', authMsg:'', busy:false,
   form:{name:'',email:inviteParam,pw:'',colq:'',college:'',notListed:false,ncol:'',ncity:''}, cat:null, cpick:null,
   ready:{config:false,people:false,priv:false}, subs:[],
-  config:{}, peopleDocs:{}, priv:{}, threadDocs:{}, pitchIn:{}, pitchMine:{}, offersIn:{}, offersOut:{}, myCodes:{}, lastCode:null,
+  config:{}, peopleDocs:{}, priv:{}, threadDocs:{}, pitchIn:{}, pitchMine:{}, offersIn:{}, offersOut:{}, freeDocs:{}, myCodes:{}, lastCode:null,
   offer:{to:null,prevJob:null,text:'',price:'',when:'Next hour',where:''}, invites:{}, reports:[], myInvite:null,
   myDoc:null, pendingMine:0,
   view:'board', openJob:null, personOf:null, sort:'high', find:{q:''}, near:false,
@@ -143,7 +145,14 @@ function ringOf(uid){const r=uid===S.me?.id&&S.onb.ring&&(S.phase==='onboard'||S
 function metaOf(uid){const d=pdoc(uid);return [str(d.year,12),str(d.branch,24)].filter(Boolean).join(' ')}
 function face(uid,s){if(isOrg(uid))return tackFace(s);const src=photoOf(uid);return src?`<img class="av" src="${src}" width="${s}" height="${s}" alt="">`:`<span class="av av-empty" style="width:${s}px;height:${s}px;font-size:${Math.round(s*.4)}px">${esc((firstName(uid).replace(/^@/,'')[0]||'?').toUpperCase())}</span>`}
 function liveOf(uid){const n=Date.now();return Object.values(pdoc(uid).jobs||{}).some(j=>j&&j.status==='open'&&num(j.deadline)>n)}
-const freeNow=uid=>num(pdoc(uid).freeUntil)>Date.now();
+const freeUntilOf=uid=>num(S.freeDocs?.[uid]?.until),freeNow=uid=>freeUntilOf(uid)>Date.now();
+// Quiet hours are 11 pm to 7 am, India time. Free always ends by 11 pm and lasts at most 3 hours.
+const IST=198e5,quietNow=()=>{const h=new Date(Date.now()+IST).getUTCHours();return h>=23||h<7},
+  quietFrom=()=>{const d=new Date(Date.now()+IST);d.setUTCHours(23,0,0,0);return +d-IST},freeEnd=h=>Math.min(Date.now()+h*36e5,quietFrom());
+const restricted=()=>arr(S.priv.restricted).filter(u=>typeof u==='string');
+const freeAudience=()=>({all:'Anyone on your campus can see it and ask you for a favour.',none:'Nobody can ask you for favours right now. You can change this in Settings.'})[asksOf(S.me.id)]||'People you’ve finished a job with can see it and ask you for a favour.';
+// An ask with no yes after 3 hours reads the same whether it was declined or ignored.
+const askStale=o=>Date.now()-num(o.at)>3*36e5;
 function ring(uid,s){return `<span class="ring${freeNow(uid)?' live':''}" style="width:${s}px;height:${s}px">${face(uid,s-8)}</span>`}
 const campusName=id=>str(S.campuses?.[id]?.name,60)||(id&&id===S.myCampus?.id?str(S.myCampus.name,60):'')||DEFAULT_CAMPUS;
 const curCampus=()=>(S.me?.isOwner&&S.viewCampus&&S.campuses[S.viewCampus]?S.viewCampus:S.myCampus?.id)||'mit-wpu';
@@ -221,7 +230,8 @@ function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str
   }
   for(const[id,iv]of Object.entries(S.cinv||{}))if(S.coms[id])add(num(iv.at),iv.by,`${nm(iv.by)} ${A('invited you')} to <b>${esc(comName(id))}</b>`,{go:'board'});
   for(const o of offerList(S.offersIn))if(ok(o.owner))add(num(o.at),o.owner,`${nm(o.owner)} ${A('asked you')}: ${esc(str(o.text,60))}`,{go:'bids'});
-  for(const o of offerList(S.offersOut))if(ok(o.to)&&o.status!=='pending')add(num(o.respondedAt),o.to,o.status==='accepted'?`${nm(o.to)} ${A('said yes')} to ${esc(str(o.text,60))}`:`${nm(o.to)} ${A('can\u2019t do')} ${esc(str(o.text,60))} this time`,{go:'bids'});
+  // Declines are silent: the asker only ever hears about a yes.
+  for(const o of offerList(S.offersOut))if(ok(o.to)&&o.status==='accepted')add(num(o.respondedAt),o.to,`${nm(o.to)} ${A('said yes')} to ${esc(str(o.text,60))}`,{go:'bids'});
   return out.sort((a,b)=>b.at-a.at).slice(0,80);
 }
 function miniNote(j){if(!j||j.owner!==S.me?.id)return'';const c=noteOf(j);
@@ -250,9 +260,10 @@ function sortJobs(l){
   return o?[...l.filter(j=>j.owner===o),...l.filter(j=>j.owner!==o)]:l;
 }
 const pref=(k,d=true)=>{const v=(S.priv.prefs||{})[k];return typeof v==='boolean'?v:d};
-const asksOf=u=>{const a=pdoc(u).asks;return a==='past'||a==='none'?a:'all'};
+const asksOf=u=>{const a=pdoc(u).asks;return a==='all'||a==='none'?a:'past'};
 const needTerms=()=>S.phase==='app'&&!!S.ready?.priv&&!S.joining&&(S.priv.terms||{}).v!==TERMS_V;
-function freePeople(D){const now=Date.now();return D.members.filter(u=>num(pdoc(u).freeUntil)>now&&!D.blocked.has(u)&&(u===S.me.id||asksOf(u)==='all'||(asksOf(u)==='past'&&workedWith(u,D).length)))}
+// The database only shows someone's free status to people allowed to ask them.
+function freePeople(D){return D.members.filter(u=>freeNow(u)&&!D.blocked.has(u)&&(u===S.me.id||asksOf(u)!=='none'))}
 function payOf(j){const x=j.pick&&j.pick.paid;return x&&typeof x==='object'&&typeof x.ok==='boolean'?{ok:x.ok,at:num(x.at)}:null}
 const PAY_GRACE=864e5;
 const UPI_RE=/^[a-zA-Z0-9._-]{2,64}@[a-zA-Z][a-zA-Z0-9.-]{1,48}$/;
@@ -453,6 +464,10 @@ function startSubs(){
     const d={};snap.forEach(x=>{d[x.id]=x.data()});
     S.peopleDocs=d;if(!S.pendingMine)S.myDoc=d[me]?clone(d[me]):null;S.ready.people=true;afterData();
   },fail));
+  const setFree=snap=>{const f={};snap.forEach(x=>{f[x.id]=x.data()});const mine=S.freeDocs[me];if(mine&&S.freeSaving)f[me]=mine;S.freeDocs=f;if(S.phase==='app')render()};
+  S.subs.push(onSnapshot(collection(db,'free'),setFree,e=>console.warn(e)));
+  // Who may see whom changes with restricts and finished jobs, which don't fire on this table, so refresh now and then.
+  const freeTick=setInterval(()=>{if(!document.hidden)S.fb.getDocs(collection(db,'free')).then(setFree,()=>{})},60000);S.subs.push(()=>clearInterval(freeTick));
   S.subs.push(onSnapshot(doc(db,'private',me),s=>{const d=s.exists()?s.data():{};if(S.privPend>0){S.privLast=d;return}S.priv=d;S.ready.priv=true;afterData()},fail));
   const pk={own:{},doer:{}},mergePicks=()=>{S.picks={...pk.doer,...pk.own};if(S.phase==='app')render()};
   S.subs.push(onSnapshot(query(collection(db,'picks'),where('owner','==',me)),snap=>{pk.own={};snap.forEach(x=>{pk.own[x.id]=x.data()});mergePicks()},e=>console.warn(e)));
@@ -960,15 +975,15 @@ function wallHTML(list,D){const n=wideMQ.matches?3:2,cols=Array.from({length:n},
 wideMQ.addEventListener?.('change',()=>{if(S.phase==='app')render()});
 function viewBoard(D){
   const drop=!S.boardDropped&&!S.intro.on&&!S.momentOn&&!S.joining&&S.priv.introSeen&&!reduceMotion.matches;if(drop){S.boardDropped=true;S.dropping=true;setTimeout(()=>{S.dropping=false},2200)}
-  const all=boardJobs(D),list=findJobs(all),filtered=!!(S.find.q.trim()||S.near),free=freePeople(D).filter(u=>u!==S.me.id),meFree=num(S.myDoc?.freeUntil)>Date.now();
+  const all=boardJobs(D),list=findJobs(all),filtered=!!(S.find.q.trim()||S.near),free=freePeople(D).filter(u=>u!==S.me.id),meFree=freeNow(S.me.id);
   return`<div class="boardpage"><header class="top">
     <div><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${S.me.isOwner?`<button class="campbtn" data-sheet="campus">${esc(campus())}${ic('chev',12,2.4)}</button>`:esc(campus())} · ${all.length} pinned</span></div></div>
     <button data-go="me" aria-label="Your profile">${ring(S.me.id,48)}</button>
   </header>
-  <section class="stripwrap" aria-label="Free right now"><p class="label">Free right now${free.length?' <span class="labelhint">· tap a face to ask for a favour</span>':''}</p>
+  <section class="stripwrap" aria-label="Free"><p class="label">Free${free.length?' <span class="labelhint">· tap a face to ask for a favour</span>':''}</p>
     <div class="strip">
       <button class="person" data-sheet="free" aria-label="${meFree?'Change when you’re free':'Mark yourself free'}">${meFree?ring(S.me.id,50):`<span class="add">${ic('plus',18)}</span>`}<span>You</span></button>
-      ${free.map(u=>`<button class="person" data-ask="${esc(u)}" aria-label="Ask ${esc(firstName(u))} for a favour">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}
+      ${free.map(u=>`<button class="person" data-ask="${esc(u)}" data-hold="${esc(u)}" aria-label="Ask ${esc(firstName(u))} for a favour">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}
 
     </div></section>
   ${comChips()}
@@ -1158,13 +1173,13 @@ function viewBids(D){
   const offerCard=o=>`<div class="box stack" style="gap:10px;border:1px solid rgba(170,226,84,.3)">
     <div style="display:flex;align-items:center;gap:10px">${ring(o.owner,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.owner))} asked you</span><span class="t2">${esc([o.where,o.when].filter(Boolean).join(' · '))}</span></span><span class="amt" style="color:var(--accent)">₹${fmt(o.price)}</span></div>
     <span style="font-size:var(--t-14);line-height:1.4;color:var(--fg);overflow-wrap:anywhere">${esc(o.text)}</span>
-    ${o.status==='pending'?`<div class="offeracts"><button class="ghostbtn" data-act="declineOffer" data-key="${esc(o.key)}">Can't do it</button><button class="pick" data-act="acceptOffer" data-key="${esc(o.key)}">Accept</button></div>`
+    ${o.status==='pending'?`<div class="offeracts"><button class="ghostbtn" data-act="declineOffer" data-key="${esc(o.key)}">Not this time</button><button class="pick" data-act="acceptOffer" data-key="${esc(o.key)}">Accept</button></div>`
       :`<p class="okmsg">Accepted. ${esc(firstName(o.owner))} will message you here.</p>`}</div>`;
   return`<div class="pad narrow"><h1 class="pageh">Activity</h1>
    <div class="stack">
     ${oin.length?`<div class="sect"><h2 class="h2">Offers for you</h2></div><div class="stack gap8">${oin.map(offerCard).join('')}</div>`:''}
-    ${oout.length?`<div class="sect"><h2 class="h2">Offers you sent</h2></div><div class="stack gap8">${oout.map(o=>`<div class="row">${ring(o.to,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.to))} · ₹${fmt(o.price)}</span><span class="t2">${o.status==='declined'?'Can\u2019t do it this time':'Waiting for them to answer'} · ${esc(o.text)}</span></span>
-      <button class="btn2" style="width:auto;padding:8px 12px;font-size:var(--t-12)" data-act="withdrawOffer" data-key="${esc(o.key)}">${o.status==='declined'?'Dismiss':'Withdraw'}</button></div>`).join('')}</div>`:''}
+    ${oout.length?`<div class="sect"><h2 class="h2">Offers you sent</h2></div><div class="stack gap8">${oout.map(o=>`<div class="row">${ring(o.to,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.to))} · ₹${fmt(o.price)}</span><span class="t2">${askStale(o)?'No answer':'Waiting for them to answer'} · ${esc(o.text)}</span></span>
+      <button class="btn2" style="width:auto;padding:8px 12px;font-size:var(--t-12)" data-act="withdrawOffer" data-key="${esc(o.key)}">${askStale(o)?'Dismiss':'Withdraw'}</button></div>`).join('')}</div>`:''}
     ${(()=>{const pastJob=j=>{const st=jobState(j);return st==='closed'||st==='expired'||st==='removed'||(st==='done'&&payOf(j)?.ok&&j.pick?.ratedDoer)};
       const all=[...doing.map(j=>({j,amt:j.agreed||j.price,at:num(j.pick?.at)||j.at})),...myBids.map(x=>({j:x.j,amt:num(x.b.amt),at:x.b.at,x}))];
       const pastBid=({j})=>j.accepted===me?(jobState(j)==='done'&&payOf(j)?.ok&&j.pick?.ratedPoster):(jobState(j)!=='open'&&!(repicking(j)&&!droppedMe(j)))||!!j.accepted;
@@ -1201,7 +1216,7 @@ function dateGroups(list,at){const d0=new Date().setHours(0,0,0,0),grp=t=>!t?'Ea
   for(const x of list){const g=grp(at(x));if(!out.length||out[out.length-1][0]!==g)out.push([g,[]]);out[out.length-1][1].push(x)}return out}
 function viewChats(D){
   return`<div class="pad narrow"><h1 class="pageh">Chats</h1>
-  ${D.threads.length?`<div class="ifeed">${dateGroups(D.threads,t=>t.last?.at||t.job?.at||0).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(t=>`<button class="item" data-thread="${esc(t.key)}">${ring(t.other,46)}
+  ${D.threads.length?`<div class="ifeed">${dateGroups(D.threads,t=>t.last?.at||t.job?.at||0).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(t=>`<button class="item" data-thread="${esc(t.key)}" data-hold="${esc(t.other)}">${ring(t.other,46)}
     <span class="itext"><span class="t1">${esc(shortName(t.other))}${t.job?` <span style="color:var(--fg)">· ₹${fmt(t.job.agreed||t.job.price)}</span>`:''}</span><span class="t2" style="${t.unread?'color:var(--fg);font-weight:500':''}">${esc(t.sub)}</span></span>
     <span class="iend"><span class="time">${t.last?ago(t.last.at):''}</span>${t.unread?'<span class="udot" aria-label="Unread"></span>':''}</span></button>`).join('')}</section>`).join('')}</div>`
    :inviteCard(D,true)}
@@ -1215,9 +1230,9 @@ function viewChat(D){
   const can=canMessage(c,D);
   return`<div class="pad" style="padding-bottom:10px"><div style="display:flex;align-items:center;gap:10px">
      <button class="back" data-go="chats" aria-label="Back to chats" style="padding:0">${ic('back',20)}</button>
-     <button class="rowmain" data-person="${esc(c.other)}">${ring(c.other,42)}<span class="rowtext"><span style="font-size:var(--t-16);font-weight:600;letter-spacing:-.015em">${esc(shortName(c.other))}</span>
+     <button class="rowmain" data-person="${esc(c.other)}" data-hold="${esc(c.other)}">${ring(c.other,42)}<span class="rowtext"><span style="font-size:var(--t-16);font-weight:600;letter-spacing:-.015em">${esc(shortName(c.other))}</span>
        <span style="font-size:var(--t-12);font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${j?`<span style="color:var(--fg);font-weight:600">₹${fmt(j.agreed||j.price)}</span> · ${esc(j.text)}`:esc(metaOf(c.other)||campus())}</span></span></button>
-     <button class="iconbtn" data-sheet="report" data-about="${esc(c.other)}" aria-label="Report or block">${ic('flag',17)}</button></div></div>
+     <button class="iconbtn" data-sheet="who" data-about="${esc(c.other)}" aria-label="Restrict, block or report">${ic('flag',17)}</button></div></div>
   <div class="msgs">
    ${accepted?`<div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${payOf(j)?.ok?`Paid ✓ · ₹${fmt(j.agreed)}`:`Bid accepted · ₹${fmt(j.agreed)} · pay on UPI after`}</div>`:''}
    ${j&&!accepted?`<button class="banner" style="background:color-mix(in srgb,${noteOf(j)} 14%,var(--surface2));color:${noteOf(j)}" data-job="${esc(j.key)}">About: ${esc(j.text.slice(0,40))}${j.text.length>40?'…':''}</button>`:''}
@@ -1239,7 +1254,7 @@ function viewChat(D){
   </div>`}</div>`}`;
 }
 function viewPerson(uid,D){
-  const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,free=num(d.freeUntil)>Date.now();
+  const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,free=freeNow(uid);
   const bio=str(d.bio,BIO_MAX)||str(d.does,60),bn=bannerOk(d.banner)?d.banner:'';
   const tints=[['rgba(79,227,224,.16)','var(--cyan-ink)'],['rgba(255,122,209,.16)','var(--pink-ink)'],['rgba(255,197,61,.16)','var(--amber-ink)'],['rgba(170,226,84,.18)','var(--violet-ink)']];
   return`<div class="pad">${isMe?'':back('board','Back to the board')}
@@ -1250,13 +1265,13 @@ function viewPerson(uid,D){
      ${!isOrg(uid)&&realNameOf(uid)&&handleOf(uid)?`<span class="realname">${esc(realNameOf(uid))}</span>`:''}
      ${bio?`<p class="pbio">${esc(bio)}</p>`:''}
      <div class="chips pchips">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campusName(campusOf(uid)))}</span>
-       ${uid===ownerId()?'<span class="chip vio">Organiser</span>':''}${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${free?'<span class="chip on">Free right now</span>':''}</div>
+       ${uid===ownerId()?'<span class="chip vio">Organiser</span>':''}${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${free?'<span class="chip on">Free</span>':''}</div>
    </div>
    <div class="stats"><div><b>${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b>${st.avg?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.avg}`:'New'}</b><span>rating</span></div>${isMe?`<div><b class="money">₹${fmt(st.earned)}</b><span>earned</span></div>`:`<div><b>${st.poster.n?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.poster.avg.toFixed(1)}`:'–'}</b><span>as a poster</span></div>`}</div>
    ${st.doer.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a doer · from ${st.doer.n} ${st.doer.n===1?'rating':'ratings'}</span>${st.doer.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
    ${isMe?'':reviewList(uid)}
    ${st.poster.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a poster · from ${st.poster.n} ${st.poster.n===1?'rating':'ratings'}</span>${st.poster.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
-   ${isMe?`<button class="card" data-sheet="free">${ic('clock',20)}<span class="rowtext"><span class="t1">${free?'You’re free until '+clock(num(d.freeUntil)):'Free right now?'}</span><span class="t2">${free?'Anyone can message you until then. Tap to change.':'Show you’re around and open to quick requests'}</span></span><span class="chev">${ic('chev',18)}</span></button>`:''}
+   ${isMe?`<button class="card" data-sheet="free">${ic('clock',20)}<span class="rowtext"><span class="t1">${free?'You’re free until '+clock(freeUntilOf(uid)):'I’m free'}</span><span class="t2">${free?freeAudience()+' Tap to change.':'Mark yourself free for up to 3 hours.'}</span></span><span class="chev">${ic('chev',18)}</span></button>`:''}
    ${isMe?`<div class="menu">
        <button data-go="reviews">${ic('star',18)} Your reviews${(()=>{const l=reviewsOf(S.me.id);return l&&l.length?`<span class="menuval">${l.length}</span>`:''})()}<span class="chev">${ic('chev',16)}</span></button>
        <button data-act="${pushOn()?'pushOff':'pushOn'}" ${S.busy?'disabled':''}>${ic('bell',18)} Notifications<span class="menuval">${pushOn()?'On':'Off'}</span></button>
@@ -1266,16 +1281,15 @@ function viewPerson(uid,D){
        <button data-go="help">${ic('flag',18)} Report or feedback<span class="chev">${ic('chev',16)}</span></button>
        <button data-act="logout">${ic('out',18)} Log out</button></div>
        <p class="note">Logged in as ${esc(S.me.email)}</p>`
-     :`${(()=>{const fn=esc(firstName(uid)),freeNow=num(d.freeUntil)>Date.now(),prev=lastJobFor(uid,D);
-        const asks=asksOf(uid),canAsk=freeNow&&(asks==='all'||(asks==='past'&&prev));
+     :`${(()=>{const fn=esc(firstName(uid)),isFree=freeNow(uid),prev=lastJobFor(uid,D);
+        const asks=asksOf(uid),canAsk=isFree;
         if(asks==='none')return`<p class="note">${fn} isn\u2019t taking favour requests right now.</p>`;
         return (canAsk?`<button class="cta" data-ask="${esc(uid)}">Ask ${fn} for a favour</button>`:'')
-          +(prev?`<button class="${freeNow?'btn2':'cta'}" data-ask="${esc(uid)}" data-prev="${esc(prev.id)}">Hire ${fn} again</button>`:'')
-          +(!canAsk&&!prev?`<p class="note">You can ask ${fn} for a favour when they're marked Free right now.</p>`:'')})()}
-       <button class="linkbtn" data-sheet="report" data-about="${esc(uid)}">Report or block</button>`}
+          +(prev?`<button class="${isFree?'btn2':'cta'}" data-ask="${esc(uid)}" data-prev="${esc(prev.id)}">Hire ${fn} again</button>`:'')})()}
+       <button class="linkbtn" data-sheet="who" data-about="${esc(uid)}">Restrict, block or report</button>`}
   </div></div><div style="height:24px"></div>`;
 }
-function viewSettings(D){const me=S.me.id,asks=asksOf(me),blocked=arr(S.priv.blocked).filter(u=>typeof u==='string'),t=S.priv.terms||{};
+function viewSettings(D){const me=S.me.id,asks=asksOf(me),blocked=arr(S.priv.blocked).filter(u=>typeof u==='string'),rs=restricted(),t=S.priv.terms||{};
   const row=(t1,t2,attrs,end='')=>`<button class="setrow" ${attrs}><span class="rowtext"><span class="t1">${t1}</span>${t2?`<span class="t2">${t2}</span>`:''}</span>${end||`<span class="chev">${ic('chev',16)}</span>`}</button>`;
   const tog=(on,t1,t2,attrs)=>`<button class="setrow" role="switch" aria-checked="${on}" ${attrs}><span class="rowtext"><span class="t1">${t1}</span><span class="t2">${t2}</span></span><span class="switch ${on?'on':''}" aria-hidden="true"></span></button>`;
   return`<div class="pad">${back('me','Back')}<div class="stack narrow" style="margin-top:6px;gap:24px">
@@ -1295,11 +1309,15 @@ function viewSettings(D){const me=S.me.id,asks=asksOf(me),blocked=arr(S.priv.blo
      ${tog(pref('near'),'Show Near you on my bids','Tells the poster you were close to the job when you bid. Never your location.','data-pref="near"')}
      ${tog(pref('receipts'),'Read receipts','Let people see when you’ve read their messages. If you turn this off, you won’t see theirs either.','data-pref="receipts"')}
      ${tog(locOptIn(),'Use my location','Shows jobs near you and lets you tag jobs. Your location stays on this device.','data-act="toggleLocPref"')}
-     <div class="setrow static col"><span class="rowtext"><span class="t1">Who can ask you for a favour</span><span class="t2">Favour requests are private offers sent to you directly.</span></span>
-       <div class="chips">${[['all','Anyone, when I’m free'],['past','People I’ve worked with'],['none','No one']].map(([k,l])=>`<button class="chip ${asks===k?'on':''}" data-asks="${k}" aria-pressed="${asks===k}">${l}</button>`).join('')}</div></div>
+     <div class="setrow static col"><span class="rowtext"><span class="t1">Who sees when you’re free</span><span class="t2">They can ask you for a favour while you’re free. Nobody else is told.</span></span>
+       <div class="chips">${[['past','People I’ve finished a job with'],['all','Anyone on my campus'],['none','No one']].map(([k,l])=>`<button class="chip ${asks===k?'on':''}" data-asks="${k}" aria-pressed="${asks===k}">${l}</button>`).join('')}</div></div>
+   </div></section>
+   <section class="setsec"><h2 class="seth">Restricted people</h2><div class="setcard">
+     ${rs.length?rs.map(u=>`<div class="setrow static">${ring(u,34)}<span class="rowtext"><span class="t1">${esc(shortName(u))}</span><span class="t2">They can’t see when you’re free or ask you for favours.</span></span><button class="btn2 setbtn" data-act="unrestrict" data-uid="${esc(u)}">Unrestrict</button></div>`).join('')
+       :`<div class="setrow static"><span class="rowtext"><span class="t2">You haven’t restricted anyone. Hold someone in Chats or open their profile to restrict them.</span></span></div>`}
    </div></section>
    <section class="setsec"><h2 class="seth">Blocked people</h2><div class="setcard">
-     ${blocked.length?blocked.map(u=>`<div class="setrow static">${ring(u,34)}<span class="rowtext"><span class="t1">${esc(shortName(u))}</span><span class="t2">You don’t see their jobs, bids or messages.</span></span><button class="btn2 setbtn" data-act="unblock" data-uid="${esc(u)}">Unblock</button></div>`).join('')
+     ${blocked.length?blocked.map(u=>`<div class="setrow static">${ring(u,34)}<span class="rowtext"><span class="t1">${esc(shortName(u))}</span><span class="t2">You don’t see their jobs, bids or messages, and they can’t see when you’re free.</span></span><button class="btn2 setbtn" data-act="unblock" data-uid="${esc(u)}">Unblock</button></div>`).join('')
        :`<div class="setrow static"><span class="rowtext"><span class="t2">You haven’t blocked anyone.</span></span></div>`}
    </div></section>
    <section class="setsec"><h2 class="seth">Help</h2><div class="setcard">
@@ -1402,12 +1420,12 @@ function viewInvites(D){
 function railHTML(D){
   const free=freePeople(D).filter(u=>u!==S.me.id),me=S.me.id;
   const myBids=Object.values(S.pitchMine).filter(p=>p&&num(p.amt)>0).map(p=>({b:{amt:num(p.amt),at:num(p.at)},j:D.jobByKey[p.job]})).filter(x=>x.j&&x.j.owner!==me).sort((a,b)=>num(b.b.at)-num(a.b.at)).slice(0,4);
-  return`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">Free right now</h2><span style="font-size:var(--t-12);font-weight:500;color:var(--dim)">${D.members.length} on the board</span></div>
-  <div class="stack gap8">${free.length?free.map(u=>`<div style="display:flex;align-items:center;gap:10px"><button class="rowmain" data-person="${esc(u)}">${ring(u,40)}
+  return`<span style="font-size:var(--t-12);font-weight:500;color:var(--dim)">${D.members.length} on the board</span>
+  <div class="stack gap8">${free.length?free.map(u=>`<div style="display:flex;align-items:center;gap:10px"><button class="rowmain" data-person="${esc(u)}" data-hold="${esc(u)}">${ring(u,40)}
      <span class="rowtext"><span style="font-size:var(--t-14);font-weight:600">${esc(shortName(u))}</span><span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc([metaOf(u),str(pdoc(u).does,40)].filter(Boolean).join(' · '))}</span></span></button>
      <button data-ask="${esc(u)}" style="background:var(--surface2);border-radius:999px;padding:7px 13px;font-size:var(--t-12);font-weight:600">Ask</button></div>`).join('')
    :''}
-   <button class="btn2" style="padding:10px;font-size:var(--t-12)" data-sheet="free">${num(S.myDoc?.freeUntil)>Date.now()?'You’re free until '+clock(num(S.myDoc.freeUntil)):'I’m free right now'}</button></div>
+   <button class="btn2" style="padding:10px;font-size:var(--t-12)" data-sheet="free">${freeNow(S.me.id)?'You’re free until '+clock(freeUntilOf(S.me.id)):'I’m free'}</button></div>
   <div style="height:1px;background:var(--line)"></div>
   <h2 class="h2">Your bids</h2>
   <div class="stack gap8">${myBids.length?myBids.map(({b,j})=>{const ok=j.accepted===me;return`<button data-job="${esc(j.key)}" style="display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:var(--r-sm);padding:11px 13px;width:100%;text-align:left">
@@ -1421,10 +1439,19 @@ function sheetHTML(D){
   const s=S.sheet;if(!s)return'';let b='';
   const j=S.openJob?D.jobByKey[S.openJob]:null;
   switch(s.type){
-  case'free':{const f=num(S.myDoc?.freeUntil)>Date.now();
-    b=`<h2 id="sheetT">When are you free?</h2><p>You'll show at the top of the board, and anyone can message you directly until then.</p>
-    <div class="stack gap8">${[['1h','For the next hour'],['3h','Next 3 hours'],['day','Rest of today']].map(([k,l])=>`<button class="btn2" data-free="${k}">${l}</button>`).join('')}
+  case'free':{const f=freeNow(S.me.id),q=quietNow(),seen=new Set();
+    const opts=q?[]:[1,2,3].map(h=>({h,end:freeEnd(h)})).filter(o=>o.end-Date.now()>6e5&&!seen.has(o.end)&&seen.add(o.end));
+    b=q?`<h2 id="sheetT">Quiet hours</h2><p>tack is quiet from 11 pm to 7 am. You can mark yourself free again in the morning.</p>`
+      :`<h2 id="sheetT">I’m free</h2><p>For up to 3 hours. ${freeAudience()}</p>`;
+    b+=`<div class="stack gap8">${opts.map(o=>`<button class="btn2" data-free="${o.h}">${o.end<Date.now()+o.h*36e5-6e4?'Until 11 pm':o.h===1?'For the next hour':`For the next ${o.h} hours`}</button>`).join('')}
+    ${!q&&!opts.length?'<p class="note">It’s nearly 11 pm. Try again in the morning.</p>':''}
     ${f?'<button class="btn2 danger" data-free="off">I’m not free any more</button>':''}</div>`;break}
+  case'who':{const u=s.about,rs=restricted().includes(u),bl=arr(S.priv.blocked).includes(u),fn=esc(firstName(u));
+    b=`<h2 id="sheetT">${esc(shortName(u))}</h2>
+    <div class="menu whomenu">
+      <button data-act="${rs?'unrestrict':'restrict'}" data-uid="${esc(u)}">${ic('eyeoff',18)}<span class="rowtext"><span class="t1">${rs?'Unrestrict':'Restrict'}</span><span class="t2">${rs?`${fn} can see when you’re free again.`:`${fn} won’t see when you’re free or be able to ask you for favours. Chats about jobs still work. They aren’t told.`}</span></span></button>
+      <button class="danger" data-act="${bl?'unblock':'blockWho'}" data-uid="${esc(u)}">${ic('ban',18)}<span class="rowtext"><span class="t1">${bl?'Unblock':'Block'}</span><span class="t2">${bl?`You’ll see ${fn}’s jobs, bids and messages again.`:`You won’t see ${fn}’s jobs, bids or messages, and they can’t see when you’re free. They aren’t told.`}</span></span></button>
+      <button class="danger" data-sheet="report" data-about="${esc(u)}">${ic('flag',18)}<span class="rowtext"><span class="t1">Report</span><span class="t2">The organiser looks at it. ${fn} isn’t told who reported.</span></span></button></div>`;break}
   case'pick':b=`<h2 id="sheetT">Pick ${esc(firstName(s.uid))} for ₹${fmt(s.amt)}?</h2><p>The job leaves the board and you two can sort out the details in chat. Pay them on UPI or cash after.</p>
     <button class="cta" data-act="confirmPick">Pick ${esc(firstName(s.uid))}</button><button class="linkbtn" data-act="closeSheet">Not yet</button>`;break;
   case'done':case'ratePoster':{const side=s.type==='done'?'d':'p',who=j?(side==='d'?j.accepted:j.owner):null,fn=esc(who?firstName(who):'them');
@@ -1533,7 +1560,7 @@ function sheetHTML(D){
   case'report':b=`<h2 id="sheetT">Report ${esc(shortName(s.about))}</h2><p>${esc(organiser())} sees your report and can read chats with them.</p>
     <div class="chips" role="group" aria-label="Reason">${REASONS.map(r=>`<button class="chip ${S.rep.why===r?'on':''}" data-why="${esc(r)}" aria-pressed="${S.rep.why===r}">${esc(r)}</button>`).join('')}</div>
     <input id="repN" class="inp" maxlength="200" placeholder="What happened? (optional)" value="${esc(S.rep.note)}" data-bind="rep.note" aria-label="What happened">
-    <label class="check" for="repB"><input type="checkbox" id="repB" data-bind="rep.block" ${S.rep.block?'checked':''}> Also block them. You won't see their jobs, bids or messages.</label>
+    <label class="check" for="repB"><input type="checkbox" id="repB" data-bind="rep.block" ${S.rep.block?'checked':''}> Also block them. You won't see their jobs, bids or messages, and they can't see when you're free.</label>
     ${S.err.rep?`<p class="err">${esc(S.err.rep)}</p>`:''}<button class="cta" data-act="confirmReport" data-need="report">Send report</button>
     <button class="linkbtn" data-act="blockOnly">Just block them</button>`;break;
   case'erase':b=`<h2 id="sheetT">Delete your account?</h2><p>This erases your profile, the jobs you pinned, your bids, ratings you gave and your messages, and removes your login. It can't be undone.</p>
@@ -1548,7 +1575,7 @@ function sheetHTML(D){
 const VIEWS={cboard:viewCBoard,cnote:viewCNote,board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewSettings,settings:viewSettings,help:viewHelp,invites:viewInvites,saved:viewSaved,reviews:viewReviews,review:viewReview,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
 let lastView=null,lastSheet=null;const scrollMem={};
 const INTRO=[
-  {k:'board',t:'This is the board.',b:'Classmates pin small jobs here. A print run, a lift down four floors, an hour of help before a deadline. Tap + when you’re free and people can ask you directly.'},
+  {k:'board',t:'This is the board.',b:'Classmates pin small jobs here. A print run, a lift down four floors, an hour of help before a deadline. Tap + to mark yourself free, and people you’ve worked with can ask you for a favour.'},
   {k:'pin',t:'Need something? Pin it.',b:'Write it on a note, set a price, pick a colour. It goes up for everyone on campus to see.'},
   {k:'bid',t:'Bid what it’s worth.',b:'Name your price and pitch yourself in a line. Only the poster sees your bid.'},
   {k:'pick',t:'Get picked. Pay safely.',b:'The poster picks one person and you plan it in chat. Pay on UPI or cash and confirm it in tack. tack never touches the money.'},
@@ -1559,7 +1586,7 @@ const inote=(h,p,t,meta,cls='',st='')=>`<span class="inote ${cls}" style="--h:${
 function introScene(k){const me=S.me?.id;
   if(k==='board')return`<div class="isc isc-board" aria-hidden="true">
     ${inote(128,'₹120','Print 40 pages at Sai Xerox','Gate 1 · Today','n1')}${inote(262,'₹300','20 photos at golden hour','Lawn · Tomorrow','n2')}${inote(350,'₹60','Parcel from Gate 1','Hostel B · Now','n3')}
-    <span class="ichip c1"><span class="ilive"></span>Free right now</span></div>`;
+    <span class="ichip c1"><span class="ilive"></span>I’m free</span></div>`;
   if(k==='pin')return`<div class="isc isc-pin" aria-hidden="true">
     <span class="inote ibig"><span class="ipinhead"></span><b class="iprice">₹150</b><i class="itype">Xerox 40 pages by 5</i><em>Design block · Now</em></span>
     <span class="ihue"><span class="ithumb"></span></span><span class="ipinit">Pin it</span></div>`;
@@ -1620,7 +1647,7 @@ function moment(title,sub,ms=1300){
   document.body.appendChild(r);S.momentOn=true;const t=reduceMotion.matches?Math.min(ms,700):ms;
   return new Promise(res=>setTimeout(()=>{r.classList.add('out');setTimeout(()=>{r.remove();S.momentOn=false;res();if(S.phase==='app')render()},reduceMotion.matches?0:260)},t))}
 function stepsCard(D){if(!S.priv.introSeen||S.priv.stepsHidden||S.priv.stepsDone)return'';const me=S.me.id,d=S.myDoc||{};
-  const steps=[[!!d.photo,'Add a profile photo','A real face helps people say yes.','data-go="edit"'],[num(d.freeUntil)>0,'Mark yourself free','Free people show up first for quick asks.','data-sheet="free"'],
+  const steps=[[!!d.photo,'Add a profile photo','A real face helps people say yes.','data-go="edit"'],[S.freeDocs[me]!=null,'Mark yourself free','People you’ve worked with can ask you for quick favours.','data-sheet="free"'],
     [D.jobs.some(j=>j.owner===me)||Object.keys(S.pitchMine).length>0,'Pin or bid on a job','The first one is the hardest.','data-go="post"']];
   const n=steps.filter(x=>x[0]).length;
   // Once all three are done the card is gone for good, even if a step is undone later.
@@ -1963,12 +1990,18 @@ const ACT={
   sendOffer(){const o=S.offer,text=o.text.trim(),price=digits(o.price),me=S.me.id;
     if(!need(text.length>=6,'offer','Say what you need in a few more words.')||!need(price>=10&&price<=20000,'offer','Set a price between ₹10 and ₹20,000.'))return;
     if(modBlock('offer',text,o.where))return;
+    if(quietNow()){need(false,'offer','tack is quiet from 11 pm to 7 am. Ask again in the morning.');return}
     const id=rid(),key=`${me}~${id}~${o.to}`,d={owner:me,to:o.to,job:id,text:text.slice(0,200),price,when:o.when,where:o.where.trim().slice(0,40),at:Date.now(),status:'pending',...(o.prevJob?{prevJob:o.prevJob}:{})};
     S.offersOut={...S.offersOut,[key]:d};S.sheet=null;render();
     S.fb.setDoc(S.fb.doc(S.db,'offers',key),d).then(()=>toast('Sent to '+firstName(o.to)+'. You\u2019ll see their answer in Activity.')).catch(e=>{const m={...S.offersOut};delete m[key];S.offersOut=m;render();
-      toast(e&&e.code==='permission-denied'?firstName(o.to)+' isn\u2019t free any more. Try again when they are.':'Couldn\u2019t send it. Try again.')})},
+      if(!(e&&e.code==='permission-denied')){toast('Couldn\u2019t send it. Try again.');return}
+      S.sb.rpc('ask_block_reason',{p_to:o.to,p_prev:o.prevJob||null}).then(({data})=>toast({quiet:'tack is quiet from 11 pm to 7 am. Ask again in the morning.',limit:'You can ask up to 5 people a day. Try again tomorrow.',
+        again:'You\u2019ve already asked '+firstName(o.to)+' today.'}[data]||firstName(o.to)+' isn\u2019t free any more.'),()=>toast('Couldn\u2019t send it. Try again.'))})},
   acceptOffer(el){const k=el.dataset.key;S.fb.updateDoc(S.fb.doc(S.db,'offers',k),{status:'accepted',respondedAt:Date.now()}).then(()=>toast('Accepted. It\u2019s now a job between you two.')).catch(writeErr)},
-  declineOffer(el){const k=el.dataset.key;S.fb.updateDoc(S.fb.doc(S.db,'offers',k),{status:'declined',respondedAt:Date.now()}).then(()=>toast('Declined')).catch(writeErr)},
+  declineOffer(el){const k=el.dataset.key;S.fb.updateDoc(S.fb.doc(S.db,'offers',k),{status:'declined',respondedAt:Date.now()}).then(()=>toast('Declined. They won\u2019t be told.')).catch(writeErr)},
+  restrict(el){const u=el.dataset.uid;savePriv({restricted:[...new Set([...restricted(),u])]});S.sheet=null;toast('Restricted. '+firstName(u)+' isn\u2019t told.')},
+  unrestrict(el){const u=el.dataset.uid;savePriv({restricted:restricted().filter(x=>x!==u)});if(S.sheet?.type==='who')S.sheet=null;toast('Unrestricted')},
+  blockWho(el){const u=el.dataset.uid;savePriv({blocked:[...new Set([...arr(S.priv.blocked),u])]});S.sheet=null;toast('Blocked. '+firstName(u)+' isn\u2019t told.');if(['chat','person'].includes(S.view))go('board')},
   withdrawOffer(el){const k=el.dataset.key,m={...S.offersOut};delete m[k];S.offersOut=m;render();S.fb.deleteDoc(S.fb.doc(S.db,'offers',k)).catch(writeErr)},
   toggleMemberInvites(el){S.config={...S.config,memberInvites:!!el.checked};render();S.fb.setDoc(S.fb.doc(S.db,'config','app'),S.config).catch(writeErr);toast(el.checked?'Members can invite friends':'Member invites are off')},
   saveCampus(){const c=(S.inv.campus||'').trim();if(!c)return;const {doc,setDoc}=S.fb;
@@ -2035,8 +2068,11 @@ document.addEventListener('click',e=>{
   if(ds.onb!==undefined){S.onb[ds.onb]=ds.val;render();return}
   if(ds.pick!==undefined){const b=bidsFor(derive(),S.openJob).find(x=>x.by===ds.pick);if(b){S.sheet={type:'pick',uid:b.by,amt:b.amt};render()}return}
   if(ds.sheet!==undefined){if(ds.sheet==='invitefriend')S.lastCode=null;S.err={};S.erase={pw:''};if(ds.sheet==='done'||ds.sheet==='ratePoster'||ds.sheet==='review')S.rate={a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]};if(ds.sheet==='report')S.rep={why:ds.prewhy||'',note:'',block:false};S.sheet={type:ds.sheet,about:ds.about,rid:ds.rid};render();return}
-  if(ds.free!==undefined){const now=new Date(),t={'1h':+now+36e5,'3h':+now+3*36e5,day:new Date(now).setHours(23,59,0,0),off:0}[ds.free];
-    saveMine(d=>{d.freeUntil=t;return d});S.sheet=null;toast(t?'You’re on the Free right now row':'Marked not free');return}
+  if(ds.free!==undefined){const me=S.me.id;if(ds.free!=='off'&&quietNow()){toast('tack is quiet from 11 pm to 7 am.');return}
+    const t=ds.free==='off'?0:freeEnd(+ds.free||1),prev=S.freeDocs[me];
+    S.freeDocs={...S.freeDocs,[me]:{until:t}};S.freeSaving=true;S.sheet=null;render();
+    S.fb.setDoc(S.fb.doc(S.db,'free',me),{until:t}).then(()=>toast(t?'You’re free until '+clock(t):'You’re not marked free any more'),
+      e=>{const f={...S.freeDocs};if(prev)f[me]=prev;else delete f[me];S.freeDocs=f;render();toast(quietNow()?'tack is quiet from 11 pm to 7 am.':'Couldn\u2019t save that. Try again.')}).finally(()=>{S.freeSaving=false});return}
   if(ds.review!==undefined){S.openRev=ds.review;go('review');return}
   if(ds.com!==undefined){openCom(ds.com);return}
   if(ds.cnote!==undefined){S.cnote=ds.cnote;go('cnote');return}
@@ -2051,12 +2087,14 @@ document.addEventListener('click',e=>{
 });
 let lp=null;
 function openJobMenu(k){S.sheet={type:'jobmenu',key:k};render()}
-document.addEventListener('pointerdown',e=>{const t=e.target.closest('.tile[data-job]');if(!t||e.button>0)return;if(lp)clearTimeout(lp.t);
-  lp={x:e.clientX,y:e.clientY,fired:false,t:setTimeout(()=>{lp.fired=true;navigator.vibrate?.(12);openJobMenu(t.dataset.job)},480)}});
+// Hold a note for its menu, or hold a person (chats, the free row) to restrict, block or report them.
+const holdOpen=t=>{if(t.dataset.job)openJobMenu(t.dataset.job);else if(t.dataset.hold&&t.dataset.hold!==S.me?.id){S.sheet={type:'who',about:t.dataset.hold};render()}};
+document.addEventListener('pointerdown',e=>{const t=e.target.closest('.tile[data-job],[data-hold]');if(!t||e.button>0)return;if(lp)clearTimeout(lp.t);
+  lp={x:e.clientX,y:e.clientY,fired:false,t:setTimeout(()=>{lp.fired=true;navigator.vibrate?.(12);holdOpen(t)},480)}});
 document.addEventListener('pointermove',e=>{if(lp&&!lp.fired&&Math.hypot(e.clientX-lp.x,e.clientY-lp.y)>10)clearTimeout(lp.t)});
 ['pointerup','pointercancel'].forEach(n=>document.addEventListener(n,()=>{if(!lp)return;clearTimeout(lp.t);if(lp.fired){lp.until=Date.now()+400;lp.fired=false}}));
 document.addEventListener('click',e=>{if(lp&&lp.until>Date.now()){lp=null;e.stopPropagation();e.preventDefault()}},true);
-document.addEventListener('contextmenu',e=>{const t=e.target.closest('.tile[data-job]');if(!t)return;e.preventDefault();if(lp?.fired||lp?.until>Date.now())return;if(lp)clearTimeout(lp.t);openJobMenu(t.dataset.job)});
+document.addEventListener('contextmenu',e=>{const t=e.target.closest('.tile[data-job],[data-hold]');if(!t)return;e.preventDefault();if(lp?.fired||lp?.until>Date.now())return;if(lp)clearTimeout(lp.t);holdOpen(t)});
 document.addEventListener('submit',e=>{
   const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();
   if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset,newpw:setNewPw})[f.dataset.form]?.();

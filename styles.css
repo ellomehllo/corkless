@@ -1353,3 +1353,10 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .cmrow .cn{flex:1}
 .linkbtn.danger{color:var(--danger)}
 .cntile:has(.tpics) p{margin-top:26px}
+/* Restrict, block or report sheet */
+.sheet-who .menu button{background:transparent;align-items:flex-start}
+.whomenu button>svg{flex:none;margin-top:2px}
+.whomenu .rowtext{display:flex;flex-direction:column;gap:3px;min-width:0}
+.whomenu .t1{font-weight:600}
+.whomenu .t2{font-size:var(--t-12);font-weight:500;line-height:1.4;color:var(--muted);white-space:normal}
+[data-hold]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
