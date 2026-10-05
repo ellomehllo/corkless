@@ -1138,3 +1138,11 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 @media (prefers-reduced-motion:reduce){.bignote.enter,.bignote.enter .pin{animation:none}}
 .notewrap.flat .bignote{transition:none}
 .tile.ntile>.tpics:not(.tbg):not(.pin),.tile.ntile>.heldtag:not(.tbg):not(.pin){position:absolute;top:12px;right:12px;left:auto}
+
+/* nav bar: part of the bottom of the screen, a thin line on top, no floating pill */
+@media (max-width:899px){
+  .tabbar{margin:0;border-radius:0;background:rgba(6,6,8,.92);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+    border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));box-shadow:none}
+  .typing .tabbar,.kb .tabbar{display:none!important}
+}
+@media (max-width:899px){.tabbar .fab{width:44px;height:44px;box-shadow:0 0 16px rgba(170,226,84,.35)}}

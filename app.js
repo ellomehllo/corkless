@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050553';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050553';
-import {modHit,MOD_CAT} from './mod.js?v=202610050553';
+import {makeDb} from './db.js?v=202610050645';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050645';
+import {modHit,MOD_CAT} from './mod.js?v=202610050645';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -1560,6 +1560,13 @@ const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
 const typingEl=e=>e&&(e.tagName==='TEXTAREA'||e.isContentEditable||(e.tagName==='INPUT'&&!['range','checkbox','radio','button','submit','file','color'].includes(e.type)));
 let kbT=null;document.addEventListener('focusin',e=>{if(typingEl(e.target)){clearTimeout(kbT);document.documentElement.classList.add('typing')}});
 document.addEventListener('focusout',()=>{clearTimeout(kbT);kbT=setTimeout(()=>{if(!typingEl(document.activeElement))document.documentElement.classList.remove('typing')},120)});
+const kbBase={h:window.innerHeight};
+function kbCheck(){const vv=window.visualViewport,h=window.innerHeight,vh=vv?vv.height*vv.scale:h;
+  if(!typingEl(document.activeElement))kbBase.h=Math.max(kbBase.h,h);
+  const open=typingEl(document.activeElement)&&(kbBase.h-vh>120||kbBase.h-h>120);document.documentElement.classList.toggle('kb',open)}
+window.visualViewport?.addEventListener('resize',kbCheck);window.addEventListener('resize',kbCheck);
+document.addEventListener('focusin',()=>setTimeout(kbCheck,300));document.addEventListener('focusout',()=>setTimeout(kbCheck,200));
+window.addEventListener('orientationchange',()=>{kbBase.h=0;setTimeout(()=>{kbBase.h=window.innerHeight;kbCheck()},400)});
 function go(v,keepThread){if(v==='post'&&S.view!=='post')S.postEnter=true;
   const from=S.view;
   if(v!=='chat'&&!keepThread)closeThread();
