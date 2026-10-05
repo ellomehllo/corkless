@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050752';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050752';
-import {modHit,MOD_CAT} from './mod.js?v=202610050752';
+import {makeDb} from './db.js?v=202610050759';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050759';
+import {modHit,MOD_CAT} from './mod.js?v=202610050759';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -1007,10 +1007,10 @@ function viewJob(D){
   </section>`;
   return`<div class="pad jobpage${gcls(j)}" style="--nc:${noteOf(j)}${gvars(j)}">
   <div class="jhero">${cover}${back('board','Board')}<div class="jtools">${mine&&st==='open'?`<button class="jtool" data-act="editJob" data-key="${esc(j.key)}" aria-label="Edit this job">${ic('edit',18)}</button>`:''}<button class="jtool" data-act="openShare" data-key="${esc(j.key)}" aria-label="Share this job">${ic('share',18)}</button>${mine?'':`<button class="jtool ${isSaved(j.key)?'on':''}" data-act="toggleSave" data-key="${esc(j.key)}" aria-label="${isSaved(j.key)?'Remove from saved':'Save this job'}" aria-pressed="${isSaved(j.key)}">${ic('bookmark',18,2,'currentColor',isSaved(j.key)?'currentColor':'none')}</button>`}</div>
-    <div class="jhead"><h1 class="h1">${esc(j.text)}</h1></div><span class="jhint">${hint}</span></div>
-  <button class="jposter" data-person="${esc(j.owner)}"><span class="javwrap"><span class="ring${freeNow(j.owner)?' live':''}" style="width:68px;height:68px">${face(j.owner,58)}</span>${online?'<span class="onl"><i></i>Online</span>':''}</span>
+    <div class="jhead"><h1 class="h1">${esc(j.text)}</h1></div></div>
+  <div class="jpwrap">${hasPh?`<button class="jhint" data-pic="${esc('j:'+j.key)}" data-i="0">${hint}</button>`:`<span class="jhint">${hint}</span>`}<button class="jposter" data-person="${esc(j.owner)}"><span class="javwrap"><span class="ring${freeNow(j.owner)?' live':''}" style="width:68px;height:68px">${face(j.owner,58)}</span>${online?'<span class="onl"><i></i>Online</span>':''}</span>
     <span class="pname">${esc(shortName(j.owner))}</span>
-    <span class="jmeta">${mine?`posted ${since(j.at)}${j.editedAt?' · edited':''}`:`${esc(metaOf(j.owner)||campus())}${esc(posterLine(j.owner))} · posted ${since(j.at)}${j.editedAt?' · edited':''}${esc(payLine(j.owner))}`}</span></button>
+    <span class="jmeta">${mine?`posted ${since(j.at)}${j.editedAt?' · edited':''}`:`${esc(metaOf(j.owner)||campus())}${esc(posterLine(j.owner))} · posted ${since(j.at)}${j.editedAt?' · edited':''}${esc(payLine(j.owner))}`}</span></button></div>
   <div class="jcard stack">
     <span class="big" style="view-transition-name:jp">₹${fmt(j.price)}</span>
     <div class="chips">${[j.when,online?'':j.where].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${nearMe(j)?nearTag():''}${stTag}</div>

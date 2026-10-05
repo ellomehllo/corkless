@@ -1196,3 +1196,15 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .mininote .mnl.s{width:65%;background:rgba(255,255,255,.35)}
 .notif .mininote+.udot,.nbanner .mininote{margin-left:8px}
 .notif .mininote{margin-right:2px}
+
+/* job header: the poster sits half over the photo right under the title, photo hint level with the avatar */
+.jhero{min-height:0;padding:60px 20px 52px}
+.jpwrap{position:relative;z-index:1;display:flex;justify-content:center;margin-top:-34px}
+.jposter{margin:0;gap:3px}
+.jpwrap .jhint{position:absolute;left:0;top:34px;bottom:auto;transform:translateY(-50%);pointer-events:auto;cursor:pointer}
+.jpwrap span.jhint{pointer-events:none}
+.jcard{margin-top:12px}
+.jcover::after{background:linear-gradient(180deg,rgba(6,6,8,.3),rgba(6,6,8,0) 28%,rgba(6,6,8,0) 82%,rgba(6,6,8,.55))}
+.jcover .tbg.ph::after{background:linear-gradient(180deg,rgba(8,16,44,.55) 0%,rgba(8,16,44,.2) 35%,rgba(8,16,44,.3) 75%,rgba(8,16,44,.45) 100%)}
+.jhero{border-radius:0 0 22px 22px}
+.jpwrap .ring{box-shadow:0 0 0 4px var(--bg)!important;background:var(--bg)}
