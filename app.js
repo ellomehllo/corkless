@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050645';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050645';
-import {modHit,MOD_CAT} from './mod.js?v=202610050645';
+import {makeDb} from './db.js?v=202610050654';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050654';
+import {modHit,MOD_CAT} from './mod.js?v=202610050654';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -58,6 +58,9 @@ const I={
  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/>',
  search:'<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
  x:'<path d="M6 6l12 12M18 6 6 18"/>',
+ mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/>',
+ play:'<polygon points="7 4 20 12 7 20 7 4"/>',
+ pause:'<line x1="8" y1="5" x2="8" y2="19"/><line x1="16" y1="5" x2="16" y2="19"/>',
  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
  camera:'<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.5" r="3.5"/>'
 };
@@ -550,7 +553,7 @@ async function setNewPw(){if(!need(S.pw.nw.length>=8,'pw','Use a new password of
   S.recovery=false;S.pw={cur:'',nw:''};S.err={};toast('Password set');handleUser(userOf(data.user))}
 async function checkPw(pw){const {error}=await S.sb.auth.signInWithPassword({email:S.user.email,password:pw});if(error)throw authErr(error)}
 
-function closeThread(){if(S.chat.unsub)try{S.chat.unsub()}catch{};S.chat={key:null}}
+function closeThread(){if(S.chat.unsub)try{S.chat.unsub()}catch{};if(S.rec)recStop(false);if(S.audio){S.audio.pause();S.playing=null}S.chat={key:null}}
 function openThread(t){
   const {collection,query,orderBy,limit,onSnapshot}=S.fb;
   closeThread();S.chatDraft={text:''};
@@ -558,12 +561,41 @@ function openThread(t){
   S.chat={key:k,other:t.other,jobKey:t.jobKey||null,msgs:[],loaded:false,unsub:null};
   S.chat.unsub=onSnapshot(query(collection(S.db,'threads',k,'msgs'),orderBy('at','desc'),limit(300)),snap=>{
     if(S.chat.key!==k)return;
-    S.chat.msgs=snap.docs.map(d=>d.data()).filter(m=>m&&typeof m.t==='string').map(m=>({t:m.t.slice(0,1000),at:num(m.at),by:str(m.by,128)})).reverse();
+    S.chat.msgs=snap.docs.map(d=>d.data()).filter(m=>m&&typeof m.t==='string').map(m=>({t:m.t.slice(0,1000),at:num(m.at),by:str(m.by,128),kind:['photo','audio'].includes(m.kind)?m.kind:'text',media:typeof m.media==='string'?m.media:'',dur:num(m.dur)})).reverse();
     S.chat.loaded=true;markSeen();render();
     requestAnimationFrame(()=>{const m=$('main');if(S.view==='chat')m.scrollTop=m.scrollHeight});
   },e=>{S.chat.loaded=true;render();console.warn(e)});
   go('chat',true);
 }
+function mediaUrl(path){S.media=S.media||{};const v=S.media[path];if(v!==undefined)return v;S.media[path]=null;
+  S.sb.storage.from('chat').createSignedUrl(path,6*3600).then(({data})=>{S.media[path]=data?.signedUrl||'';if(data?.signedUrl)S.pics['m:'+path]=[data.signedUrl];if(S.view==='chat')render()}).catch(()=>{S.media[path]=''});return null}
+const mmss=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+function msgBody(m){if(m.kind==='photo'){const u=mediaUrl(m.media);return u?`<button class="mphoto" data-pic="${esc('m:'+m.media)}" data-i="0" aria-label="Open photo"><img src="${esc(u)}" alt="Photo"></button>`:'<span class="mphoto wait"></span>'}
+  if(m.kind==='audio'){const u=mediaUrl(m.media),on=S.playing===m.media;return`<span class="maudio"><button class="mplay" data-act="playVoice" data-src="${esc(m.media)}" ${u?'':'disabled'} aria-label="${on?'Pause':'Play'} voice message">${ic(on?'pause':'play',16,2.2,'currentColor',on?'none':'currentColor')}</button><span class="mwave"><i style="width:${on?S.playPct||0:0}%"></i></span><span class="mdur">${mmss(m.dur)}</span></span>`}
+  return esc(m.t)}
+async function sendMedia(kind,blob,ext,dur){const c=S.chat;if(!c.key||!canMessage(c,derive()))return;
+  const path=`${c.key}/${crypto.randomUUID()}.${ext}`,type=kind==='photo'?'image/jpeg':(blob.type||'audio/webm').split(';')[0];
+  S.chatUp=kind;render();
+  const {error}=await S.sb.storage.from('chat').upload(path,blob,{contentType:type,upsert:false});
+  if(error){S.chatUp=null;render();console.warn(error);toast(kind==='photo'?'Couldn\u2019t send the photo. Try again.':'Couldn\u2019t send the voice message. Try again.');return}
+  try{await S.fb.rpc('send_msg',{p_thread:c.key,p_job:c.jobKey||null,p_other:c.other,p_text:'',p_kind:kind,p_media:path,p_dur:dur||null});savePriv({seen:{[c.key]:Date.now()}})}
+  catch(e){console.warn(e);toast('Couldn\u2019t send that. Try again.')}
+  S.chatUp=null;render()}
+async function sendChatPhoto(file){try{const d=await readPic(file),b=await (await fetch(d)).blob();sendMedia('photo',b,'jpg')}catch{toast('That photo couldn\u2019t be opened. Try another one.')}}
+const recClock=()=>mmss(S.rec?(Date.now()-S.rec.t0)/1000:0);
+async function recStart(){if(S.rec)return;if(!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==='undefined'){toast('This browser can\u2019t record audio.');return}
+  let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:true})}catch{toast('Allow the microphone for tack to send voice messages.');return}
+  const mt=['audio/webm;codecs=opus','audio/mp4','audio/webm','audio/ogg'].find(t=>MediaRecorder.isTypeSupported?.(t))||'';
+  const rec=new MediaRecorder(stream,mt?{mimeType:mt}:undefined),parts=[];rec.ondataavailable=e=>{if(e.data.size)parts.push(e.data)};
+  S.rec={rec,stream,parts,t0:Date.now(),tick:setInterval(()=>{const el=$('recT');if(el)el.textContent=recClock();if(Date.now()-S.rec.t0>=120000)recStop(true)},250)};rec.start(250);render()}
+function recStop(send){const r=S.rec;if(!r)return;clearInterval(r.tick);S.rec=null;const dur=(Date.now()-r.t0)/1000;
+  r.rec.onstop=()=>{r.stream.getTracks().forEach(t=>t.stop());if(!send)return;if(dur<1){toast('Hold on a little longer to record.');return}
+    const type=(r.rec.mimeType||r.parts[0]?.type||'audio/webm').split(';')[0],blob=new Blob(r.parts,{type}),ext=type.includes('mp4')?'m4a':type.includes('ogg')?'ogg':'webm';sendMedia('audio',blob,ext,Math.round(dur))};
+  try{r.rec.stop()}catch{r.stream.getTracks().forEach(t=>t.stop())}render()}
+function playVoice(path){const u=S.media?.[path];if(!u)return;S.audio=S.audio||new Audio();const a=S.audio;
+  if(S.playing===path&&!a.paused){a.pause();S.playing=null;render();return}
+  a.src=u;S.playing=path;S.playPct=0;a.ontimeupdate=()=>{S.playPct=a.duration?Math.round(a.currentTime/a.duration*100):0;const b=document.querySelector(`[data-src="${CSS.escape(path)}"]`)?.parentElement?.querySelector('.mwave i');if(b)b.style.width=S.playPct+'%'};
+  a.onended=()=>{S.playing=null;S.playPct=0;render()};a.play().catch(()=>{S.playing=null;toast('Couldn\u2019t play that.')});render()}
 function markSeen(){
   const c=S.chat;if(!c.key||S.view!=='chat')return;
   const last=Math.max(0,...c.msgs.filter(m=>m.by!==S.me.id).map(m=>m.at));
@@ -1103,13 +1135,20 @@ function viewChat(D){
    ${j&&!accepted?`<button class="banner" style="background:color-mix(in srgb,${noteOf(j)} 14%,var(--surface2));color:${noteOf(j)}" data-job="${esc(j.key)}">About: ${esc(j.text.slice(0,40))}${j.text.length>40?'…':''}</button>`:''}
    ${!c.msgs.length?`<p class="note" style="margin:10px 0">${c.loaded?'Say hi. Sort out the time and place here.':'Loading messages…'}</p>`:''}
    ${(()=>{const lastOut=[...c.msgs].reverse().find(m=>m.by===me),readAt=num(((S.threadDocs[c.key]||{}).read||{})[c.other]),seen=pref('receipts')&&lastOut&&readAt>=lastOut.at;
-     return c.msgs.map(m=>`<div class="${m.by===me?'out':'in'}">${esc(m.t)}<span class="time">${stamp(m.at)}</span></div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`).join('')})()}
+     return c.msgs.map(m=>`<div class="${m.by===me?'out':'in'}${m.kind!=='text'?' media '+m.kind:''}">${msgBody(m)}<span class="time">${stamp(m.at)}</span></div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`).join('')})()}
+   ${S.chatUp?`<div class="out media pending">${S.chatUp==='photo'?'Sending photo…':'Sending voice message…'}</div>`:''}
   </div>
   ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats now happen inside jobs: ask ${esc(firstName(c.other))} for a favour when they're free, or hire them again from their profile.`}</p></div>`:`
-  <div class="foot" style="position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%)"><div style="display:flex;gap:9px">
+  <div class="foot" style="position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%)">${S.rec?`<div class="composer rec">
+    <button class="cbtn" data-act="recCancel" aria-label="Cancel recording">${ic('trash',19)}</button>
+    <span class="recbar"><i class="recdot"></i><span id="recT">${recClock()}</span><span class="muted">Recording</span></span>
+    <button class="csend" data-act="recSend" aria-label="Send voice message">${ic('send',19,2,'var(--on-grad)')}</button></div>`
+   :`<div class="composer ${S.chatDraft.text.trim()?'hastext':''}" id="composer">
+    <label class="cbtn" for="chatPic" aria-label="Send a photo">${ic('camera',20)}<input id="chatPic" type="file" accept="image/*" hidden></label>
     <label class="field" for="msg"><input id="msg" type="text" maxlength="1000" placeholder="Message…" value="${esc(S.chatDraft.text)}" data-bind="chatDraft.text" aria-label="Message ${esc(firstName(c.other))}" autocomplete="off"></label>
-    <button data-act="send" aria-label="Send" style="width:50px;height:50px;flex-shrink:0;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(170,226,84,.35)">${ic('send',19,2,'var(--on-grad)')}</button>
-  </div></div>`}`;
+    <button class="csend cmic" data-act="recStart" aria-label="Record a voice message">${ic('mic',20,2,'var(--on-grad)')}</button>
+    <button class="csend ctext" data-act="send" aria-label="Send">${ic('send',19,2,'var(--on-grad)')}</button>
+  </div>`}</div>`}`;
 }
 function viewPerson(uid,D){
   const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,free=num(d.freeUntil)>Date.now();
@@ -1662,6 +1701,8 @@ const ACT={
   introSkip(){closeIntro()},
   introDone(){closeIntro('board')},
   introPost(){closeIntro('post')},
+  recStart(){recStart()},recCancel(){recStop(false)},recSend(){recStop(true)},
+  playVoice(el){playVoice(el.dataset.src)},
   pickCollege(el){S.form.college=el.dataset.id;S.form.notListed=false;S.authErr='';render()},
   clearCollege(){S.form.college='';render();setTimeout(()=>$('fCol')?.focus(),0)},
   colMissing(){S.form.notListed=true;S.form.college='';render();setTimeout(()=>$('fNcol')?.focus(),0)},
@@ -1751,7 +1792,7 @@ const ACT={
     try{await checkPw(S.erase.pw)}
     catch(e){S.busy=false;S.err={erase:e.code==='auth/too-many-requests'?authMsg(e):'That password isn\u2019t right.'};render();return}
     try{
-      for(const[k,t]of Object.entries(S.threadDocs)){const q=await getDocs(query(collection(S.db,'threads',k,'msgs'),where('by','==',me)));for(const m of q.docs)await deleteDoc(m.ref);
+      for(const[k,t]of Object.entries(S.threadDocs)){const q=await getDocs(query(collection(S.db,'threads',k,'msgs'),where('by','==',me)));const files=q.docs.map(m=>m.data().media).filter(Boolean);if(files.length)await S.sb.storage.from('chat').remove(files).catch(()=>{});for(const m of q.docs)await deleteDoc(m.ref);
         if(t&&t.lastBy===me)await S.fb.updateDoc(doc(S.db,'threads',k),{lastText:'Message deleted'}).catch(()=>{})}
       for(const[id,p]of Object.entries(S.pitchMine)){if(num(p?.pics))await deleteDoc(doc(S.db,'bidpics',id)).catch(()=>{});await deleteDoc(doc(S.db,'pitches',id))}
       for(const pk of Object.values(S.picks))if(pk&&pk.owner===me&&typeof pk.review==='string'){await deleteDoc(doc(S.db,'reviewpics',pk.review)).catch(()=>{});await deleteDoc(doc(S.db,'reviews',pk.review)).catch(()=>{})}
@@ -1882,10 +1923,11 @@ document.addEventListener('submit',e=>{
   if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset,newpw:setNewPw})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
-document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='q')render();else if(e.target.id==='fCol'||e.target.id==='cpQ')paintCol();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jhue'&&S.draft.white){S.draft.white=false;$('jwhite')?.classList.remove('on')}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
+document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='msg'){$('composer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='q')render();else if(e.target.id==='fCol'||e.target.id==='cpQ')paintCol();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jhue'&&S.draft.white){S.draft.white=false;$('jwhite')?.classList.remove('on')}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
 document.addEventListener('change',async e=>{
   bind(e);syncNeed();
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}
+  if(e.target.id==='chatPic'){const f=e.target.files?.[0];e.target.value='';if(f)sendChatPhoto(f);return}
   if(e.target.matches('[data-pics]')){const t=e.target.dataset.pics,o=t==='draft'?S.draft:t==='rev'?S.rate:S.bid,ek=t==='draft'?'post':t==='rev'?'rate':'bid';
     const files=[...e.target.files].slice(0,Math.max(0,MAX_PICS-(o.pics||[]).length));e.target.value='';let bad=0;
     for(const f of files){try{o.pics=[...(o.pics||[]),await readPic(f)]}catch{bad++}}

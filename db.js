@@ -21,7 +21,7 @@ const COLS={
   reviewpics:['id','pics'],
   campuses:['id','name','auto','at'],
   threads:['id','members','job','open','last_text','last_at','last_by','read'],
-  msgs:['id','thread','by','t','at'],
+  msgs:['id','thread','by','t','at','kind','media','dur'],
   reports:['by','about','why','note','kind','job','at'],
   flags:['by','area','cat','at'],
 };

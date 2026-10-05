@@ -1146,3 +1146,30 @@ svg[aria-hidden="true"]{stroke-width:1.6}
   .typing .tabbar,.kb .tabbar{display:none!important}
 }
 @media (max-width:899px){.tabbar .fab{width:44px;height:44px;box-shadow:0 0 16px rgba(170,226,84,.35)}}
+
+/* chat composer: camera, message, then mic (or send once you type) */
+.composer{display:flex;align-items:center;gap:8px}
+.composer .field{flex:1}
+.cbtn{width:44px;height:44px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--surface2);color:var(--fg2);cursor:pointer}
+.csend{width:46px;height:46px;flex-shrink:0;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;box-shadow:0 0 18px rgba(170,226,84,.3)}
+.composer .ctext{display:none}.composer.hastext .ctext{display:flex}.composer.hastext .cmic{display:none}
+.composer.rec .recbar{flex:1;display:flex;align-items:center;gap:10px;height:46px;padding:0 16px;border-radius:999px;background:var(--surface2);font-variant-numeric:tabular-nums;font-weight:600}
+.composer.rec .recbar .muted{font-weight:500;font-size:var(--fs-c)}
+.recdot{width:9px;height:9px;border-radius:50%;background:#FF5B6E;animation:recblink 1s ease-in-out infinite}
+@keyframes recblink{50%{opacity:.25}}
+/* photo and voice bubbles */
+.in.media.photo,.out.media.photo{padding:4px;background:var(--in)}
+.out.media.photo{background:var(--surface2)}
+.mphoto{display:block;border-radius:16px;overflow:hidden;line-height:0}
+.mphoto img{display:block;max-width:240px;max-height:300px;width:100%;object-fit:cover}
+.mphoto.wait{width:200px;height:150px;background:var(--surface2)}
+.media.photo .time{display:block;padding:4px 8px 2px}
+.maudio{display:flex;align-items:center;gap:10px;min-width:190px}
+.mplay{width:34px;height:34px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(6,6,8,.18);color:inherit}
+.in .mplay{background:var(--surface2)}
+.mwave{flex:1;height:4px;border-radius:999px;background:rgba(6,6,8,.18);overflow:hidden}
+.in .mwave{background:rgba(255,255,255,.12)}
+.mwave i{display:block;height:100%;background:currentColor;border-radius:999px;transition:width .2s linear}
+.mdur{font-size:var(--fs-c);font-variant-numeric:tabular-nums;opacity:.8}
+.media.pending{opacity:.6;font-size:var(--fs-c)}
+@media (prefers-reduced-motion:reduce){.recdot{animation:none}}
