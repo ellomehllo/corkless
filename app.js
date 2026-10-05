@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050815';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050815';
-import {modHit,MOD_CAT} from './mod.js?v=202610050815';
+import {makeDb} from './db.js?v=202610050824';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050824';
+import {modHit,MOD_CAT} from './mod.js?v=202610050824';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -224,7 +224,7 @@ function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str
   return out.sort((a,b)=>b.at-a.at).slice(0,80);
 }
 function miniNote(j){if(!j||j.owner!==S.me?.id)return'';const c=noteOf(j);
-  return`<span class="mininote" style="--nc:${c}" aria-hidden="true"><i class="mnpin"></i><b>₹${fmt(j.price)}</b><span class="mnl"></span><span class="mnl s"></span></span>`}
+  return`<span class="mininote${isOrg(j.owner)?' tackmini':''}" style="--nc:${c}" aria-hidden="true"><i class="mnpin"></i>${isOrg(j.owner)?'':`<b>₹${fmt(j.price)}</b>`}<span class="mnl"></span><span class="mnl s"></span></span>`}
 function tackFace(s){return`<span class="tackav" style="width:${s}px;height:${s}px" role="img" aria-label="tack"></span>`}
 const HOLD_AT=5;
 const held=uid=>{const x=(S.strikes||{})[uid];return!!x&&num(x.n)-num(x.cleared)>=HOLD_AT};
@@ -883,10 +883,11 @@ function noteOf(j){if(!j)return DEFAULT_NOTE;if(COLOR_RE.test(j.color||''))retur
 function tile(j,D,i=0){
   const c=noteOf(j),n=bidsFor(D,j.key).length,left=j.deadline-Date.now();
   const ph=j.pics?(picsOf('j:'+j.key)||[])[0]:'',d=-((Date.now()/1000+i*2.3)%32).toFixed(2);
-  return`<button class="tile ntile${gcls(j)} r${i%3} ${S.fresh===j.key?'fresh':''}" data-job="${esc(j.key)}" style="--nc:${c};--i:${i};--d:${d}s${gvars(j)}">
+  const tk=isOrg(j.owner);
+  return`<button class="tile ntile${gcls(j)}${tk?' tacknote':''} r${i%3} ${S.fresh===j.key?'fresh':''}" data-job="${esc(j.key)}" style="--nc:${c};--i:${i};--d:${d}s${gvars(j)}">
     <span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span>
     <span class="pin"></span>${S.me?.isOwner&&held(j.owner)?'<span class="heldtag">Held</span>':j.pics?`<span class="tpics">${ic('camera',12,2.2)} ${j.pics} ${j.pics===1?'photo':'photos'}</span>`:''}
-    <span class="price">₹${fmt(j.price)}</span>
+    ${tk?'':`<span class="price">₹${fmt(j.price)}</span>`}
     ${left<36e5?`<span class="flag">${Math.max(1,Math.round(left/6e4))} min left</span>`:''}${nearMe(j)?nearTag():''}
     <p>${esc(j.text)}</p>
     ${j.where||j.when?`<span class="where">${ic('place',12,2.2)}<span>${esc([j.where,left<36e5?'':j.when].filter(Boolean).join(' · '))}</span></span>`:''}
@@ -1008,14 +1009,14 @@ function viewJob(D){
     </div>${picStrip('b:'+j.key+'~'+b.by,b.pics,'sub')}`).join(''):''}
    </div>
   </section>`;
-  return`<div class="pad jobpage${gcls(j)}" style="--nc:${noteOf(j)}${gvars(j)}">
+  return`<div class="pad jobpage${gcls(j)}${isOrg(j.owner)?' tackjob':''}" style="--nc:${noteOf(j)}${gvars(j)}">
   <div class="jhero">${cover}${back('board','Board')}<div class="jtools">${mine&&st==='open'?`<button class="jtool" data-act="editJob" data-key="${esc(j.key)}" aria-label="Edit this job">${ic('edit',18)}</button>`:''}<button class="jtool" data-act="openShare" data-key="${esc(j.key)}" aria-label="Share this job">${ic('share',18)}</button>${mine?'':`<button class="jtool ${isSaved(j.key)?'on':''}" data-act="toggleSave" data-key="${esc(j.key)}" aria-label="${isSaved(j.key)?'Remove from saved':'Save this job'}" aria-pressed="${isSaved(j.key)}">${ic('bookmark',18,2,'currentColor',isSaved(j.key)?'currentColor':'none')}</button>`}</div>
     <div class="jhead"><h1 class="h1">${esc(j.text)}</h1></div></div>
   <div class="jpwrap">${hasPh?`<button class="jhint" data-pic="${esc('j:'+j.key)}" data-i="0">${hint}</button>`:`<span class="jhint">${hint}</span>`}<button class="jposter" data-person="${esc(j.owner)}"><span class="javwrap"><span class="ring${freeNow(j.owner)?' live':''}" style="width:68px;height:68px">${face(j.owner,58)}</span>${online?'<span class="onl"><i></i>Online</span>':''}</span>
     <span class="pname">${esc(shortName(j.owner))}</span>
     <span class="jmeta">${mine?`posted ${since(j.at)}${j.editedAt?' · edited':''}`:`${esc(metaOf(j.owner)||campus())}${esc(posterLine(j.owner))} · posted ${since(j.at)}${j.editedAt?' · edited':''}${esc(payLine(j.owner))}`}</span></button></div>
   <div class="jcard stack">
-    <span class="big" style="view-transition-name:jp">₹${fmt(j.price)}</span>
+    ${isOrg(j.owner)?'':`<span class="big" style="view-transition-name:jp">₹${fmt(j.price)}</span>`}
     <div class="chips">${[j.when,online?'':j.where].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${nearMe(j)?nearTag():''}${stTag}</div>
     ${j.more?`<p class="jmore">${esc(j.more)}</p>`:''}
   </div>
@@ -1413,7 +1414,7 @@ function sheetHTML(D){
       <input id="payRef" class="inp" inputmode="numeric" maxlength="22" placeholder="e.g. 412345678901" value="${esc(S.pay.ref||'')}" data-bind="pay.ref"></div>
     <button class="btn2" data-act="markSent">I’ve paid ${dn}</button>`;break}
   case'jobmenu':{const mj=D.jobByKey[s.key];if(!mj){b='<h2 id="sheetT">This job is gone</h2>';break}const own=mj.owner===S.me.id,sv=isSaved(mj.key);
-    b=`<div class="jmhead${gcls(mj)}" style="--nc:${noteOf(mj)}"><span class="jmprice">₹${fmt(mj.price)}</span><h2 id="sheetT">${esc(mj.text.length>70?mj.text.slice(0,70)+'…':mj.text)}</h2></div>
+    b=`<div class="jmhead${gcls(mj)}" style="--nc:${noteOf(mj)}">${isOrg(mj.owner)?'':`<span class="jmprice">₹${fmt(mj.price)}</span>`}<h2 id="sheetT">${esc(mj.text.length>70?mj.text.slice(0,70)+'…':mj.text)}</h2></div>
     <div class="menu"><button data-act="openShare" data-key="${esc(mj.key)}">${ic('share',18)} Share</button>
       ${own?'':`<button data-act="toggleSave" data-key="${esc(mj.key)}">${ic('bookmark',18,2,'currentColor',sv?'currentColor':'none')} ${sv?'Remove from saved':'Save for later'}</button>`}
       ${own&&jobState(mj)==='open'?`<button data-act="editJob" data-key="${esc(mj.key)}">${ic('edit',18)} Edit</button>`:''}
