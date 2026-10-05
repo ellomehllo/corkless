@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050841';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050841';
-import {modHit,MOD_CAT} from './mod.js?v=202610050841';
+import {makeDb} from './db.js?v=202610050854';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050854';
+import {modHit,MOD_CAT} from './mod.js?v=202610050854';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -82,7 +82,7 @@ const S={
   view:'board', openJob:null, personOf:null, sort:'high', find:{q:''}, near:false,
   draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, pw:{cur:'',nw:''}, pwOpen:false, help:{kind:null,job:null,why:'',note:'',sent:null}, actTab:'all', actSeenAt:0, intro:{on:false,i:0}, fresh:null, chatDraft:{text:''}, pay:{upi:null,ref:''},
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',banner:'',adult:false,rules:false},
-  inv:{email:'',campus:'',camp:''}, camp:{q:''}, lastInvite:null, myCampus:null, campuses:{}, viewCampus:(()=>{try{return localStorage.getItem('tack.viewCampus')||''}catch{return''}})(),
+  inv:{email:'',campus:'',camp:''}, camp:{q:''}, coms:{}, cmine:{}, cinv:{}, cid:null, cnote:null, cnotes:{}, ccoms:{}, cmembers:{}, cdraft:{name:'',about:'',text:'',more:'',color:'#7FA2FF',handle:'',comment:''}, lastInvite:null, myCampus:null, campuses:{}, viewCampus:(()=>{try{return localStorage.getItem('tack.viewCampus')||''}catch{return''}})(),
   picks:{}, repDocs:{},
   sheet:null, rate:{a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]}, rep:{why:'',note:'',block:false}, erase:{pw:''},
   chat:{key:null}, err:{}
@@ -219,6 +219,7 @@ function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str
       else if(b&&jobState(j)==='open'&&j.editedAt>b.at)add(j.editedAt,j.owner,`${nm(j.owner)} ${A('updated')} ${t(j)}. Check it still works for you.`,{job:j.key});
     }
   }
+  for(const[id,iv]of Object.entries(S.cinv||{}))if(S.coms[id])add(num(iv.at),iv.by,`${nm(iv.by)} ${A('invited you')} to <b>${esc(comName(id))}</b>`,{go:'board'});
   for(const o of offerList(S.offersIn))if(ok(o.owner))add(num(o.at),o.owner,`${nm(o.owner)} ${A('asked you')}: ${esc(str(o.text,60))}`,{go:'bids'});
   for(const o of offerList(S.offersOut))if(ok(o.to)&&o.status!=='pending')add(num(o.respondedAt),o.to,o.status==='accepted'?`${nm(o.to)} ${A('said yes')} to ${esc(str(o.text,60))}`:`${nm(o.to)} ${A('can\u2019t do')} ${esc(str(o.text,60))} this time`,{go:'bids'});
   return out.sort((a,b)=>b.at-a.at).slice(0,80);
@@ -406,7 +407,7 @@ async function boot(){
     if(k===last&&ev!=='SIGNED_OUT')return;last=k;
     setTimeout(()=>{if(!S.recovery)handleUser(userOf(u))},0)});
 }
-function stopSubs(){S.subs.forEach(u=>{try{u()}catch{}});S.subs=[];closeThread()}
+function stopSubs(){S.subs.forEach(u=>{try{u()}catch{}});S.subs=[];closeThread();closeCom()}
 let verifyTimer=null;
 function stopVerifyPoll(){clearInterval(verifyTimer);verifyTimer=null}
 async function handleUser(user){
@@ -456,6 +457,9 @@ function startSubs(){
   const pk={own:{},doer:{}},mergePicks=()=>{S.picks={...pk.doer,...pk.own};if(S.phase==='app')render()};
   S.subs.push(onSnapshot(query(collection(db,'picks'),where('owner','==',me)),snap=>{pk.own={};snap.forEach(x=>{pk.own[x.id]=x.data()});mergePicks()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'picks'),where('doer','==',me)),snap=>{pk.doer={};snap.forEach(x=>{pk.doer[x.id]=x.data()});mergePicks()},e=>console.warn(e)));
+  S.subs.push(onSnapshot(collection(db,'communities'),snap=>{const c={};snap.forEach(x=>{c[x.id]=x.data()});S.coms=c;if(S.phase==='app')render()},e=>console.warn(e)));
+  S.subs.push(onSnapshot(query(collection(db,'cmembers'),where('uid','==',me)),snap=>{const c={};snap.forEach(x=>{const d=x.data();c[d.community]=d.role});S.cmine=c;if(S.cid&&!c[S.cid]&&S.phase==='app'&&['cboard','cnote'].includes(S.view)){closeCom();go('board')}if(S.phase==='app')render()},e=>console.warn(e)));
+  S.subs.push(onSnapshot(query(collection(db,'cinvites'),where('uid','==',me)),snap=>{const c={};snap.forEach(x=>{const d=x.data();c[d.community]=d});S.cinv=c;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(collection(db,'campuses'),snap=>{const c={};snap.forEach(x=>{c[x.id]=x.data()});S.campuses=c;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(collection(db,'strikes'),snap=>{const r={};snap.forEach(x=>{r[x.id]=x.data()});S.strikes=r;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(collection(db,'rep'),snap=>{const r={};snap.forEach(x=>{r[x.id]=x.data()});S.repDocs=r;if(S.phase==='app')render()},e=>console.warn(e)));
@@ -558,6 +562,39 @@ async function setNewPw(){if(!need(S.pw.nw.length>=8,'pw','Use a new password of
   S.recovery=false;S.pw={cur:'',nw:''};S.err={};toast('Password set');handleUser(userOf(data.user))}
 async function checkPw(pw){const {error}=await S.sb.auth.signInWithPassword({email:S.user.email,password:pw});if(error)throw authErr(error)}
 
+function closeCom(){(S.comSubs||[]).forEach(u=>{try{u()}catch{}});S.comSubs=[];S.cid=null;S.cnote=null;S.cnotes={};S.ccoms={};S.cmembers={}}
+function openCom(id){if(S.cid===id){go('cboard');return}closeCom();S.cid=id;const {collection,query,where,onSnapshot}=S.fb,db=S.db;
+  const r=()=>{if(S.phase==='app')render()};
+  S.comSubs=[onSnapshot(query(collection(db,'cnotes'),where('community','==',id)),snap=>{const c={};snap.forEach(x=>{c[x.id]=x.data()});S.cnotes=c;r()},e=>console.warn(e)),
+    onSnapshot(query(collection(db,'ccomments'),where('community','==',id)),snap=>{const c={};snap.forEach(x=>{c[x.id]=x.data()});S.ccoms=c;r()},e=>console.warn(e)),
+    onSnapshot(query(collection(db,'cmembers'),where('community','==',id)),snap=>{const c={};snap.forEach(x=>{const d=x.data();c[d.uid]=d.role});S.cmembers=c;r()},e=>console.warn(e))];
+  go('cboard')}
+const comName=id=>str(S.coms[id]?.name,40)||'Board';
+const comOwner=id=>S.cmine[id]==='owner';
+function comChips(){const mine=Object.keys(S.cmine).filter(id=>S.coms[id]).sort((a,b)=>comName(a).localeCompare(comName(b))),inv=Object.keys(S.cinv).filter(id=>S.coms[id]);
+  return`<div class="comrow" role="navigation" aria-label="Boards"><button class="comchip on">${esc(campus())}</button>${mine.map(id=>`<button class="comchip" data-com="${esc(id)}">${esc(comName(id))}</button>`).join('')}${inv.map(id=>`<button class="comchip invited" data-sheet="cjoin" data-about="${esc(id)}">${ic('mail',13)} ${esc(comName(id))}</button>`).join('')}<button class="comchip cnewchip" data-sheet="cnew">${ic('plus',14)} New board</button></div>`}
+function cnoteTile(n,i){const c=COLOR_RE.test(n.color||'')?n.color:'#7FA2FF',k=Object.values(S.ccoms).filter(x=>x.note===n.id).length;
+  return`<button class="tile ntile cntile r${i%3}" data-cnote="${esc(n.id)}" style="--nc:${c};--i:${i};--d:0s"><span class="pin"></span><p>${esc(n.text)}</p>
+    <span class="by">${face(n.by,22)}<span class="nm">${esc(firstName(n.by))}</span><span class="n">${ic('chat',12,2.2)} ${k}</span></span></button>`}
+function viewCBoard(D){const id=S.cid,c=S.coms[id];if(!id||!c||!S.cmine[id])return viewBoard(D);
+  const notes=Object.entries(S.cnotes).map(([k,v])=>({...v,id:k})).sort((a,b)=>b.at-a.at),n=Object.keys(S.cmembers).length,owner=comOwner(id);
+  const cols=wideMQ.matches?3:2,col=Array.from({length:cols},()=>[]);notes.forEach((x,i)=>col[i%cols].push(cnoteTile(x,i)));
+  return`<div class="pad cboard">${back('board',campus())}
+    <div class="chead"><h1 class="pageh">${esc(c.name)}</h1>${c.about?`<p class="cabout">${esc(c.about)}</p>`:''}
+      <div class="cmeta"><button class="cmembtn" data-sheet="cmembers">${ic('users',15)} ${n} ${n===1?'member':'members'}</button>${owner?`<button class="pick" data-sheet="cinvite">${ic('plus',14,2.4)} Invite</button>`:''}</div></div>
+    ${notes.length?`<div class="wall">${col.map(x=>`<div class="wcol">${x.join('')}</div>`).join('')}</div>`:`<div class="empty"><b>No notes yet</b><p>Add the first note for ${esc(c.name)}.</p></div>`}
+    <button class="cta cadd" data-sheet="cnoteNew">${ic('plus',17,2.4,'var(--on-grad)')} Add a note</button></div>`}
+function viewCNote(D){const n0=S.cnotes[S.cnote];if(!S.cid||!n0)return viewCBoard(D);const n={...n0,id:S.cnote},c=COLOR_RE.test(n.color||'')?n.color:'#7FA2FF',me=S.me.id,owner=comOwner(S.cid);
+  const coms=Object.entries(S.ccoms).map(([k,v])=>({...v,id:k})).filter(x=>x.note===n.id).sort((a,b)=>a.at-b.at);
+  return`<div class="pad cnotepage">${back('cboard',comName(S.cid))}
+    <div class="tile ntile cnbig" style="--nc:${c};--d:0s"><span class="pin"></span><p>${esc(n.text)}</p>${n.more?`<p class="cmore">${esc(n.more)}</p>`:''}
+      <span class="by">${face(n.by,26)}<span class="nm">${esc(shortName(n.by))}</span><span class="n">${since(n.at)}</span></span></div>
+    ${n.by===me||owner?`<button class="linkbtn cdel" data-act="cnoteDel">${n.by===me?'Delete this note':'Remove this note'}</button>`:''}
+    <h2 class="h2">${coms.length} ${coms.length===1?'comment':'comments'}</h2>
+    <div class="ccoms">${coms.map(x=>`<div class="ccom">${face(x.by,30)}<div class="cbody"><span class="cwho">${esc(shortName(x.by))} <span class="muted">${since(x.at)}</span></span><p>${esc(x.t)}</p>
+      ${x.by===me||owner?`<button class="linkbtn" data-act="ccomDel" data-id="${esc(x.id)}">Delete</button>`:''}</div></div>`).join('')}</div>
+    <div class="composer ccomposer ${S.cdraft.comment.trim()?'hastext':''}" id="ccomposer"><label class="field" for="ccomIn"><input id="ccomIn" maxlength="500" placeholder="Add a comment…" value="${esc(S.cdraft.comment)}" data-bind="cdraft.comment" autocomplete="off"></label>
+      <button class="csend" data-act="ccomSend" aria-label="Post comment">${ic('send',19,2,'var(--on-grad)')}</button></div></div>`}
 function closeThread(){if(S.chat.unsub)try{S.chat.unsub()}catch{};if(S.rec)recStop(false);if(S.audio){S.audio.pause();S.playing=null}S.chat={key:null}}
 function openThread(t){
   const {collection,query,orderBy,limit,onSnapshot}=S.fb;
@@ -933,6 +970,7 @@ function viewBoard(D){
       ${free.map(u=>`<button class="person" data-ask="${esc(u)}" aria-label="Ask ${esc(firstName(u))} for a favour">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}
 
     </div></section>
+  ${comChips()}
   ${stepsCard(D)}
   <div class="dhead"><h1 class="h1">The board</h1><span class="muted">${all.length} pinned at ${S.me.isOwner?`<button class="campbtn" data-sheet="campus">${esc(campus())}${ic('chev',12,2.4)}</button>`:esc(campus())}</span></div>
   <label class="search" for="q">${ic('search',17)}<input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search jobs: print, shawarma, today, library" value="${esc(S.find.q)}" data-bind="find.q" aria-label="Search jobs">${S.find.q?`<button class="sclear" data-act="clearSearch" aria-label="Clear search">${ic('x',14,2.4)}</button>`:''}</label>
@@ -1464,6 +1502,23 @@ function sheetHTML(D){
   case'campus':{const q=(S.camp?.q||'').toLowerCase().trim(),l=campusList().filter(c=>c.n>0&&(!q||c.name.toLowerCase().includes(q)));
     b=`<h2 id="sheetT">Switch board</h2><input id="campQ" class="inp" autocomplete="off" placeholder="Search campuses" value="${esc(S.camp?.q||'')}" data-bind="camp.q">
     <div class="menu camplist">${l.length?l.map(c=>`<button data-act="viewCampus" data-id="${esc(c.id)}">${c.id===curCampus()?ic('tick',16,2.6,'var(--accent)'):'<span style="width:16px"></span>'} <span class="cn">${esc(c.name)}</span><span class="muted">${c.n} ${c.n===1?'member':'members'}</span></button>`).join(''):'<p class="note">No campus with members matches that.</p>'}</div>`;break}
+  case'cnew':b=`<h2 id="sheetT">New board</h2><p>Start an invite-only board. You\u2019ll be its organiser.</p>
+    <input id="cnName" class="inp" maxlength="40" placeholder="Name, e.g. Film club" value="${esc(S.cdraft.name)}" data-bind="cdraft.name">
+    <input id="cnAbout" class="inp" maxlength="200" placeholder="What it\u2019s for (optional)" value="${esc(S.cdraft.about)}" data-bind="cdraft.about">
+    ${S.err.cnew?`<p class="err">${esc(S.err.cnew)}</p>`:''}<button class="cta" data-act="comCreate">Create board</button>`;break;
+  case'cinvite':b=`<h2 id="sheetT">Invite to ${esc(comName(S.cid))}</h2><p>Invite people by their tack username.</p>
+    <label class="field hfield" for="ciIn"><span class="hat">@</span><input id="ciIn" maxlength="21" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="username" value="${esc(S.cdraft.handle)}" data-bind="cdraft.handle"></label>
+    ${S.err.cinv?`<p class="err">${esc(S.err.cinv)}</p>`:''}<button class="cta" data-act="comInvite">Send invite</button>`;break;
+  case'cjoin':{const c=S.coms[s.about],iv=S.cinv[s.about];b=`<h2 id="sheetT">${esc(c?.name||'Board')}</h2>${c?.about?`<p>${esc(c.about)}</p>`:''}<p>${esc(shortName(iv?.by))} invited you to this board.</p>
+    <button class="cta" data-act="comJoin" data-id="${esc(s.about)}">Join board</button><button class="btn2" data-act="comDecline" data-id="${esc(s.about)}">Decline</button>`;break}
+  case'cmembers':{const id=S.cid,owner=comOwner(id),me=S.me.id,l=Object.entries(S.cmembers).sort((a,b)=>(a[1]==='owner'?-1:1)-(b[1]==='owner'?-1:1));
+    b=`<h2 id="sheetT">Members</h2><div class="menu cmlist">${l.map(([u,r])=>`<div class="cmrow">${face(u,30)}<span class="cn">${esc(shortName(u))}${r==='owner'?' <span class="muted">· organiser</span>':''}</span>${owner&&r!=='owner'?`<button class="ghostbtn" data-act="comKick" data-uid="${esc(u)}">Remove</button>`:''}</div>`).join('')}</div>
+    ${owner?'<button class="linkbtn danger" data-act="comDelete">Delete this board</button>':'<button class="linkbtn" data-act="comLeave">Leave this board</button>'}`;break}
+  case'cnoteNew':b=`<h2 id="sheetT">Add a note</h2>
+    <textarea id="cnText" class="inp" rows="3" maxlength="400" placeholder="What do you want to share?" data-bind="cdraft.text">${esc(S.cdraft.text)}</textarea>
+    <textarea id="cnMore" class="inp" rows="2" maxlength="600" placeholder="More details (optional)" data-bind="cdraft.more">${esc(S.cdraft.more)}</textarea>
+    <div class="ccolors" role="group" aria-label="Note colour">${['#7FA2FF','#C6F24E','#FF7AD1','#FFC53D','#4FE3E0','#FF8A5B'].map(x=>`<button class="ccol ${S.cdraft.color===x?'on':''}" data-act="cnoteColor" data-c="${x}" style="--nc:${x}" aria-label="Colour"></button>`).join('')}</div>
+    ${S.err.cnote?`<p class="err">${esc(S.err.cnote)}</p>`:''}<button class="cta" data-act="cnoteAdd">Pin it</button>`;break;
   case'invitefriend':{const c=S.lastCode,jt=`Join me on tack, the ${campus()} board for quick jobs and favours. Sign up with your college email:\n${SITE}`;
     b=!S.me.isOwner?`<h2 id="sheetT">Invite a friend</h2><p>Anyone from ${esc(campus())} can join with their college email. Send them the link.</p>
       <div class="copyrow"><span>${esc(SITE)}</span></div>
@@ -1488,7 +1543,7 @@ function sheetHTML(D){
   return`<div class="scrim" data-act="closeSheet"></div><div class="sheet sheet-${s.type}" role="dialog" aria-modal="true" aria-labelledby="sheetT">${b}</div>`;
 }
 
-const VIEWS={board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewSettings,settings:viewSettings,help:viewHelp,invites:viewInvites,saved:viewSaved,reviews:viewReviews,review:viewReview,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
+const VIEWS={cboard:viewCBoard,cnote:viewCNote,board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewSettings,settings:viewSettings,help:viewHelp,invites:viewInvites,saved:viewSaved,reviews:viewReviews,review:viewReview,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
 let lastView=null,lastSheet=null;const scrollMem={};
 const INTRO=[
   {k:'board',t:'This is the board.',b:'Classmates pin small jobs here. A print run, a lift down four floors, an hour of help before a deadline. Tap + when you’re free and people can ask you directly.'},
@@ -1645,7 +1700,7 @@ function nbHide(now){const el=$('nbanners')?.firstChild;clearTimeout(NB.t);if(!e
   el.classList.add('out');el.addEventListener('animationend',()=>{el.remove();setTimeout(nbNext,250)},{once:true})}
 let toastT;
 function toast(msg){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},2800)}
-const DEPTH={board:0,bids:0,chats:0,me:0,saved:0,invites:1,post:1,job:1,person:1,chat:1,privacy:1,settings:1,help:2,edit:2,reviews:1,review:2};
+const DEPTH={cboard:1,cnote:2,board:0,bids:0,chats:0,me:0,saved:0,invites:1,post:1,job:1,person:1,chat:1,privacy:1,settings:1,help:2,edit:2,reviews:1,review:2};
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
 const typingEl=e=>e&&(e.tagName==='TEXTAREA'||e.isContentEditable||(e.tagName==='INPUT'&&!['range','checkbox','radio','button','submit','file','color'].includes(e.type)));
 let kbT=null;document.addEventListener('focusin',e=>{if(typingEl(e.target)){clearTimeout(kbT);document.documentElement.classList.add('typing')}});
@@ -1752,6 +1807,25 @@ const ACT={
   introSkip(){closeIntro()},
   introDone(){closeIntro('board')},
   introPost(){closeIntro('post')},
+  async comCreate(){const d=S.cdraft,n=d.name.trim();if(n.length<2){S.err={cnew:'Give the board a name.'};render();return}if(modBlock('job',n,d.about))return;
+    try{const id=await S.fb.rpc('create_community',{p_name:n,p_about:d.about.trim()||null});S.cdraft.name='';S.cdraft.about='';S.sheet=null;S.err={};S.coms={...S.coms,[id]:{name:n,about:d.about.trim(),owner:S.me.id}};S.cmine={...S.cmine,[id]:'owner'};openCom(id);toast('Board created. Invite people from the board.')}
+    catch(e){console.warn(e);S.err={cnew:/10 boards/.test(e.message)?'You can start up to 10 boards.':'Couldn\u2019t create the board. Try again.'};render()}},
+  async comInvite(){const h=S.cdraft.handle.trim().replace(/^@/,'').toLowerCase();if(!h){S.err={cinv:'Type a username.'};render();return}
+    try{const r=await S.fb.rpc('invite_to_community',{p_id:S.cid,p_handle:h});if(r==='invited'){S.cdraft.handle='';S.err={};S.sheet=null;toast('Invited @'+h)}else{S.err={cinv:r==='member'?'@'+h+' is already a member.':'No one on '+campus()+' has that username.'};render()}}
+    catch(e){console.warn(e);S.err={cinv:'Couldn\u2019t send the invite.'};render()}},
+  async comJoin(el){const id=el.dataset.id;try{await S.fb.rpc('join_community',{p_id:id});S.sheet=null;S.cmine={...S.cmine,[id]:'member'};const v={...S.cinv};delete v[id];S.cinv=v;openCom(id);toast('You joined '+comName(id))}catch(e){console.warn(e);toast('Couldn\u2019t join. The invite may have been removed.')}},
+  comDecline(el){const id=el.dataset.id;S.fb.deleteDoc(S.fb.doc(S.db,'cinvites',id+'~'+S.me.id)).catch(()=>{});const v={...S.cinv};delete v[id];S.cinv=v;S.sheet=null;render()},
+  comKick(el){const u=el.dataset.uid;S.fb.deleteDoc(S.fb.doc(S.db,'cmembers',S.cid+'~'+u)).then(()=>toast('Removed '+firstName(u))).catch(()=>toast('Couldn\u2019t remove them.'))},
+  comLeave(){const id=S.cid;S.fb.deleteDoc(S.fb.doc(S.db,'cmembers',id+'~'+S.me.id)).then(()=>{S.sheet=null;closeCom();go('board');toast('You left the board')}).catch(()=>toast('Couldn\u2019t leave.'))},
+  comDelete(){if(!confirm('Delete '+comName(S.cid)+' and all its notes?'))return;const id=S.cid;S.fb.deleteDoc(S.fb.doc(S.db,'communities',id)).then(()=>{S.sheet=null;closeCom();go('board');toast('Board deleted')}).catch(()=>toast('Couldn\u2019t delete it.'))},
+  cnoteColor(el){S.cdraft.color=el.dataset.c;render()},
+  cnoteAdd(){const d=S.cdraft,t=d.text.trim();if(!t){S.err={cnote:'Write something first.'};render();return}if(modBlock('job',t,d.more))return;
+    S.fb.addDoc(S.fb.collection(S.db,'cnotes'),{community:S.cid,by:S.me.id,text:t.slice(0,400),more:d.more.trim().slice(0,600),color:d.color,at:Date.now()}).then(()=>toast('Pinned')).catch(e=>{console.warn(e);toast('Couldn\u2019t pin it.')});
+    S.cdraft.text='';S.cdraft.more='';S.sheet=null;S.err={};render()},
+  cnoteDel(){const id=S.cnote;S.fb.deleteDoc(S.fb.doc(S.db,'cnotes',id)).then(()=>toast('Note removed')).catch(()=>toast('Couldn\u2019t remove it.'));go('cboard')},
+  ccomSend(){const t=S.cdraft.comment.trim();if(!t)return;if(modBlock('chat',t))return;S.cdraft.comment='';
+    S.fb.addDoc(S.fb.collection(S.db,'ccomments'),{note:S.cnote,community:S.cid,by:S.me.id,t:t.slice(0,500),at:Date.now()}).catch(e=>{console.warn(e);toast('Couldn\u2019t post your comment.')});render()},
+  ccomDel(el){S.fb.deleteDoc(S.fb.doc(S.db,'ccomments',el.dataset.id)).catch(()=>toast('Couldn\u2019t delete it.'))},
   recStart(){recStart()},recCancel(){recStop(false)},recSend(){recStop(true)},
   playVoice(el){playVoice(el.dataset.src)},
   pickCollege(el){S.form.college=el.dataset.id;S.form.notListed=false;S.authErr='';render()},
@@ -1929,7 +2003,7 @@ const ACT={
 };
 
 document.addEventListener('click',e=>{
-  const el=e.target.closest('[data-doc],[data-pref],[data-asks],[data-helpkind],[data-helpjob],[data-helpwhy],[data-acttab],[data-pic],[data-review],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
+  const el=e.target.closest('[data-com],[data-cnote],[data-doc],[data-pref],[data-asks],[data-helpkind],[data-helpjob],[data-helpwhy],[data-acttab],[data-pic],[data-review],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
   if(!el)return;const ds=el.dataset;
   if(ds.ask!==undefined){if(ds.ask===S.me?.id)return;S.offer={to:ds.ask,prevJob:ds.prev||null,text:'',price:'',when:'Next hour',where:''};S.err={};S.sheet={type:'offer'};render();return}
   if(ds.ofwhen!==undefined){S.offer.when=ds.ofwhen;render();return}
@@ -1954,6 +2028,8 @@ document.addEventListener('click',e=>{
   if(ds.free!==undefined){const now=new Date(),t={'1h':+now+36e5,'3h':+now+3*36e5,day:new Date(now).setHours(23,59,0,0),off:0}[ds.free];
     saveMine(d=>{d.freeUntil=t;return d});S.sheet=null;toast(t?'You’re on the Free right now row':'Marked not free');return}
   if(ds.review!==undefined){S.openRev=ds.review;go('review');return}
+  if(ds.com!==undefined){openCom(ds.com);return}
+  if(ds.cnote!==undefined){S.cnote=ds.cnote;go('cnote');return}
   if(ds.pic!==undefined){S.sheet={type:'pic',k:ds.pic,i:+ds.i||0};render();return}
   if(ds.unpic!==undefined){const o=ds.unpic==='draft'?S.draft:ds.unpic==='rev'?S.rate:S.bid;o.pics=(o.pics||[]).filter((_,i)=>i!==+ds.i);render();return}
   if(ds.star!==undefined){S.rate[ds.star[0]]=+ds.star.slice(1);render();return}
@@ -1976,7 +2052,7 @@ document.addEventListener('submit',e=>{
   if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset,newpw:setNewPw})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
-document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='msg'){$('composer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='q'||e.target.id==='campQ')render();else if(e.target.id==='fCol'||e.target.id==='cpQ')paintCol();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jhue'&&S.draft.white){S.draft.white=false;$('jwhite')?.classList.remove('on')}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
+document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='msg'){$('composer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='ccomIn'){$('ccomposer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='q'||e.target.id==='campQ')render();else if(e.target.id==='fCol'||e.target.id==='cpQ')paintCol();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jhue'&&S.draft.white){S.draft.white=false;$('jwhite')?.classList.remove('on')}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
 document.addEventListener('change',async e=>{
   bind(e);syncNeed();
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}
