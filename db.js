@@ -9,7 +9,7 @@ const COLS={
   invcodes:['code','by','at','used_by','used_at'],
   people:['id','name','photo','year','branch','does','bio','banner','ring','adult','joined_at','free_until','removed','asks','handle','handle_at'],
   names:['id','name'],
-  jobs:['owner','id','text','more','price','kind','when_label','place','at','deadline','status','done_at','taken_at','edited_at','repick_at','offer','pics','geo','color','dropped','drop_why'],
+  jobs:['owner','id','text','more','price','kind','when_label','place','at','deadline','status','done_at','taken_at','edited_at','repick_at','offer','pics','geo','color','dropped','drop_why','campus'],
   jobpics:['owner','job','pics','at'],
   pitches:['owner','job','by','amt','say','at','pics','near'],
   bidpics:['owner','job','by','pics','at'],

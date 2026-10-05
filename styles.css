@@ -1208,3 +1208,10 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .jcover .tbg.ph::after{background:linear-gradient(180deg,rgba(8,16,44,.55) 0%,rgba(8,16,44,.2) 35%,rgba(8,16,44,.3) 75%,rgba(8,16,44,.45) 100%)}
 .jhero{border-radius:0 0 22px 22px}
 .jpwrap .ring{box-shadow:0 0 0 4px var(--bg)!important;background:var(--bg)}
+
+/* organiser board switcher */
+.campbtn{display:inline-flex;align-items:center;gap:3px;font:inherit;color:inherit;padding:0;text-decoration:underline;text-decoration-color:rgba(255,255,255,.25);text-underline-offset:3px}
+.camplist{max-height:52vh;overflow-y:auto}
+.camplist button{display:flex;align-items:center;gap:10px}
+.camplist .cn{flex:1;text-align:left}
+.camplist .muted{font-size:var(--fs-c)}
