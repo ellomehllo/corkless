@@ -1128,3 +1128,12 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 
 /* photo count sits in the note's top-right corner */
 .tile .tpics{position:absolute;top:12px;right:12px;z-index:2;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;background:rgba(6,6,8,.42);color:rgba(255,255,255,.82);font-size:var(--fs-c);font-weight:500;line-height:1.3}
+
+/* the note drops in once when the page opens, not on every redraw while you type or tap tags */
+.bignote{animation:none}
+.bignote .pin{animation:none}
+.bignote.enter{animation:bndrop .75s cubic-bezier(.2,.9,.3,1.15) both}
+.bignote.enter .pin{animation:bnpin .5s .6s cubic-bezier(.2,.9,.3,1.5) both}
+.notewrap.flat{transform:none;transition:none}
+@media (prefers-reduced-motion:reduce){.bignote.enter,.bignote.enter .pin{animation:none}}
+.notewrap.flat .bignote{transition:none}

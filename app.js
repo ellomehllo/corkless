@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050552';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050552';
-import {modHit,MOD_CAT} from './mod.js?v=202610050552';
+import {makeDb} from './db.js?v=202610050553';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050553';
+import {modHit,MOD_CAT} from './mod.js?v=202610050553';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -992,12 +992,14 @@ function noteTone(){return{c:S.draft.white?NOTE_WHITE:hueHex(S.draft.hue),g:fals
 function syncNoteTone(){const hb=$('jhue');if(hb)hb.style.setProperty('--thumb',hueHex(S.draft.hue));const n=$('bignote');if(!n)return;const {c,g}=noteTone();n.style.setProperty('--nc',c);n.classList.toggle('gnote',g);
   if(g){n.style.setProperty('--nc1','var(--g1)');n.style.setProperty('--nc2','var(--g2)')}else{n.style.removeProperty('--nc1');n.style.removeProperty('--nc2')}
   const pr=$('bnPrice');if(pr)pr.classList.toggle('blank',!digits(S.draft.price))}
+const noteHeld=()=>{const a=document.activeElement;return!!(a&&a.closest&&a.closest('#notewrap'))};
+function postEnterOnce(){const e=!!S.postEnter;S.postEnter=false;return e}
 function viewPost(){
   const d=S.draft,{c,g}=noteTone(),me=S.me.id,ph=(d.pics||[])[0]||'';
   const group=(t,k,list)=>`<div class="stack gap8"><span class="formlabel" id="g-${k}">${t}</span><div class="chips" role="group" aria-labelledby="g-${k}">${list.map(v=>`<button class="chip ${d[k]===v&&!(k==='where'&&d.whereText.trim())?'on':''}" data-set="${k}" data-val="${esc(v)}" aria-pressed="${d[k]===v&&!(k==='where'&&d.whereText.trim())}">${esc(v)}</button>`).join('')}</div></div>`;
   return`<div class="pad postpage">${d.editId?back('job','Cancel'):back('board','Close')}
    <h1 class="pageh" style="margin:6px 0 2px">${d.editId?'Edit your job':'Pin a job'}</h1>
-   <div class="notewrap" id="notewrap"><div class="bignote tile ntile${g?' gnote':''}" id="bignote" style="--nc:${c}${g?';--nc1:var(--g1);--nc2:var(--g2)':''};--d:0s">
+   <div class="notewrap${noteHeld()?' flat':''}" id="notewrap"><div class="bignote tile ntile${g?' gnote':''}${postEnterOnce()?' enter':''}" id="bignote" style="--nc:${c}${g?';--nc1:var(--g1);--nc2:var(--g2)':''};--d:0s">
      <span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span>
      <span class="pin" aria-hidden="true"></span>
      <label class="bnprice ${digits(d.price)?'':'blank'}" id="bnPrice" for="jp"><span>₹</span><input id="jp" type="text" inputmode="numeric" maxlength="5" placeholder="150" value="${esc(d.price)}" data-bind="draft.price" aria-label="You'll pay, in rupees"></label>
@@ -1558,7 +1560,7 @@ const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
 const typingEl=e=>e&&(e.tagName==='TEXTAREA'||e.isContentEditable||(e.tagName==='INPUT'&&!['range','checkbox','radio','button','submit','file','color'].includes(e.type)));
 let kbT=null;document.addEventListener('focusin',e=>{if(typingEl(e.target)){clearTimeout(kbT);document.documentElement.classList.add('typing')}});
 document.addEventListener('focusout',()=>{clearTimeout(kbT);kbT=setTimeout(()=>{if(!typingEl(document.activeElement))document.documentElement.classList.remove('typing')},120)});
-function go(v,keepThread){
+function go(v,keepThread){if(v==='post'&&S.view!=='post')S.postEnter=true;
   const from=S.view;
   if(v!=='chat'&&!keepThread)closeThread();
   const apply=()=>{if(v==='post'&&from!=='post'&&S.draft.editId&&!S.editEnter)S.draft=blankDraft();S.editEnter=false;if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}S.view=v;S.sheet=null;S.err={};if(v==='help'&&from!=='help')S.help={kind:null,job:null,why:'',note:'',sent:null};if(v==='settings'){S.pwOpen=false}if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit'){seedOnb();S.hcheck={h:handleOf(S.me.id),st:'mine'}}if(v==='invites')S.inv.campus='';render();
@@ -1884,6 +1886,7 @@ document.addEventListener('change',async e=>{
   if(e.target.matches('[data-photo]')||e.target.matches('[data-bannerfile]')){const f=e.target.files&&e.target.files[0];e.target.value='';openCrop(f,e.target.matches('[data-bannerfile]')?'banner':'photo');return}
 });
 document.addEventListener('pointerdown',e=>{if(e.target.id==='jhue')$('notewrap')?.classList.add('straight')});
+document.addEventListener('focusout',e=>{if(e.target.closest?.('#notewrap'))setTimeout(()=>{const w=$('notewrap');if(w&&!noteHeld())w.classList.remove('flat')},0)});
 ['pointerup','pointercancel'].forEach(t=>document.addEventListener(t,()=>$('notewrap')?.classList.remove('straight')));
 document.addEventListener('keydown',e=>{
   if($('docRoot')){if(e.key==='Escape')closeDoc();return}
