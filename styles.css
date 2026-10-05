@@ -1137,3 +1137,4 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .notewrap.flat{transform:none;transition:none}
 @media (prefers-reduced-motion:reduce){.bignote.enter,.bignote.enter .pin{animation:none}}
 .notewrap.flat .bignote{transition:none}
+.tile.ntile>.tpics:not(.tbg):not(.pin),.tile.ntile>.heldtag:not(.tbg):not(.pin){position:absolute;top:12px;right:12px;left:auto}
