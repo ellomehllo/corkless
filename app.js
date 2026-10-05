@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050654';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050654';
-import {modHit,MOD_CAT} from './mod.js?v=202610050654';
+import {makeDb} from './db.js?v=202610050700';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050700';
+import {modHit,MOD_CAT} from './mod.js?v=202610050700';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -574,7 +574,7 @@ function msgBody(m){if(m.kind==='photo'){const u=mediaUrl(m.media);return u?`<bu
   if(m.kind==='audio'){const u=mediaUrl(m.media),on=S.playing===m.media;return`<span class="maudio"><button class="mplay" data-act="playVoice" data-src="${esc(m.media)}" ${u?'':'disabled'} aria-label="${on?'Pause':'Play'} voice message">${ic(on?'pause':'play',16,2.2,'currentColor',on?'none':'currentColor')}</button><span class="mwave"><i style="width:${on?S.playPct||0:0}%"></i></span><span class="mdur">${mmss(m.dur)}</span></span>`}
   return esc(m.t)}
 async function sendMedia(kind,blob,ext,dur){const c=S.chat;if(!c.key||!canMessage(c,derive()))return;
-  const path=`${c.key}/${crypto.randomUUID()}.${ext}`,type=kind==='photo'?'image/jpeg':(blob.type||'audio/webm').split(';')[0];
+  const path=`${c.key.replaceAll('~','_')}/${crypto.randomUUID()}.${ext}`,type=kind==='photo'?'image/jpeg':(blob.type||'audio/webm').split(';')[0];
   S.chatUp=kind;render();
   const {error}=await S.sb.storage.from('chat').upload(path,blob,{contentType:type,upsert:false});
   if(error){S.chatUp=null;render();console.warn(error);toast(kind==='photo'?'Couldn\u2019t send the photo. Try again.':'Couldn\u2019t send the voice message. Try again.');return}
