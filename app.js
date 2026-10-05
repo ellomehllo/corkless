@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050541';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050541';
-import {modHit,MOD_CAT} from './mod.js?v=202610050541';
+import {makeDb} from './db.js?v=202610050546';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050546';
+import {modHit,MOD_CAT} from './mod.js?v=202610050546';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -742,7 +742,7 @@ function onboardHTML(edit){
   return`<div class="gatebox onb" style="gap:20px">
    ${edit?`<button class="back" data-go="me" style="padding:0">${ic('back',16)} Profile</button>`:'<div class="mark">tack</div>'}
    <div><h1>${edit?'Edit profile':'Set up your profile'}</h1>
-   ${edit?'':`<p style="margin-top:8px">Classmates see this when you post or bid. A real photo helps people trust you.</p>`}</div>
+   </div>
    ${edit?`<div class="eprev">
      <div class="eban" style="${bannerStyle(o.banner)}"><label class="ebtn" for="obn">${ic('camera',14)} ${o.banner?'Change banner':'Add banner'}<input id="obn" type="file" accept="image/*" data-bannerfile></label></div>
      <div class="eav"><label for="oph" class="eavl" aria-label="${o.photo?'Change photo':'Add a photo'}">${ring(me,96)}<span class="eavcam">${ic('camera',15)}</span><input id="oph" type="file" accept="image/*" data-photo></label></div>
@@ -872,13 +872,13 @@ function viewBoard(D){
     <div class="strip">
       <button class="person" data-sheet="free" aria-label="${meFree?'Change when you’re free':'Mark yourself free'}">${meFree?ring(S.me.id,50):`<span class="add">${ic('plus',18)}</span>`}<span>You</span></button>
       ${free.map(u=>`<button class="person" data-ask="${esc(u)}" aria-label="Ask ${esc(firstName(u))} for a favour">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}
-      ${free.length?'':`<span class="stripnote">Nobody else is marked free. Tap + to say you're around.</span>`}
+
     </div></section>
   ${stepsCard(D)}
   <div class="dhead"><h1 class="h1">The board</h1><span class="muted">${all.length} pinned at ${esc(campus())}</span></div>
   <label class="search" for="q">${ic('search',17)}<input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search jobs: print, shawarma, today, library" value="${esc(S.find.q)}" data-bind="find.q" aria-label="Search jobs">${S.find.q?`<button class="sclear" data-act="clearSearch" aria-label="Clear search">${ic('x',14,2.4)}</button>`:''}</label>
   <div class="pills" role="group" aria-label="Filter and sort jobs"><button class="pill ${S.near?'on':''}" data-act="toggleNear" aria-pressed="${S.near}">${ic('place',13,2.2)} Near you</button><span class="pillsep" aria-hidden="true"></span>${[['high','Top pay'],['newest','Newest'],['closing','Closing soon']].map(([k,l])=>`<button class="pill ${S.sort===k?'on':''}" data-sort="${k}" aria-pressed="${S.sort===k}">${l}</button>`).join('')}</div>
-  <div class="wallzone ${S.dropping?'dropin':''}">${filtered&&!list.length&&all.length?`<div class="empty"><b>${S.near&&!S.find.q.trim()?'Nothing near you right now':'No jobs match that'}</b><p>${S.near?'Only jobs pinned with a location can show as near you.':'Try another word, like the place, the time or what you need.'}</p><button class="btn2" data-act="clearFind">Show all jobs</button></div>`:list.length?wallHTML(list,D)+`<div class="boardend"><span class="endpin" aria-hidden="true"></span><p>${filtered?`${list.length} of ${all.length} jobs shown.`:`That's everything pinned at ${esc(campus())}.`}</p><button class="btn2" data-go="post">Pin a job</button></div>`
+  <div class="wallzone ${S.dropping?'dropin':''}">${filtered&&!list.length&&all.length?`<div class="empty"><b>${S.near&&!S.find.q.trim()?'Nothing near you right now':'No jobs match that'}</b><p>${S.near?'Only jobs pinned with a location can show as near you.':'Try another word, like the place, the time or what you need.'}</p><button class="btn2" data-act="clearFind">Show all jobs</button></div>`:list.length?wallHTML(list,D)+`<div class="boardend"><span class="endpin" aria-hidden="true"></span>${filtered?`<p>${list.length} of ${all.length} jobs shown.</p>`:''}<button class="btn2" data-go="post">Pin a job</button></div>`
     :`<div class="empty"><b>Nothing pinned yet</b><p>Pin the first job: a xerox run, a lift down four floors, an hour of help before a submission.</p><button class="cta" data-go="post">Pin a job</button></div>`}</div></div>`;
 }
 function viewJob(D){
@@ -892,7 +892,7 @@ function viewJob(D){
     assigned:repicking(j)?(mine?'<span class="tag warn">Choose someone else</span>':droppedMe(j)?'<span class="tag">Taken</span>':'<span class="tag">Choosing again</span>'):mine||j.accepted===me?`<span class="tag ok">Picked ${esc(shortName(j.accepted))}</span>`:'<span class="tag">Taken</span>',done:payOf(j)?.ok?'<span class="tag ok">Done · Paid ✓</span>':'<span class="tag ok">Done</span>'}[st]||'';
   let foot='';
   if(mine){
-    if(st==='open')foot=`<div class="foot"><button class="btn2" data-act="editJob" data-key="${esc(j.key)}">Edit job</button><button class="btn2" data-sheet="close">Close this job</button><p class="note">Pick someone from the bids to take it off the board.</p></div>`;
+    if(st==='open')foot=`<div class="foot"><button class="btn2" data-act="editJob" data-key="${esc(j.key)}">Edit job</button><button class="btn2" data-sheet="close">Close this job</button></div>`;
     else if(st==='assigned'&&!j.accepted){const left=bids.filter(b=>!j.dropped.includes(b.by)).length;
       foot=`<div class="foot"><div class="banner warnbanner">${left?'Pick someone else from the bids':'Nobody else has bid yet'}</div>
       <p class="note">${left?'The job stays off the board while you choose.':'Put it back on the board so others can bid, or close it.'}</p>
@@ -919,7 +919,7 @@ function viewJob(D){
         <div class="bidbtns"><button class="btn2" data-act="editBid">${ic('edit',15)} Edit bid</button>${threadOpen(jobThreadKey(j.key,me))?`<button class="btn2" data-thread-job>${ic('chat',15)} Message ${esc(firstName(j.owner))}</button>`:''}</div>
         <button class="linkbtn bidwd" data-act="withdraw">Withdraw my bid</button>
       </div>
-      <p class="note">${threadOpen(jobThreadKey(j.key,me))?`${esc(firstName(j.owner))} messaged you about this job.`:`You can message ${esc(firstName(j.owner))} once they pick you.`} You pay each other on UPI.</p></div>`;
+      </div>`;
     else if(st==='open')foot=`<div class="foot">
       <h2 class="h2">${myBid?'Edit your bid':'Place your bid'}</h2>
       <div style="display:flex;gap:9px"><label class="field" for="bidAmt"><span class="fl">Your bid ₹</span>
@@ -932,7 +932,7 @@ function viewJob(D){
       ${S.err.bid?`<p class="err">${esc(S.err.bid)}</p>`:''}
       <button class="cta" data-act="bid" data-need="bid">${myBid?'Update bid':'Place bid'}</button>
       ${myBid?'<button class="linkbtn" data-act="cancelBidEdit">Cancel</button>':''}
-      <p class="note">${threadOpen(jobThreadKey(j.key,me))?`${esc(firstName(j.owner))} messaged you about this job.`:`You can message ${esc(firstName(j.owner))} once they pick you.`} You pay each other on UPI.</p></div>`;
+      </div>`;
     else if(j.accepted===me&&st==='done'){const pay=payOf(j),pn=esc(firstName(j.owner)),late=!pay?.ok&&Date.now()-(j.doneAt||pay?.at||Date.now())>PAY_GRACE;
       foot=pay?.ok?`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} Paid · you confirmed ₹${fmt(j.agreed)} ${since(pay.at)}</div>
           ${j.pick?.ratedPoster?`<p class="note">You rated ${pn}${(S.priv.gave||{})[j.key]?' ★'+num(S.priv.gave[j.key]).toFixed(1):''}.</p>`:`<button class="cta" data-sheet="ratePoster">Rate ${pn}</button>`}
@@ -946,7 +946,7 @@ function viewJob(D){
           ${late?`<button class="linkbtn" data-sheet="report" data-about="${esc(j.owner)}" data-prewhy="No-show or didn’t pay">Still not paid? Report it</button>`:''}
           <p class="note">tack never holds your money. This only records what you both tell us.</p></div>`}
     else if(j.accepted===me)foot=`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${esc(firstName(j.owner))} picked you for ₹${fmt(j.agreed)}</div>
-      <button class="cta" data-thread-job>Message ${esc(firstName(j.owner))}</button>${doerPay(j)}<p class="note">You’re paid directly on UPI or in cash. tack never holds your money.</p></div>`;
+      <button class="cta" data-thread-job>Message ${esc(firstName(j.owner))}</button>${doerPay(j)}</div>`;
     else foot=`<div class="foot"><p class="note">${st==='assigned'||st==='done'?'This job went to someone else.':'This job is closed.'}</p></div>`;
   }
   const mod=!mine&&S.me.isOwner&&st!=='removed'?`<button class="linkbtn" data-sheet="remove">Take this job off the board</button>`:'';
@@ -957,26 +957,26 @@ function viewJob(D){
   const hint=hasPh?`${ic('camera',12,2.2)} Tap to see ${jp.length} ${jp.length===1?'photo':'photos'}`:j.pics?'Loading photos…':'No pictures';
   const bidsSec=`<section class="jbids">
    <div class="stack">
-    ${mine?`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">${bids.length} ${bids.length===1?'bid':'bids'}</h2><span style="font-size:var(--t-12);font-weight:500;color:var(--muted)">only you see these</span></div>`
-      :`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">Your bid</h2><span style="font-size:var(--t-12);font-weight:500;color:var(--muted)">only ${esc(firstName(j.owner))} sees who bids</span></div>`}
+    ${mine?`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">${bids.length} ${bids.length===1?'bid':'bids'}</h2></div>`
+      :`<div style="display:flex;align-items:baseline;gap:8px"><h2 class="h2">Your bid</h2></div>`}
     ${bids.length?bids.map(b=>`<div class="row">
       <button class="rowmain" data-person="${esc(b.by)}">${ring(b.by,42)}<span class="rowtext">
-        <span class="t1">${esc(shortName(b.by))}${b.by===me?' (you)':''}${mine&&b.near?' '+nearTag():''} <span class="muted">· ${esc(metaOf(b.by))}${esc(rateLine(b.by,D))}</span></span>
+        <span class="t1">${esc(shortName(b.by))}${mine&&b.near?' '+nearTag():''} <span class="muted">· ${esc(metaOf(b.by))}${esc(rateLine(b.by,D))}</span></span>
         ${b.say?`<span class="t2 bidsay">${esc(b.say)}</span>`:''}</span></button>
       <span class="bidend"><span class="amt">₹${fmt(b.amt)}</span>
       ${mine&&(st==='open'||repicking(j))&&!j.dropped.includes(b.by)?`<button class="pick" data-pick="${esc(b.by)}" aria-label="Pick ${esc(firstName(b.by))} for ₹${fmt(b.amt)}">Pick</button>`:''}
       ${mine&&(st==='open'||repicking(j))&&!j.dropped.includes(b.by)?`<button class="iconbtn" data-thread-with="${esc(b.by)}" aria-label="Message ${esc(firstName(b.by))}">${ic('chat',17)}</button>`:''}
       ${mine&&j.dropped.includes(b.by)?'<span class="tag">Didn’t do it</span>':''}
       ${j.accepted===b.by?'<span class="tag ok">Picked</span>':''}</span>
-    </div>${picStrip('b:'+j.key+'~'+b.by,b.pics,'sub')}`).join(''):`<p class="note" style="text-align:left">${mine?'No bids yet. Classmates see this on the board now.':'Your bid shows up here once you place it. Only '+esc(firstName(j.owner))+' sees it.'}</p>`}
+    </div>${picStrip('b:'+j.key+'~'+b.by,b.pics,'sub')}`).join(''):''}
    </div>
   </section>`;
   return`<div class="pad jobpage${gcls(j)}" style="--nc:${noteOf(j)}${gvars(j)}">
   <div class="jhero">${cover}${back('board','Board')}<div class="jtools">${mine&&st==='open'?`<button class="jtool" data-act="editJob" data-key="${esc(j.key)}" aria-label="Edit this job">${ic('edit',18)}</button>`:''}<button class="jtool" data-act="openShare" data-key="${esc(j.key)}" aria-label="Share this job">${ic('share',18)}</button>${mine?'':`<button class="jtool ${isSaved(j.key)?'on':''}" data-act="toggleSave" data-key="${esc(j.key)}" aria-label="${isSaved(j.key)?'Remove from saved':'Save this job'}" aria-pressed="${isSaved(j.key)}">${ic('bookmark',18,2,'currentColor',isSaved(j.key)?'currentColor':'none')}</button>`}</div>
     <div class="jhead"><h1 class="h1">${esc(j.text)}</h1></div><span class="jhint">${hint}</span></div>
   <button class="jposter" data-person="${esc(j.owner)}"><span class="javwrap"><span class="ring${freeNow(j.owner)?' live':''}" style="width:68px;height:68px">${face(j.owner,58)}</span>${online?'<span class="onl"><i></i>Online</span>':''}</span>
-    <span class="pname">${esc(shortName(j.owner))}${mine?' <span class="muted">(you)</span>':''}</span>
-    <span class="jmeta">${esc(metaOf(j.owner)||campus())}${esc(posterLine(j.owner))} · posted ${since(j.at)}${j.editedAt?' · edited':''}${esc(payLine(j.owner))}</span></button>
+    <span class="pname">${esc(shortName(j.owner))}</span>
+    <span class="jmeta">${mine?`posted ${since(j.at)}${j.editedAt?' · edited':''}`:`${esc(metaOf(j.owner)||campus())}${esc(posterLine(j.owner))} · posted ${since(j.at)}${j.editedAt?' · edited':''}${esc(payLine(j.owner))}`}</span></button>
   <div class="jcard stack">
     <span class="big" style="view-transition-name:jp">₹${fmt(j.price)}</span>
     <div class="chips">${[j.when,online?'':j.where].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${nearMe(j)?nearTag():''}${stTag}</div>
@@ -997,7 +997,6 @@ function viewPost(){
   const group=(t,k,list)=>`<div class="stack gap8"><span class="formlabel" id="g-${k}">${t}</span><div class="chips" role="group" aria-labelledby="g-${k}">${list.map(v=>`<button class="chip ${d[k]===v&&!(k==='where'&&d.whereText.trim())?'on':''}" data-set="${k}" data-val="${esc(v)}" aria-pressed="${d[k]===v&&!(k==='where'&&d.whereText.trim())}">${esc(v)}</button>`).join('')}</div></div>`;
   return`<div class="pad postpage">${d.editId?back('job','Cancel'):back('board','Close')}
    <h1 class="pageh" style="margin:6px 0 2px">${d.editId?'Edit your job':'Pin a job'}</h1>
-   <p class="note" style="text-align:left;margin:0 0 14px">Write it on the note. This is exactly how it shows on the board.</p>
    <div class="notewrap" id="notewrap"><div class="bignote tile ntile${g?' gnote':''}" id="bignote" style="--nc:${c}${g?';--nc1:var(--g1);--nc2:var(--g2)':''};--d:0s">
      <span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span>
      <span class="pin" aria-hidden="true"></span>
@@ -1019,7 +1018,7 @@ function viewPost(){
        <div class="pitchfoot" style="justify-content:flex-end"><span class="wc">${d.more.length} / 600</span></div></div>
    </div>
    <div class="foot">${S.err.post?`<p class="err">${esc(S.err.post)}</p>`:''}<button class="cta" data-act="post" data-need="post">${d.editId?'Save changes':'Pin it to the board'}</button>
-     <p class="note">Your photo and first name show on the note. No assignment or exam work, nothing illegal or unsafe.</p></div>
+     </div>
   </div><div style="height:24px"></div>`;
 }
 function viewBids(D){
@@ -1103,7 +1102,6 @@ function viewChat(D){
    ${!c.msgs.length?`<p class="note" style="margin:10px 0">${c.loaded?'Say hi. Sort out the time and place here.':'Loading messages…'}</p>`:''}
    ${(()=>{const lastOut=[...c.msgs].reverse().find(m=>m.by===me),readAt=num(((S.threadDocs[c.key]||{}).read||{})[c.other]),seen=pref('receipts')&&lastOut&&readAt>=lastOut.at;
      return c.msgs.map(m=>`<div class="${m.by===me?'out':'in'}">${esc(m.t)}<span class="time">${stamp(m.at)}</span></div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`).join('')})()}
-   <p class="note" style="margin-top:4px">Keep it here. If you report someone, we can see this chat.</p>
   </div>
   ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats now happen inside jobs: ask ${esc(firstName(c.other))} for a favour when they're free, or hire them again from their profile.`}</p></div>`:`
   <div class="foot" style="position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%)"><div style="display:flex;gap:9px">
@@ -1120,12 +1118,12 @@ function viewPerson(uid,D){
    <div class="prof ${bn?'hasbanner':''}">${bn?`<div class="pbanner" style="${bannerStyle(bn)}"></div>`:''}${isMe?`<button class="editpen" data-go="edit" aria-label="Edit profile">${ic('edit',17)}</button>`:''}
      <span class="ring${liveOf(uid)?' live':''}" style="width:108px;height:108px">${face(uid,94)}</span>
      <span class="pname">${handleOf(uid)?'@'+esc(handleOf(uid)):esc(shortName(uid))}</span>
-     ${realNameOf(uid)&&handleOf(uid)?`<span class="realname">${esc(realNameOf(uid))}${isMe?`<span class="privnote">${ic('shield',11)} Only people you make a deal with see this</span>`:''}</span>`:''}
+     ${realNameOf(uid)&&handleOf(uid)?`<span class="realname">${esc(realNameOf(uid))}</span>`:''}
      ${bio?`<p class="pbio">${esc(bio)}</p>`:''}
      <div class="chips pchips">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campusName(campusOf(uid)))}</span>
        ${uid===ownerId()?'<span class="chip vio">Organiser</span>':''}${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${free?'<span class="chip on">Free right now</span>':''}</div>
    </div>
-   <div class="stats"><div><b>${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b>${st.avg?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.avg}`:'New'}</b><span>rating</span></div>${isMe?`<div><b class="money">₹${fmt(st.earned)}</b><span>earned · only you</span></div>`:`<div><b>${st.poster.n?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.poster.avg.toFixed(1)}`:'–'}</b><span>as a poster</span></div>`}</div>
+   <div class="stats"><div><b>${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b>${st.avg?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.avg}`:'New'}</b><span>rating</span></div>${isMe?`<div><b class="money">₹${fmt(st.earned)}</b><span>earned</span></div>`:`<div><b>${st.poster.n?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.poster.avg.toFixed(1)}`:'–'}</b><span>as a poster</span></div>`}</div>
    ${st.doer.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a doer · from ${st.doer.n} ${st.doer.n===1?'rating':'ratings'}</span>${st.doer.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
    ${isMe?'':reviewList(uid)}
    ${st.poster.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a poster · from ${st.poster.n} ${st.poster.n===1?'rating':'ratings'}</span>${st.poster.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
@@ -1254,8 +1252,7 @@ function viewInvites(D){
      <p class="note" style="text-align:left">People with a college email don’t need an invite. They sign up and land on their campus board. Invite people who use Gmail or another personal email.</p>
      ${S.err.inv?`<p class="err">${esc(S.err.inv)}</p>`:''}</div>
    ${li?`<div class="box stack" style="gap:10px;border:1px solid rgba(170,226,84,.35)">
-     <span class="t1" style="font-size:var(--t-14)">${esc(li)} can sign up now. Send them the invite:</span>${shareButtons(li)}
-     <p class="note" style="text-align:left">The invite has a link to the sign-up page with their email filled in.</p></div>`:''}
+     <span class="t1" style="font-size:var(--t-14)">${esc(li)} can sign up now. Send them the invite:</span>${shareButtons(li)}</div>`:''}
    <div class="stack gap8"><div class="sect"><h2 class="h2">Invited</h2><span class="time">${list.length}</span></div>
     ${list.length?list.map(x=>{const joined=x.uid&&S.peopleDocs[x.uid]?.adult;return`<div class="row">${joined?ring(x.uid,40):`<span class="add" style="width:40px;height:40px">${ic('clock',16)}</span>`}
       <span class="rowtext"><span class="t1">${esc(x.email)}</span><span class="t2" style="color:${joined?'var(--accent)':'var(--muted)'}">${joined?'Joined as '+esc(shortName(x.uid)):(x.uid?'Signed up, setting up profile':'Not signed up yet · invited '+since(x.at))}${x.code&&x.by?' · invited by '+esc(shortName(x.by)):''}${campusList().length>1&&x.camp?' · '+esc(campusName(x.camp)):''}</span></span>
@@ -1271,7 +1268,6 @@ function viewInvites(D){
       ${c.id===curCampus()?'':`<button class="btn2" style="width:auto;padding:8px 12px;font-size:var(--t-12)" data-act="viewCampus" data-id="${esc(c.id)}">View</button>`}</div>`).join('')}</div>
    <div class="stack gap8"><label class="formlabel" for="invC">Name of the board you’re viewing</label>
      <div style="display:flex;gap:8px"><input id="invC" class="inp" maxlength="60" value="${esc(S.inv.campus||campus())}" data-bind="inv.campus"><button class="btn2" style="width:auto;padding:12px 18px" data-act="saveCampus">Save</button></div></div>
-   <p class="note" style="text-align:left">Removing an invite locks that person out straight away and takes their jobs off the board.</p>
   </div></div><div style="height:24px"></div>`;
 }
 function railHTML(D){
@@ -1281,7 +1277,7 @@ function railHTML(D){
   <div class="stack gap8">${free.length?free.map(u=>`<div style="display:flex;align-items:center;gap:10px"><button class="rowmain" data-person="${esc(u)}">${ring(u,40)}
      <span class="rowtext"><span style="font-size:var(--t-14);font-weight:600">${esc(shortName(u))}</span><span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc([metaOf(u),str(pdoc(u).does,40)].filter(Boolean).join(' · '))}</span></span></button>
      <button data-ask="${esc(u)}" style="background:var(--surface2);border-radius:999px;padding:7px 13px;font-size:var(--t-12);font-weight:600">Ask</button></div>`).join('')
-   :`<p class="note" style="text-align:left">Nobody else is marked free right now.</p>`}
+   :''}
    <button class="btn2" style="padding:10px;font-size:var(--t-12)" data-sheet="free">${num(S.myDoc?.freeUntil)>Date.now()?'You’re free until '+clock(num(S.myDoc.freeUntil)):'I’m free right now'}</button></div>
   <div style="height:1px;background:var(--line)"></div>
   <h2 class="h2">Your bids</h2>
@@ -1289,7 +1285,7 @@ function railHTML(D){
      <span class="rowtext"><span style="font-size:var(--t-12);font-weight:500;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(j.text)}</span>
      <span style="font-size:var(--t-11);font-weight:500;color:${ok?'var(--accent)':'var(--muted)'}">${ok?'Accepted · ₹'+fmt(j.agreed):j.accepted?'Went to someone else':jobState(j)==='open'?'Waiting for '+firstName(j.owner)+' to pick':'Closed'}</span></span>
      <span style="font-family:var(--display);font-size:var(--t-16);font-weight:700;color:var(--fg2);font-variant-numeric:tabular-nums">₹${fmt(b.amt)}</span></button>`}).join('')
-   :'<p class="note" style="text-align:left">Bids you place show up here.</p>'}</div>`;
+   :''}</div>`;
 }
 
 function sheetHTML(D){
@@ -1345,12 +1341,10 @@ function sheetHTML(D){
   case'share':{const sj=D.jobByKey[s.key];if(!sj){b='<h2 id="sheetT">This job is gone</h2>';break}const img=S.shareImg?.key===s.key?S.shareImg.url:'';
     b=`<h2 id="sheetT">Share this job</h2>
     <div class="sharepreview">${img?`<img src="${img}" alt="Share image: ₹${fmt(sj.price)}, ${esc(sj.text)}">`:'<span class="pic wait"></span>'}</div>
-    <div class="slogos">${slogo('wa','WhatsApp','data-act="shareTo" data-to="wa"')}${slogo('ig','Instagram','data-act="shareTo" data-to="ig"')}${navigator.share?slogo('share','More','data-act="shareTo" data-to="sys"'):''}${slogo('download','Save image','data-act="shareTo" data-to="save"')}${slogo('link','Copy link','data-act="shareTo" data-to="copy"')}</div>
-    <p class="note">The image shows the price, the job and where. Never your name or photo. Only invited members can open the link.</p>`;break}
+    <div class="slogos">${slogo('wa','WhatsApp','data-act="shareTo" data-to="wa"')}${slogo('ig','Instagram','data-act="shareTo" data-to="ig"')}${navigator.share?slogo('share','More','data-act="shareTo" data-to="sys"'):''}${slogo('download','Save image','data-act="shareTo" data-to="save"')}${slogo('link','Copy link','data-act="shareTo" data-to="copy"')}</div>`;break}
   case'crop':{const c=S.crop;if(!c){b='';break}
     b=`<h2 id="sheetT">${c.target==='banner'?'Crop your banner':'Crop your photo'}</h2>
     <div id="cropBox" class="cropbox ${c.target==='banner'?'wide':'round'}"><img id="cropImg" src="${c.url}" alt="" draggable="false"></div>
-    <p class="note">Drag to move. Pinch or use the slider to zoom.</p>
     <input id="cropZoom" class="cropzoom" type="range" min="1" max="4" step="0.01" value="${c.z}" aria-label="Zoom">
     <button class="cta" data-act="cropUse">${c.target==='banner'?'Use banner':'Use photo'}</button><button class="linkbtn" data-act="cropCancel">Cancel</button>`;break}
   case'repick':{if(!j||!j.accepted){b='';break}const dn=esc(firstName(j.accepted));
