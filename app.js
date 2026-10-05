@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050546';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050546';
-import {modHit,MOD_CAT} from './mod.js?v=202610050546';
+import {makeDb} from './db.js?v=202610050552';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050552';
+import {modHit,MOD_CAT} from './mod.js?v=202610050552';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -848,12 +848,12 @@ function tile(j,D,i=0){
   const ph=j.pics?(picsOf('j:'+j.key)||[])[0]:'',d=-((Date.now()/1000+i*2.3)%32).toFixed(2);
   return`<button class="tile ntile${gcls(j)} r${i%3} ${S.fresh===j.key?'fresh':''}" data-job="${esc(j.key)}" style="--nc:${c};--i:${i};--d:${d}s${gvars(j)}">
     <span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span>
-    <span class="pin"></span>${S.me?.isOwner&&held(j.owner)?'<span class="heldtag">Held</span>':''}
+    <span class="pin"></span>${S.me?.isOwner&&held(j.owner)?'<span class="heldtag">Held</span>':j.pics?`<span class="tpics">${ic('camera',12,2.2)} ${j.pics} ${j.pics===1?'photo':'photos'}</span>`:''}
     <span class="price">₹${fmt(j.price)}</span>
     ${left<36e5?`<span class="flag">${Math.max(1,Math.round(left/6e4))} min left</span>`:''}${nearMe(j)?nearTag():''}
     <p>${esc(j.text)}</p>
     ${j.where||j.when?`<span class="where">${ic('place',12,2.2)}<span>${esc([j.where,left<36e5?'':j.when].filter(Boolean).join(' · '))}</span></span>`:''}
-    <span class="by">${face(j.owner,22)}<span class="nm">${esc(firstName(j.owner))}</span><span class="n">${j.pics?ic('camera',12,2.2)+' ':''}${j.owner===S.me.id?`${n} ${n===1?'bid':'bids'}`:since(j.at)}</span></span>
+    <span class="by">${face(j.owner,22)}<span class="nm">${esc(firstName(j.owner))}</span><span class="n">${j.owner===S.me.id?`${n} ${n===1?'bid':'bids'}`:since(j.at)}</span></span>
   </button>`;
 }
 const wideMQ=matchMedia('(min-width:900px)');
@@ -1006,7 +1006,7 @@ function viewPost(){
      <span class="bnfoot"><span class="by">${face(me,22)}<span class="nm">${esc(firstName(me))}</span></span><span class="wc ${d.text.length>=NOTE_MAX?'full':''}" id="jtWc">${noteCount(d.text)}</span></span>
    </div>
    <div class="huewrap"><input type="range" id="jhue" class="huebar" min="0" max="359" step="1" value="${num(d.hue)}" data-bind="draft.hue" aria-label="Note colour" title="Slide to pick the note colour" style="--thumb:${c}"><button type="button" class="hueclear${d.white?' on':''}" id="jwhite" data-act="noteWhite" aria-label="No colour, white text" aria-pressed="${!!d.white}">${ic('x',12,2)}</button></div></div>
-   <div class="bnbump"><span class="formlabel">You'll pay</span><button class="pill" data-bump="50">+₹50</button><button class="pill" data-bump="100">+₹100</button></div>
+
    <div class="stack postsec"><h2 class="h2">Tags</h2>
      ${group('By when','when',WHENS)}${group('Where','where',WHERES)}
      <input id="jw" class="inp" maxlength="40" placeholder="Or type a place: Seminar hall, B-wing 4th floor…" value="${esc(d.whereText)}" data-bind="draft.whereText" aria-label="Other place">
