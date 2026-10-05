@@ -1231,3 +1231,53 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .mininote.tackmini{background:linear-gradient(150deg,#4d6b1a,#2b469c);border-color:rgba(198,242,78,.5)}
 .mininote.tackmini .mnpin{background:linear-gradient(135deg,#D2F55E,#4A72D6)}
 @media (prefers-reduced-motion:reduce){.tile.ntile.tacknote::after{animation:none}}
+
+/* tack's own notes open as a living lime-and-blue page */
+.tackpage{position:relative;min-height:100%;padding:14px 18px 36px;display:flex;flex-direction:column;gap:22px;overflow:hidden;isolation:isolate}
+.main[data-view="job"]:has(.tackpage){padding:0}
+.tkbg{position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(circle,rgba(255,255,255,.07) 0 1.2px,transparent 1.7px) 0 0/22px 22px,linear-gradient(180deg,#0a1206 0%,#070a14 55%,var(--bg) 100%)}
+.tkbg i{position:absolute;border-radius:50%;filter:blur(40px);opacity:.75}
+.tkbg .tb1{width:120%;aspect-ratio:1;left:-45%;top:-38%;background:radial-gradient(closest-side,rgba(198,242,78,.55),rgba(198,242,78,0));animation:tkfloat1 14s ease-in-out infinite alternate}
+.tkbg .tb2{width:110%;aspect-ratio:1;right:-50%;top:-10%;background:radial-gradient(closest-side,rgba(74,114,214,.7),rgba(74,114,214,0));animation:tkfloat2 17s ease-in-out infinite alternate}
+.tkbg .tb3{width:90%;aspect-ratio:1;left:5%;top:30%;background:radial-gradient(closest-side,rgba(159,219,116,.32),rgba(159,219,116,0));animation:tkfloat3 20s ease-in-out infinite alternate}
+@keyframes tkfloat1{to{transform:translate(18%,12%) scale(1.12)}}
+@keyframes tkfloat2{to{transform:translate(-20%,18%) scale(.92)}}
+@keyframes tkfloat3{to{transform:translate(12%,-14%) scale(1.15)}}
+.tktop{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:2}
+.tktop .back{padding:8px 14px 8px 11px;border-radius:999px;background:rgba(6,6,8,.45);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--fg)}
+.tktop .jtools{position:static;display:flex;gap:8px}
+.tkhero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding:24px 4px 4px}
+.tkicon{width:76px;height:76px;border-radius:22px;background:url(icon-192.png?v=202610050117) center/cover;
+  box-shadow:0 0 0 1px rgba(255,255,255,.12),0 0 40px rgba(198,242,78,.45),0 18px 40px -12px rgba(74,114,214,.8);animation:tkpop .7s .05s cubic-bezier(.2,.9,.3,1.35) both,tkglow 4s 1s ease-in-out infinite alternate}
+@keyframes tkglow{to{box-shadow:0 0 0 1px rgba(255,255,255,.16),0 0 56px rgba(120,160,255,.55),0 18px 40px -12px rgba(198,242,78,.6)}}
+.tkbadge{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;background:rgba(6,6,8,.4);border:1px solid rgba(210,245,94,.35);
+  font-size:var(--fs-c);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#E6F7B0;animation:tkup .5s .25s cubic-bezier(.2,.8,.2,1) both}
+.tkbadge i{width:7px;height:7px;border-radius:50%;background:var(--grad);box-shadow:0 0 8px rgba(198,242,78,.8)}
+.tkh{margin:0;font-family:var(--display);font-size:clamp(28px,7.4vw,40px);font-weight:700;line-height:1.1;letter-spacing:-.035em;text-wrap:pretty;
+  background:linear-gradient(120deg,#fff 0%,#F2FBD4 40%,#D9E4FF 100%);-webkit-background-clip:text;background-clip:text;color:transparent;animation:tkup .6s .35s cubic-bezier(.2,.8,.2,1) both}
+.tkpics{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -18px;padding:2px 18px;scrollbar-width:none}
+.tkpics::-webkit-scrollbar{display:none}
+.tkpic{flex:0 0 78%;max-width:420px;aspect-ratio:4/3;border-radius:20px;overflow:hidden;scroll-snap-align:center;box-shadow:0 18px 40px -18px rgba(0,0,0,.9),0 0 0 1px rgba(255,255,255,.08);
+  animation:tkup .6s calc(.5s + var(--k)*.1s) cubic-bezier(.2,.8,.2,1) both}
+.tkpics .tkpic:only-child{flex-basis:100%}
+.tkpic img{width:100%;height:100%;object-fit:cover;display:block}
+.tkcard{display:flex;flex-direction:column;gap:12px;padding:20px;border-radius:24px;border:1px solid transparent;
+  background:linear-gradient(150deg,rgba(59,84,20,.45),rgba(36,57,122,.5)) padding-box,linear-gradient(135deg,rgba(210,245,94,.55),rgba(74,114,214,.65)) border-box;
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);animation:tkup .6s .55s cubic-bezier(.2,.8,.2,1) both}
+.tkcard p{margin:0;font-size:16px;line-height:1.6;color:#EEF3FF;animation:tkup .5s calc(.7s + var(--k)*.08s) ease both}
+.tkcta{display:flex;flex-direction:column;gap:10px;animation:tkup .6s .75s cubic-bezier(.2,.8,.2,1) both}
+.tkcta .cta{display:flex;align-items:center;justify-content:center;gap:8px}
+.tkghost{display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(6,6,8,.4);border:1px solid rgba(255,255,255,.12)}
+.tkown{display:flex;justify-content:center}
+.tkown .linkbtn{color:var(--muted)}
+@keyframes tkup{from{opacity:0;transform:translateY(16px)}}
+@keyframes tkpop{from{opacity:0;transform:scale(.6) rotate(-8deg)}}
+@media (min-width:900px){.tackpage{padding:22px 28px 40px;max-width:720px;margin:0 auto;width:100%}}
+@media (prefers-reduced-motion:reduce){.tackpage *,.tkbg i{animation:none!important}}
+
+.tackpage:not(.enter) .tkicon{animation:tkglow 4s 1s ease-in-out infinite alternate}
+.tackpage:not(.enter) .tkbadge,.tackpage:not(.enter) .tkh,.tackpage:not(.enter) .tkpic,.tackpage:not(.enter) .tkcard,.tackpage:not(.enter) .tkcard p,.tackpage:not(.enter) .tkcta{animation:none}
+.tkbg .tb1,.tkbg .tb2,.tkbg .tb3{animation-delay:var(--t,0s)}
+.tkcard .tkli{display:flex;gap:12px;align-items:flex-start}
+.tkcard .tkli i{flex-shrink:0;width:8px;height:8px;margin-top:9px;border-radius:50%;background:var(--grad);box-shadow:0 0 8px rgba(198,242,78,.6)}

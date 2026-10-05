@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050827';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050827';
-import {modHit,MOD_CAT} from './mod.js?v=202610050827';
+import {makeDb} from './db.js?v=202610050833';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050833';
+import {modHit,MOD_CAT} from './mod.js?v=202610050833';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -919,9 +919,29 @@ function viewBoard(D){
   <div class="wallzone ${S.dropping?'dropin':''}">${filtered&&!list.length&&all.length?`<div class="empty"><b>${S.near&&!S.find.q.trim()?'Nothing near you right now':'No jobs match that'}</b><p>${S.near?'Only jobs pinned with a location can show as near you.':'Try another word, like the place, the time or what you need.'}</p><button class="btn2" data-act="clearFind">Show all jobs</button></div>`:list.length?wallHTML(list,D)+`<div class="boardend"><span class="endpin" aria-hidden="true"></span>${filtered?`<p>${list.length} of ${all.length} jobs shown.</p>`:''}<button class="btn2" data-go="post">Pin a job</button></div>`
     :`<div class="empty"><b>Nothing pinned yet</b><p>Pin the first job: a xerox run, a lift down four floors, an hour of help before a submission.</p><button class="cta" data-go="post">Pin a job</button></div>`}</div></div>`;
 }
+function viewTackNote(j){const mine=j.owner===S.me.id,st=jobState(j),jp=j.pics?picsOf('j:'+j.key):null;
+  const paras=str(j.more,600).split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  const enter=S.tkSeen!==j.key;S.tkSeen=j.key;
+  return`<div class="tackpage${enter?' enter':''}">
+   <div class="tkbg" style="--t:-${(Date.now()/1000%60).toFixed(2)}s" aria-hidden="true"><i class="tb1"></i><i class="tb2"></i><i class="tb3"></i></div>
+   <div class="tktop">${back('board','Board')}<div class="jtools">${mine&&st==='open'?`<button class="jtool" data-act="editJob" data-key="${esc(j.key)}" aria-label="Edit">${ic('edit',18)}</button>`:''}<button class="jtool" data-act="openShare" data-key="${esc(j.key)}" aria-label="Share">${ic('share',18)}</button></div></div>
+   <div class="tkhero">
+     <span class="tkicon"></span>
+     <span class="tkbadge"><i></i>from tack</span>
+     <h1 class="tkh">${esc(j.text)}</h1>
+   </div>
+   ${jp&&jp.length?`<div class="tkpics">${jp.map((src,i)=>`<button class="tkpic" data-pic="${esc('j:'+j.key)}" data-i="${i}" style="--k:${i}"><img src="${src}" alt="Photo ${i+1}"></button>`).join('')}</div>`:''}
+   ${paras.length?`<div class="tkcard">${paras.map((p,i)=>/^[-•*]\s*/.test(p)?`<p class="tkli" style="--k:${i}"><i></i><span>${esc(p.replace(/^[-•*]\s*/,''))}</span></p>`:`<p style="--k:${i}">${esc(p)}</p>`).join('')}</div>`:''}
+   <div class="tkcta">
+     <button class="cta" data-go="post">${ic('plus',18,2.4,'var(--on-grad)')} Pin a job</button>
+     <button class="btn2 tkghost" data-sheet="invitefriend">${ic('users',17)} Invite a friend</button>
+   </div>
+   ${mine&&st==='open'?`<div class="tkown"><button class="linkbtn" data-sheet="close">Take this off the board</button></div>`:''}
+  </div>`}
 function viewJob(D){
   const j0=D.jobByKey[S.openJob],j=j0&&hiddenFor(j0)&&j0.accepted!==S.me.id&&!myBidOn(j0.key)?null:j0;
   if(!j)return`<div class="pad">${back('board','Back to the board')}<div class="empty" style="margin:18px 0"><b>This job is gone</b><p>The poster closed it or it was taken off the board.</p></div></div>`;
+  if(isOrg(j.owner))return viewTackNote(j);
   const me=S.me.id,mine=j.owner===me,st=jobState(j),bids=bidsFor(D,j.key).sort((a,b)=>a.amt-b.amt||a.at-b.at);
   const myBid=myBidOn(j.key);
   if(S.bid.key!==j.key)S.bid={key:j.key,amt:String(myBid?num(myBid.amt):j.price),say:myBid?myBid.say:'',pics:myBid&&num(myBid.pics)?null:[]};
@@ -1615,7 +1635,7 @@ function kbCheck(){const vv=window.visualViewport,h=window.innerHeight,vh=vv?vv.
 window.visualViewport?.addEventListener('resize',kbCheck);window.addEventListener('resize',kbCheck);
 document.addEventListener('focusin',()=>setTimeout(kbCheck,300));document.addEventListener('focusout',()=>setTimeout(kbCheck,200));
 window.addEventListener('orientationchange',()=>{kbBase.h=0;setTimeout(()=>{kbBase.h=window.innerHeight;kbCheck()},400)});
-function go(v,keepThread){if(v==='post'&&S.view!=='post')S.postEnter=true;
+function go(v,keepThread){if(v==='job')S.tkSeen=null;if(v==='post'&&S.view!=='post')S.postEnter=true;
   const from=S.view;
   if(v!=='chat'&&!keepThread)closeThread();
   const apply=()=>{if(v==='post'&&from!=='post'&&S.draft.editId&&!S.editEnter)S.draft=blankDraft();S.editEnter=false;if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}S.view=v;S.sheet=null;S.err={};if(v==='help'&&from!=='help')S.help={kind:null,job:null,why:'',note:'',sent:null};if(v==='settings'){S.pwOpen=false}if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit'){seedOnb();S.hcheck={h:handleOf(S.me.id),st:'mine'}}if(v==='invites')S.inv.campus='';render();
