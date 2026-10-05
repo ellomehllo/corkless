@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050854';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050854';
-import {modHit,MOD_CAT} from './mod.js?v=202610050854';
+import {makeDb} from './db.js?v=202610050912';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050912';
+import {modHit,MOD_CAT} from './mod.js?v=202610050912';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -161,7 +161,7 @@ function normJob(id,j,uid){
 function jobState(j){return j.status==='open'&&j.deadline<Date.now()?'expired':j.status}
 function derive(){
   const me=S.me.id,blocked=new Set(arr(S.priv.blocked));
-  const cc=curCampus(),members=Object.keys(S.peopleDocs).filter(u=>u!==me&&ID_RE.test(u)&&isMember(u)&&(!S.me.isOwner||campusOf(u)===cc));
+  const cc=curCampus(),members=Object.keys(S.peopleDocs).filter(u=>u!==me&&ID_RE.test(u)&&isMember(u)&&(campusOf(u)===cc||(!S.me.isOwner&&isOrg(u))));
   if(S.myDoc?.adult)members.push(me);
   const jobs=[],jobByKey={},bidsByJob={};
   for(const uid of members){const d=pdoc(uid);
@@ -573,8 +573,8 @@ const comName=id=>str(S.coms[id]?.name,40)||'Board';
 const comOwner=id=>S.cmine[id]==='owner';
 function comChips(){const mine=Object.keys(S.cmine).filter(id=>S.coms[id]).sort((a,b)=>comName(a).localeCompare(comName(b))),inv=Object.keys(S.cinv).filter(id=>S.coms[id]);
   return`<div class="comrow" role="navigation" aria-label="Boards"><button class="comchip on">${esc(campus())}</button>${mine.map(id=>`<button class="comchip" data-com="${esc(id)}">${esc(comName(id))}</button>`).join('')}${inv.map(id=>`<button class="comchip invited" data-sheet="cjoin" data-about="${esc(id)}">${ic('mail',13)} ${esc(comName(id))}</button>`).join('')}<button class="comchip cnewchip" data-sheet="cnew">${ic('plus',14)} New board</button></div>`}
-function cnoteTile(n,i){const c=COLOR_RE.test(n.color||'')?n.color:'#7FA2FF',k=Object.values(S.ccoms).filter(x=>x.note===n.id).length;
-  return`<button class="tile ntile cntile r${i%3}" data-cnote="${esc(n.id)}" style="--nc:${c};--i:${i};--d:0s"><span class="pin"></span><p>${esc(n.text)}</p>
+function cnoteTile(n,i){const c=COLOR_RE.test(n.color||'')?n.color:'#7FA2FF',k=Object.values(S.ccoms).filter(x=>x.note===n.id).length,ph=n.pics?(picsOf('c:'+n.id)||[])[0]:'',tags=[n.where,n.when].filter(Boolean).join(' · ');
+  return`<button class="tile ntile cntile r${i%3}" data-cnote="${esc(n.id)}" style="--nc:${c};--i:${i};--d:0s"><span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span><span class="pin"></span>${n.pics?`<span class="tpics">${ic('camera',12,2.2)} ${n.pics} ${n.pics===1?'photo':'photos'}</span>`:''}<p>${esc(n.text)}</p>${tags?`<span class="where">${ic('place',12,2.2)}<span>${esc(tags)}</span></span>`:''}
     <span class="by">${face(n.by,22)}<span class="nm">${esc(firstName(n.by))}</span><span class="n">${ic('chat',12,2.2)} ${k}</span></span></button>`}
 function viewCBoard(D){const id=S.cid,c=S.coms[id];if(!id||!c||!S.cmine[id])return viewBoard(D);
   const notes=Object.entries(S.cnotes).map(([k,v])=>({...v,id:k})).sort((a,b)=>b.at-a.at),n=Object.keys(S.cmembers).length,owner=comOwner(id);
@@ -583,12 +583,13 @@ function viewCBoard(D){const id=S.cid,c=S.coms[id];if(!id||!c||!S.cmine[id])retu
     <div class="chead"><h1 class="pageh">${esc(c.name)}</h1>${c.about?`<p class="cabout">${esc(c.about)}</p>`:''}
       <div class="cmeta"><button class="cmembtn" data-sheet="cmembers">${ic('users',15)} ${n} ${n===1?'member':'members'}</button>${owner?`<button class="pick" data-sheet="cinvite">${ic('plus',14,2.4)} Invite</button>`:''}</div></div>
     ${notes.length?`<div class="wall">${col.map(x=>`<div class="wcol">${x.join('')}</div>`).join('')}</div>`:`<div class="empty"><b>No notes yet</b><p>Add the first note for ${esc(c.name)}.</p></div>`}
-    <button class="cta cadd" data-sheet="cnoteNew">${ic('plus',17,2.4,'var(--on-grad)')} Add a note</button></div>`}
+    <button class="cta cadd" data-act="cnoteStart">${ic('plus',17,2.4,'var(--on-grad)')} Add a note</button></div>`}
 function viewCNote(D){const n0=S.cnotes[S.cnote];if(!S.cid||!n0)return viewCBoard(D);const n={...n0,id:S.cnote},c=COLOR_RE.test(n.color||'')?n.color:'#7FA2FF',me=S.me.id,owner=comOwner(S.cid);
   const coms=Object.entries(S.ccoms).map(([k,v])=>({...v,id:k})).filter(x=>x.note===n.id).sort((a,b)=>a.at-b.at);
   return`<div class="pad cnotepage">${back('cboard',comName(S.cid))}
-    <div class="tile ntile cnbig" style="--nc:${c};--d:0s"><span class="pin"></span><p>${esc(n.text)}</p>${n.more?`<p class="cmore">${esc(n.more)}</p>`:''}
+    <div class="tile ntile cnbig" style="--nc:${c};--d:0s"><span class="pin"></span><p>${esc(n.text)}</p>${[n.where,n.when].filter(Boolean).length?`<span class="where">${ic('place',12,2.2)}<span>${esc([n.where,n.when].filter(Boolean).join(' · '))}</span></span>`:''}${n.more?`<p class="cmore">${esc(n.more)}</p>`:''}
       <span class="by">${face(n.by,26)}<span class="nm">${esc(shortName(n.by))}</span><span class="n">${since(n.at)}</span></span></div>
+    ${n.pics?picStrip('c:'+n.id,n.pics):''}
     ${n.by===me||owner?`<button class="linkbtn cdel" data-act="cnoteDel">${n.by===me?'Delete this note':'Remove this note'}</button>`:''}
     <h2 class="h2">${coms.length} ${coms.length===1?'comment':'comments'}</h2>
     <div class="ccoms">${coms.map(x=>`<div class="ccom">${face(x.by,30)}<div class="cbody"><span class="cwho">${esc(shortName(x.by))} <span class="muted">${since(x.at)}</span></span><p>${esc(x.t)}</p>
@@ -703,7 +704,7 @@ function readPic(file){
 }
 const cleanPics=l=>Array.isArray(l)?l.filter(x=>typeof x==='string'&&x.length<=PIC_MAX&&PIC_RE.test(x)).slice(0,MAX_PICS):[];
 function picsOf(k){const v=S.pics[k];if(v!==undefined)return v;S.pics[k]=null;
-  const [col,id]=k.split(':');S.fb.getDoc(S.fb.doc(S.db,{j:'jobpics',b:'bidpics',r:'reviewpics'}[col],id)).then(d=>{S.pics[k]=d.exists()?cleanPics(d.data().pics):[]}).catch(()=>{S.pics[k]=[]}).finally(()=>{if(S.phase==='app')render()});
+  const [col,id]=k.split(':');S.fb.getDoc(S.fb.doc(S.db,{j:'jobpics',b:'bidpics',r:'reviewpics',c:'cnotepics'}[col],id)).then(d=>{S.pics[k]=d.exists()?cleanPics(d.data().pics):[]}).catch(()=>{S.pics[k]=[]}).finally(()=>{if(S.phase==='app')render()});
   return null}
 function picStrip(k,n,cls=''){if(!n)return'';const l=picsOf(k);
   return`<div class="pics ${cls}">${l?l.map((src,i)=>`<button class="pic" data-pic="${esc(k)}" data-i="${i}" aria-label="Open photo ${i+1} of ${l.length}"><img src="${src}" alt=""></button>`).join('')
@@ -1115,13 +1116,14 @@ function postEnterOnce(){const e=!!S.postEnter;S.postEnter=false;return e}
 function viewPost(){
   const d=S.draft,{c,g}=noteTone(),me=S.me.id,ph=(d.pics||[])[0]||'';
   const group=(t,k,list)=>`<div class="stack gap8"><span class="formlabel" id="g-${k}">${t}</span><div class="chips" role="group" aria-labelledby="g-${k}">${list.map(v=>`<button class="chip ${d[k]===v&&!(k==='where'&&d.whereText.trim())?'on':''}" data-set="${k}" data-val="${esc(v)}" aria-pressed="${d[k]===v&&!(k==='where'&&d.whereText.trim())}">${esc(v)}</button>`).join('')}</div></div>`;
-  return`<div class="pad postpage">${d.editId?back('job','Cancel'):back('board','Close')}
-   <h1 class="pageh" style="margin:6px 0 2px">${d.editId?'Edit your job':'Pin a job'}</h1>
+  const cm=!!d.cid;
+  return`<div class="pad postpage${cm?' cpost':''}">${cm?back('cboard',comName(d.cid)):d.editId?back('job','Cancel'):back('board','Close')}
+   <h1 class="pageh" style="margin:6px 0 2px">${cm?'Add a note to '+esc(comName(d.cid)):d.editId?'Edit your job':'Pin a job'}</h1>
    <div class="notewrap${noteHeld()?' flat':''}" id="notewrap"><div class="bignote tile ntile${g?' gnote':''}${postEnterOnce()?' enter':''}" id="bignote" style="--nc:${c}${g?';--nc1:var(--g1);--nc2:var(--g2)':''};--d:0s">
      <span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span>
      <span class="pin" aria-hidden="true"></span>
-     <label class="bnprice ${digits(d.price)?'':'blank'}" id="bnPrice" for="jp"><span>₹</span><input id="jp" type="text" inputmode="numeric" maxlength="5" placeholder="150" value="${esc(d.price)}" data-bind="draft.price" aria-label="You'll pay, in rupees"></label>
-     <textarea id="jt" class="bntext" rows="3" maxlength="${NOTE_MAX}" placeholder="What do you need? Pick up my print-outs from Sai Xerox before 4." data-bind="draft.text" aria-label="What do you need?">${esc(d.text)}</textarea>
+     ${cm?'':`<label class="bnprice ${digits(d.price)?'':'blank'}" id="bnPrice" for="jp"><span>₹</span><input id="jp" type="text" inputmode="numeric" maxlength="5" placeholder="150" value="${esc(d.price)}" data-bind="draft.price" aria-label="You'll pay, in rupees"></label>`}
+     <textarea id="jt" class="bntext" rows="3" maxlength="${NOTE_MAX}" placeholder="${cm?'What do you want to share?':'What do you need? Pick up my print-outs from Sai Xerox before 4.'}" data-bind="draft.text" aria-label="${cm?'Your note':'What do you need?'}">${esc(d.text)}</textarea>
      <div class="bnpics">${picEdit('draft',d.pics)}</div>
      <span class="bnfoot"><span class="by">${face(me,22)}<span class="nm">${esc(firstName(me))}</span></span><span class="wc ${d.text.length>=NOTE_MAX?'full':''}" id="jtWc">${noteCount(d.text)}</span></span>
    </div>
@@ -1130,14 +1132,14 @@ function viewPost(){
    <div class="stack postsec"><h2 class="h2">Tags</h2>
      ${group('By when','when',WHENS)}${group('Where','where',WHERES)}
      <input id="jw" class="inp" maxlength="40" placeholder="Or type a place: Seminar hall, B-wing 4th floor…" value="${esc(d.whereText)}" data-bind="draft.whereText" aria-label="Other place">
-     <button class="locbtn" data-act="toggleJobLoc" aria-pressed="${!!d.useLoc}">${ic(d.useLoc?'tick':'place',16,2.4)}<span class="rowtext"><span class="t1">${d.useLoc?'Tagged with where you are now':'Tag this job with where you are'}</span><span class="t2">${d.useLoc?'Members nearby see a Near you tag. Turn off if the job is somewhere else.':'Helps people close by find it. Rounded to about 100 m, never shown on a map.'}</span></span></button>
+     ${cm?'':`<button class="locbtn" data-act="toggleJobLoc" aria-pressed="${!!d.useLoc}">${ic(d.useLoc?'tick':'place',16,2.4)}<span class="rowtext"><span class="t1">${d.useLoc?'Tagged with where you are now':'Tag this job with where you are'}</span><span class="t2">${d.useLoc?'Members nearby see a Near you tag. Turn off if the job is somewhere else.':'Helps people close by find it. Rounded to about 100 m, never shown on a map.'}</span></span></button>`}
    </div>
-   <div class="stack postsec"><h2 class="h2">Job description</h2>
+   <div class="stack postsec"><h2 class="h2">${cm?'Details':'Job description'}</h2>
      <div class="pitchbox"><label class="pitchlabel" for="jm">Details <span class="labelhint">· optional, shown on the job page</span></label>
-       <textarea id="jm" rows="5" maxlength="600" placeholder="Anything the person doing it should know: roll number, floor, what to bring, how you'll pay." data-bind="draft.more">${esc(d.more)}</textarea>
+       <textarea id="jm" rows="5" maxlength="600" placeholder="${cm?'Anything else people should know.':'Anything the person doing it should know: roll number, floor, what to bring, how you\'ll pay.'}" data-bind="draft.more">${esc(d.more)}</textarea>
        <div class="pitchfoot" style="justify-content:flex-end"><span class="wc">${d.more.length} / 600</span></div></div>
    </div>
-   <div class="foot">${S.err.post?`<p class="err">${esc(S.err.post)}</p>`:''}<button class="cta" data-act="post" data-need="post">${d.editId?'Save changes':'Pin it to the board'}</button>
+   <div class="foot">${S.err.post?`<p class="err">${esc(S.err.post)}</p>`:''}<button class="cta" data-act="post" data-need="${cm?'cpost':'post'}">${d.editId?'Save changes':'Pin it to the board'}</button>
      </div>
   </div><div style="height:24px"></div>`;
 }
@@ -1355,7 +1357,7 @@ function renderTermsGate(){let r=$('termsRoot');
       <li>No academic work, nothing illegal or unsafe. Breaking the rules can get your account removed.</li><li>New controls in Settings: read receipts, who can ask you for favours, blocked people and downloading your data.</li></ul>
     <div class="tglinks"><button class="btn2" data-doc="terms">Read Terms of Use</button><button class="btn2" data-doc="privacy">Read Privacy Policy</button></div>
     <button class="cta" data-act="acceptTerms">I agree</button><button class="linkbtn" data-act="logout">Log out</button></div></div>`}
-const NEED_EXTRA={pw:()=>!!S.pw.cur&&S.pw.nw.length>=8,help:()=>{const h=S.help;return h.kind==='past'||h.kind==='board'?!!(h.job&&h.why):h.note.trim().length>=10}};
+const NEED_EXTRA={cpost:()=>S.draft.text.trim().length>=2,pw:()=>!!S.pw.cur&&S.pw.nw.length>=8,help:()=>{const h=S.help;return h.kind==='past'||h.kind==='board'?!!(h.job&&h.why):h.note.trim().length>=10}};
 const inviteLink=e=>`${SITE}?invite=${encodeURIComponent(e)}`;
 const inviteText=e=>`You're invited to tack, the ${campus()} noticeboard for small jobs. Post something you need done, or bid on a classmate's job.\n\nSign up with this email address (${e}):\n${inviteLink(e)}`;
 function shareButtons(e){
@@ -1715,7 +1717,7 @@ window.addEventListener('orientationchange',()=>{kbBase.h=0;setTimeout(()=>{kbBa
 function go(v,keepThread){if(v==='job')S.tkSeen=null;if(v==='post'&&S.view!=='post')S.postEnter=true;
   const from=S.view;
   if(v!=='chat'&&!keepThread)closeThread();
-  const apply=()=>{if(v==='post'&&from!=='post'&&S.draft.editId&&!S.editEnter)S.draft=blankDraft();S.editEnter=false;if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}S.view=v;S.sheet=null;S.err={};if(v==='help'&&from!=='help')S.help={kind:null,job:null,why:'',note:'',sent:null};if(v==='settings'){S.pwOpen=false}if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit'){seedOnb();S.hcheck={h:handleOf(S.me.id),st:'mine'}}if(v==='invites')S.inv.campus='';render();
+  const apply=()=>{if(v==='post'&&from!=='post'&&(S.draft.editId||S.draft.cid)&&!S.editEnter)S.draft=blankDraft();S.editEnter=false;if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}S.view=v;S.sheet=null;S.err={};if(v==='help'&&from!=='help')S.help={kind:null,job:null,why:'',note:'',sent:null};if(v==='settings'){S.pwOpen=false}if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit'){seedOnb();S.hcheck={h:handleOf(S.me.id),st:'mine'}}if(v==='invites')S.inv.campus='';render();
     if(v==='board'&&from==='job'&&S.openJob){const p=document.querySelector(`.tile[data-job="${CSS.escape(S.openJob)}"] .price`);if(p)p.style.viewTransitionName='jp'}};
   if(from===v||S.phase!=='app'||!document.startViewTransition||reduceMotion.matches){apply();return}
   const d=(DEPTH[v]??1)-(DEPTH[from]??1),root=document.documentElement;
@@ -1761,6 +1763,11 @@ const ACT={
     if(want&&want!==h&&!handleLockedUntil()){if(S.hcheck.st!=='ok'){S.err={onb:'That username isn’t available.'};render();return}try{await claimHandle(want);h=want;hAt=Date.now()}catch(e){console.warn(e);S.err={onb:'That username was just taken. Try another.'};render();return}}
     saveMine(d=>{const x={...d,handle:h,handleAt:hAt||Date.now(),photo:o.photo||'',year:o.year,branch:o.branch.trim().slice(0,24),bio:o.does.trim().slice(0,BIO_MAX),does:o.does.trim().slice(0,60),banner:bannerOk(o.banner)?o.banner:'',ring:o.ring};delete x.name;return x});go('me');toast('Profile saved')},
   post(){const d=S.draft,text=d.text.trim(),price=digits(d.price);
+    if(d.cid){if(!need(text.length>=2,'post','Write your note first.')||!need(text.length<=NOTE_MAX,'post','Keep the note to '+NOTE_MAX+' characters.'))return;if(modBlock('job',text,d.more,d.whereText))return;
+      const id=rid(),cid=d.cid,pics=cleanPics(d.pics),where=(d.whereText.trim()||d.where).slice(0,40),at=Date.now();
+      S.fb.setDoc(S.fb.doc(S.db,'cnotes',id),{community:cid,by:S.me.id,text:text.slice(0,400),more:d.more.trim().slice(0,600),color:d.white?NOTE_WHITE:hueHex(d.hue),at,when:d.when,where,...(pics.length?{pics:pics.length}:{})})
+        .then(()=>pics.length?S.fb.setDoc(S.fb.doc(S.db,'cnotepics',id),{community:cid,pics}):null).catch(e=>{console.warn(e);toast('Couldn\u2019t pin it. Try again.')});
+      if(pics.length)S.pics['c:'+id]=pics;S.draft=blankDraft();go('cboard');moment('Pinned.','',900);return}
     if(!need(text.length<=NOTE_MAX,'post','Keep the note to '+NOTE_MAX+' characters. Put the rest in the details.')||!need(text.length>=8,'post','Say what you need in a few more words.')||!need(price>=10&&price<=20000,'post','Set a price between ₹10 and ₹20,000.'))return;
     if(modBlock('job',text,d.more,d.whereText))return;
     if(d.editId){const id=d.editId,key=S.me.id+'~'+id,old=(S.myDoc?.jobs||{})[id];if(!old||old.status!=='open'){toast('This job can\u2019t be edited any more.');S.draft=blankDraft();go('job');return}
@@ -1818,6 +1825,7 @@ const ACT={
   comKick(el){const u=el.dataset.uid;S.fb.deleteDoc(S.fb.doc(S.db,'cmembers',S.cid+'~'+u)).then(()=>toast('Removed '+firstName(u))).catch(()=>toast('Couldn\u2019t remove them.'))},
   comLeave(){const id=S.cid;S.fb.deleteDoc(S.fb.doc(S.db,'cmembers',id+'~'+S.me.id)).then(()=>{S.sheet=null;closeCom();go('board');toast('You left the board')}).catch(()=>toast('Couldn\u2019t leave.'))},
   comDelete(){if(!confirm('Delete '+comName(S.cid)+' and all its notes?'))return;const id=S.cid;S.fb.deleteDoc(S.fb.doc(S.db,'communities',id)).then(()=>{S.sheet=null;closeCom();go('board');toast('Board deleted')}).catch(()=>toast('Couldn\u2019t delete it.'))},
+  cnoteStart(){S.draft={...blankDraft(),cid:S.cid,useLoc:false};S.editEnter=true;go('post')},
   cnoteColor(el){S.cdraft.color=el.dataset.c;render()},
   cnoteAdd(){const d=S.cdraft,t=d.text.trim();if(!t){S.err={cnote:'Write something first.'};render();return}if(modBlock('job',t,d.more))return;
     S.fb.addDoc(S.fb.collection(S.db,'cnotes'),{community:S.cid,by:S.me.id,text:t.slice(0,400),more:d.more.trim().slice(0,600),color:d.color,at:Date.now()}).then(()=>toast('Pinned')).catch(e=>{console.warn(e);toast('Couldn\u2019t pin it.')});
