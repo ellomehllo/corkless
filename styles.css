@@ -1293,3 +1293,21 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .tkbids .foot,.tkbids .jbids{padding:0;max-width:none}
 .tkbids .bidcard,.tkbids .pitchbox,.tkbids .field,.tkbids .row{background:rgba(10,12,20,.55);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
 @media (prefers-reduced-motion:reduce){.tkcard{animation:none!important}}
+
+/* tack details card: glass with a sliding sheen (transform only, no repaint-heavy animation) */
+.tkcard,.tackpage:not(.enter) .tkcard{position:relative;overflow:hidden;-webkit-backdrop-filter:none;backdrop-filter:none;
+  background:linear-gradient(150deg,rgba(78,108,28,.62),rgba(40,66,120,.6) 55%,rgba(43,70,156,.66)) padding-box,linear-gradient(135deg,rgba(225,250,140,.75),rgba(140,180,255,.6) 50%,rgba(74,114,214,.8)) border-box;
+  background-size:auto;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.25),0 22px 50px -24px rgba(0,0,0,.9),0 0 40px -18px rgba(198,242,78,.35)}
+.tkcard{animation:tkup .6s .55s cubic-bezier(.2,.8,.2,1) both}
+.tackpage:not(.enter) .tkcard{animation:none}
+.tkcard::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,0) 42%)}
+.tkcard::after{content:"";position:absolute;top:-20%;bottom:-20%;left:0;width:45%;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.16) 45%,rgba(230,250,170,.1) 55%,transparent);
+  transform:translateX(-120%) skewX(-12deg);will-change:transform;animation:tksheen 5.5s 1.2s cubic-bezier(.45,0,.2,1) infinite}
+@keyframes tksheen{0%{transform:translateX(-120%) skewX(-12deg)}55%,100%{transform:translateX(330%) skewX(-12deg)}}
+.tkcard p{position:relative;z-index:1}
+.tkcard .tkli{padding-left:0;border-left:0}
+.tkbg i{will-change:transform}
+.tkbids .bidcard,.tkbids .pitchbox,.tkbids .field,.tkbids .row{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(14,16,26,.82)}
+@media (prefers-reduced-motion:reduce){.tkcard::after{animation:none;display:none}}

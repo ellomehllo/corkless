@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050835';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050835';
-import {modHit,MOD_CAT} from './mod.js?v=202610050835';
+import {makeDb} from './db.js?v=202610050837';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050837';
+import {modHit,MOD_CAT} from './mod.js?v=202610050837';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -930,7 +930,7 @@ function viewTackNote(j,bidArea){const mine=j.owner===S.me.id,st=jobState(j),jp=
      <h1 class="tkh">${esc(j.text)}</h1>
    </div>
    ${jp&&jp.length?`<div class="tkpics">${jp.map((src,i)=>`<button class="tkpic" data-pic="${esc('j:'+j.key)}" data-i="${i}" style="--k:${i}"><img src="${src}" alt="Photo ${i+1}"></button>`).join('')}</div>`:''}
-   ${paras.length?`<div class="tkcard">${paras.map((p,i)=>/^[-•*]\s*/.test(p)?`<p class="tkli" style="--k:${i}">${esc(p.replace(/^[-•*]\s*/,''))}</p>`:`<p style="--k:${i}">${esc(p)}</p>`).join('')}</div>`:''}
+   ${paras.length?`<div class="tkcard">${paras.map((p,i)=>`<p style="--k:${i}">${esc(p)}</p>`).join('')}</div>`:''}
    <div class="tkbids">${bidArea||''}</div>
    <div class="tkcta">
      <button class="cta" data-go="post">${ic('plus',18,2.4,'var(--on-grad)')} Pin a job</button>
