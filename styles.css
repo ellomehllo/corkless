@@ -1178,3 +1178,10 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .tbg.ph img,.tile.ntile .tbg.ph img{filter:blur(14px) saturate(.45) brightness(.78) contrast(1.05)}
 .tbg.ph::after,.tile.ntile .tbg.ph::after{background:linear-gradient(160deg,rgba(14,26,78,.62),rgba(10,20,58,.5) 45%,color-mix(in srgb,var(--nc) 16%,rgba(6,12,34,.72)));mix-blend-mode:normal}
 .tbg.ph{background:#0A1230}
+
+/* photos on notes stay recognisable: light blur, cool wash, darker only where the text sits */
+.tbg.ph img,.tile.ntile .tbg.ph img{filter:blur(3px) saturate(.8) brightness(.9);transform-origin:center}
+.tbg.ph::after,.tile.ntile .tbg.ph::after{background:linear-gradient(180deg,rgba(8,16,44,.62) 0%,rgba(8,16,44,.28) 38%,rgba(8,16,44,.34) 60%,rgba(6,12,32,.82) 100%)}
+.tile.ntile:has(.tbg.ph) .price,.tile.ntile:has(.tbg.ph) p,.tile.ntile:has(.tbg.ph) .where,.tile.ntile:has(.tbg.ph) .by{text-shadow:0 1px 10px rgba(0,0,0,.75),0 0 2px rgba(0,0,0,.5)}
+.jcover .tbg.ph img{filter:blur(1.5px) saturate(.85) brightness(.92)}
+.jcover .tbg.ph::after{background:linear-gradient(180deg,rgba(8,16,44,.55) 0%,rgba(8,16,44,.2) 35%,rgba(8,16,44,.45) 70%,var(--bg) 100%)}
