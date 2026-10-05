@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050912';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050912';
-import {modHit,MOD_CAT} from './mod.js?v=202610050912';
+import {makeDb} from './db.js?v=202610051030';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610051030';
+import {modHit,MOD_CAT} from './mod.js?v=202610051030';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -1619,10 +1619,12 @@ function moment(title,sub,ms=1300){
   r.innerHTML=`<div class="moment"><span class="bigpin"></span><h2>${esc(title)}</h2>${sub?`<p>${esc(sub)}</p>`:''}</div>`;
   document.body.appendChild(r);S.momentOn=true;const t=reduceMotion.matches?Math.min(ms,700):ms;
   return new Promise(res=>setTimeout(()=>{r.classList.add('out');setTimeout(()=>{r.remove();S.momentOn=false;res();if(S.phase==='app')render()},reduceMotion.matches?0:260)},t))}
-function stepsCard(D){if(!S.priv.introSeen||S.priv.stepsHidden)return'';const me=S.me.id,d=S.myDoc||{};
+function stepsCard(D){if(!S.priv.introSeen||S.priv.stepsHidden||S.priv.stepsDone)return'';const me=S.me.id,d=S.myDoc||{};
   const steps=[[!!d.photo,'Add a profile photo','A real face helps people say yes.','data-go="edit"'],[num(d.freeUntil)>0,'Mark yourself free','Free people show up first for quick asks.','data-sheet="free"'],
     [D.jobs.some(j=>j.owner===me)||Object.keys(S.pitchMine).length>0,'Pin or bid on a job','The first one is the hardest.','data-go="post"']];
-  const n=steps.filter(x=>x[0]).length;if(n===steps.length)return'';
+  const n=steps.filter(x=>x[0]).length;
+  // Once all three are done the card is gone for good, even if a step is undone later.
+  if(n===steps.length){if(!S.stepsSaving){S.stepsSaving=true;setTimeout(()=>savePriv({stepsDone:Date.now()}))}return''}
   return`<section class="steps" aria-label="Your first steps"><div class="stepshead"><b>Your first steps</b><span>${n} of ${steps.length} done</span><button class="iconbtn" data-act="hideSteps" aria-label="Hide first steps">${ic('x',14,2.4)}</button></div>
     <div class="stepbar"><span style="width:${Math.round(n/steps.length*100)}%"></span></div>
     ${steps.map(([done,t,h,at])=>`<button class="step ${done?'done':''}" ${done?'disabled':at}><span class="stepdot">${done?ic('tick',12,3.2):''}</span><span class="rowtext"><span class="t1">${t}</span><span class="t2">${done?'Done':h}</span></span>${done?'':`<span class="chev">${ic('chev',16)}</span>`}</button>`).join('')}</section>`}
