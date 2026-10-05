@@ -1119,3 +1119,9 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .authcard .err,.authcard .okmsg{margin:0;font-size:var(--fs-c)}
 .authcard .invitebanner{font-size:var(--fs-c)}
 .authcard .colres{max-height:200px}
+
+/* hold menu price is white like the notes */
+.jmprice,.gnote .jmprice{color:var(--fg);background:none;-webkit-background-clip:border-box;background-clip:border-box}
+
+/* the action in each notification reads in the brand gradient: bid on, picked you, said yes */
+.act{background:var(--grad);background-size:100% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;font-weight:600}

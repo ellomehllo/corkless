@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050519';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050519';
-import {modHit,MOD_CAT} from './mod.js?v=202610050519';
+import {makeDb} from './db.js?v=202610050541';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050541';
+import {modHit,MOD_CAT} from './mod.js?v=202610050541';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -194,29 +194,29 @@ function repicking(j){return jobState(j)==='assigned'&&!j.accepted&&j.repickAt>0
 function lostBid(j){const me=S.me?.id,st=jobState(j);return!!me&&j.owner!==me&&j.accepted!==me&&(droppedMe(j)||(!(j.repickAt>0&&!j.accepted)&&(!!j.accepted||st==='assigned'||st==='done')))}
 function lostAt(j,bidAt=0){return num(j.takenAt)||num(bidAt)}
 function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str(j.text,200).trim().replace(/[.!?\s]+$/,'');return'<i>\u201c'+esc(x.length>56?x.slice(0,55).trim()+'\u2026':x)+'\u201d</i>'},nm=u=>'<b>'+esc(firstName(u))+'</b>',ok=u=>u&&D.members.includes(u)&&!D.blocked.has(u);
-  const add=(at,who,html,go)=>{if(at>0)out.push({at,who,html,...go})};
+  const add=(at,who,html,go)=>{if(at>0)out.push({at,who,html,...go})},A=w=>'<span class="act">'+w+'</span>';
   for(const w of warnsOf())if(MOD_CAT[w.cat])add(num(w.at),'tack',`Your ${MOD_AREA[w.area]||'post'} wasn\u2019t posted: it broke tack\u2019s rules on ${MOD_CAT[w.cat]}. Repeated attempts can get your account removed.`,{go:'settings'});
   const joined=num(S.myDoc?.joinedAt);add(joined,'tack','Welcome to tack. Pin a small job or bid on one from the board.',{go:'board'});
   for(const j of D.jobs){
     if(j.owner===me){
-      for(const b of bidsFor(D,j.key))if(b.by!==me&&ok(b.by))add(b.at,b.by,`${nm(b.by)} bid on ${t(j)}`,{job:j.key});
+      for(const b of bidsFor(D,j.key))if(b.by!==me&&ok(b.by))add(b.at,b.by,`${nm(b.by)} ${A('bid on')} ${t(j)}`,{job:j.key});
       const pk=j.pick;if(pk&&ok(pk.doer)){const pay=payOf(j);
-        if(pay)add(pay.at,pk.doer,pay.ok?`${nm(pk.doer)} confirmed your payment for ${t(j)}`:`${nm(pk.doer)} says your payment for ${t(j)} hasn\u2019t arrived yet`,{job:j.key})}
+        if(pay)add(pay.at,pk.doer,pay.ok?`${nm(pk.doer)} ${A('confirmed your payment')} for ${t(j)}`:`${nm(pk.doer)} says your payment for ${t(j)} ${A('hasn\u2019t arrived yet')}`,{job:j.key})}
       const st=jobState(j);
-      if(st==='expired')add(j.deadline,'tack',`Time ran out on ${t(j)}. Pin it again if you still need it.`,{job:j.key});
-      if(st==='removed')add(j.at,'tack',`${t(j)} was taken off the board by ${esc(organiser())}.`,{job:j.key});
+      if(st==='expired')add(j.deadline,'tack',`${A('Time ran out')} on ${t(j)}. Pin it again if you still need it.`,{job:j.key});
+      if(st==='removed')add(j.at,'tack',`${t(j)} was ${A('taken off the board')} by ${esc(organiser())}.`,{job:j.key});
     }else if(j.accepted===me&&j.pick){const pk=j.pick,pay=payOf(j);
-      add(num(pk.at),j.owner,`${nm(j.owner)} picked you for ${t(j)}`,{job:j.key});
-      if(pk.status==='done')add(num(pk.doneAt),j.owner,`${nm(j.owner)} marked ${t(j)} as done. Got paid?`,{job:j.key});
-      if(pay&&pay.ok)add(pay.at,'tack',`Congrats, you finished ${t(j)}`,{job:j.key,earn:j.agreed||j.price});
-      if(typeof pk.review==='string')add(num(pk.doneAt)+2,j.owner,`${nm(j.owner)} left you a review. Tap to see it.`,{rev:pk.review});
+      add(num(pk.at),j.owner,`${nm(j.owner)} ${A('picked you')} for ${t(j)}`,{job:j.key});
+      if(pk.status==='done')add(num(pk.doneAt),j.owner,`${nm(j.owner)} ${A('marked')} ${t(j)} ${A('as done')}. Got paid?`,{job:j.key});
+      if(pay&&pay.ok)add(pay.at,'tack',`${A('Congrats, you finished')} ${t(j)}`,{job:j.key,earn:j.agreed||j.price});
+      if(typeof pk.review==='string')add(num(pk.doneAt)+2,j.owner,`${nm(j.owner)} ${A('left you a review')}. Tap to see it.`,{rev:pk.review});
     }else if(ok(j.owner)){const b=myBidOn(j.key);
-      if(b&&lostBid(j))add(lostAt(j,b.at),j.owner,`${nm(j.owner)} picked someone else for ${t(j)}`,{job:j.key});
-      else if(b&&jobState(j)==='open'&&j.editedAt>b.at)add(j.editedAt,j.owner,`${nm(j.owner)} updated ${t(j)}. Check it still works for you.`,{job:j.key});
+      if(b&&lostBid(j))add(lostAt(j,b.at),j.owner,`${nm(j.owner)} ${A('picked someone else')} for ${t(j)}`,{job:j.key});
+      else if(b&&jobState(j)==='open'&&j.editedAt>b.at)add(j.editedAt,j.owner,`${nm(j.owner)} ${A('updated')} ${t(j)}. Check it still works for you.`,{job:j.key});
     }
   }
-  for(const o of offerList(S.offersIn))if(ok(o.owner))add(num(o.at),o.owner,`${nm(o.owner)} asked you: ${esc(str(o.text,60))}`,{go:'bids'});
-  for(const o of offerList(S.offersOut))if(ok(o.to)&&o.status!=='pending')add(num(o.respondedAt),o.to,o.status==='accepted'?`${nm(o.to)} said yes to ${esc(str(o.text,60))}`:`${nm(o.to)} can\u2019t do ${esc(str(o.text,60))} this time`,{go:'bids'});
+  for(const o of offerList(S.offersIn))if(ok(o.owner))add(num(o.at),o.owner,`${nm(o.owner)} ${A('asked you')}: ${esc(str(o.text,60))}`,{go:'bids'});
+  for(const o of offerList(S.offersOut))if(ok(o.to)&&o.status!=='pending')add(num(o.respondedAt),o.to,o.status==='accepted'?`${nm(o.to)} ${A('said yes')} to ${esc(str(o.text,60))}`:`${nm(o.to)} ${A('can\u2019t do')} ${esc(str(o.text,60))} this time`,{go:'bids'});
   return out.sort((a,b)=>b.at-a.at).slice(0,80);
 }
 function tackFace(s){return`<span class="tackav" style="width:${s}px;height:${s}px" role="img" aria-label="tack"></span>`}
@@ -1377,7 +1377,6 @@ function sheetHTML(D){
     <div class="menu"><button data-act="openShare" data-key="${esc(mj.key)}">${ic('share',18)} Share</button>
       ${own?'':`<button data-act="toggleSave" data-key="${esc(mj.key)}">${ic('bookmark',18,2,'currentColor',sv?'currentColor':'none')} ${sv?'Remove from saved':'Save for later'}</button>`}
       ${own&&jobState(mj)==='open'?`<button data-act="editJob" data-key="${esc(mj.key)}">${ic('edit',18)} Edit</button>`:''}
-      <button data-job="${esc(mj.key)}">${ic('chev',18)} Open job</button>
       ${own?'':`<button class="danger" data-sheet="report" data-about="${esc(mj.owner)}">${ic('flag',18)} Report</button>`}</div>`;break}
   case'invitefriend':{const c=S.lastCode,jt=`Join me on tack, the ${campus()} board for quick jobs and favours. Sign up with your college email:\n${SITE}`;
     b=!S.me.isOwner?`<h2 id="sheetT">Invite a friend</h2><p>Anyone from ${esc(campus())} can join with their college email. Send them the link.</p>
