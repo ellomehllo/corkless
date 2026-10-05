@@ -1218,7 +1218,7 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 
 /* tack's own notes: lime into blue, a soft moving sheen and a two-tone glow, no price */
 .tile.ntile.tacknote{border:1px solid transparent;
-  background:linear-gradient(150deg,#26360b 0%,#1b2a1f 38%,#15244a 72%,#1a2d6b 100%) padding-box,linear-gradient(135deg,#D2F55E,#9FDB74 45%,#4A72D6) border-box;
+  background:linear-gradient(150deg,#3b5414 0%,#2c4433 38%,#24397a 72%,#2b469c 100%) padding-box,linear-gradient(135deg,#D2F55E,#9FDB74 45%,#4A72D6) border-box;
   box-shadow:0 0 26px -8px rgba(198,242,78,.45),0 18px 34px -18px rgba(74,114,214,.7)}
 .tile.ntile.tacknote::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
   background:linear-gradient(115deg,transparent 30%,rgba(210,245,94,.14) 45%,rgba(120,160,255,.12) 55%,transparent 70%);background-size:250% 100%;animation:tacksheen 6s ease-in-out infinite}
@@ -1227,7 +1227,7 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .tile.ntile.tacknote p{color:#fff;font-weight:500}
 .tile.ntile.tacknote .where,.tile.ntile.tacknote .by .n{color:rgba(225,240,255,.7)}
 .tile.ntile.tacknote .by .nm{color:#E6F7B0;font-weight:600}
-.tackjob .jcard{background:linear-gradient(150deg,rgba(38,54,11,.55),rgba(21,36,74,.6)) padding-box,linear-gradient(135deg,rgba(210,245,94,.5),rgba(74,114,214,.6)) border-box;border:1px solid transparent}
-.mininote.tackmini{background:linear-gradient(150deg,#3a5210,#1a2d6b);border-color:rgba(198,242,78,.5)}
+.tackjob .jcard{background:linear-gradient(150deg,rgba(59,84,20,.6),rgba(36,57,122,.65)) padding-box,linear-gradient(135deg,rgba(210,245,94,.5),rgba(74,114,214,.6)) border-box;border:1px solid transparent}
+.mininote.tackmini{background:linear-gradient(150deg,#4d6b1a,#2b469c);border-color:rgba(198,242,78,.5)}
 .mininote.tackmini .mnpin{background:linear-gradient(135deg,#D2F55E,#4A72D6)}
 @media (prefers-reduced-motion:reduce){.tile.ntile.tacknote::after{animation:none}}
