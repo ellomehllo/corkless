@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610050837';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050837';
-import {modHit,MOD_CAT} from './mod.js?v=202610050837';
+import {makeDb} from './db.js?v=202610050841';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610050841';
+import {modHit,MOD_CAT} from './mod.js?v=202610050841';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -812,7 +812,7 @@ const LOGO={
   ig:'<svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><rect x="5.5" y="5.5" width="21" height="21" rx="6.5" fill="none" stroke="#fff" stroke-width="2.4"/><circle cx="16" cy="16" r="5" fill="none" stroke="#fff" stroke-width="2.4"/><circle cx="21.9" cy="10.1" r="1.5" fill="#fff"/></svg>'};
 const slogo=(k,label,attrs)=>`<${/href=/.test(attrs)?'a':'button'} class="slogo" ${attrs}><span class="slogo-i s-${k}">${LOGO[k]||ic(k,22)}</span><span>${label}</span></${/href=/.test(attrs)?'a':'button'}>`;
 const jobLink=j=>SITE+'?job='+encodeURIComponent(j.key);
-const jobShareText=j=>`₹${fmt(j.price)} on tack: ${j.text}${j.where?' ('+j.where+')':''}. Bid on it here: ${jobLink(j)}`;
+const jobShareText=j=>isOrg(j.owner)?`From tack: ${j.text} Join your campus board: ${jobLink(j)}`:`₹${fmt(j.price)} on tack: ${j.text}${j.where?' ('+j.where+')':''}. Bid on it here: ${jobLink(j)}`;
 const isSaved=k=>Array.isArray(S.priv.saved)&&S.priv.saved.includes(k);
 function wrapLines(x,t,w,max){const out=[];let line='';for(const word of String(t).split(/\s+/)){const tryL=line?line+' '+word:word;if(x.measureText(tryL).width>w&&line){out.push(line);line=word}else line=tryL;if(out.length===max)break}
   if(out.length<max&&line)out.push(line);if(out.length===max&&out.join(' ').length<String(t).trim().length){let l=out[max-1];while(l&&x.measureText(l+'…').width>w)l=l.slice(0,-1);out[max-1]=l.trimEnd()+'…'}return out}
@@ -822,7 +822,28 @@ function wordmark(F,col='#F4F6FB'){const c=document.createElement('canvas'),x=c.
   x.font=`800 ${F}px Unbounded, Gabarito, sans-serif`;x.fillStyle=col;x.textBaseline='alphabetic';x.fillText('tack',0,(F-(A+D))/2+A);
   x.globalCompositeOperation='destination-out';x.beginPath();x.arc(.235*F,.4*F,Math.max(.048*F,1.8),0,7);x.fill();return c}
 function drawPin(x,cx,cy,r,col){x.fillStyle=col;x.beginPath();x.arc(cx,cy,r,0,7);x.fill();x.fillStyle='rgba(6,6,8,.28)';x.beginPath();x.arc(cx-r*.35,cy-r*.32,r*.28,0,7);x.fill();x.fillStyle=col;rrect(x,cx-r*.17,cy+r*.75,r*.35,r*1.5,r*.17);x.fill()}
-async function noteCard(j){
+async function tackStoryCard(j){
+  try{await Promise.all(['800 84px Gabarito','500 40px Figtree','600 34px Figtree','800 76px Unbounded'].map(f=>document.fonts.load(f)))}catch{}
+  const W=1080,H=1920,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+  const bg=x.createLinearGradient(0,0,0,H);bg.addColorStop(0,'#0a1206');bg.addColorStop(.55,'#070a14');bg.addColorStop(1,'#060608');x.fillStyle=bg;x.fillRect(0,0,W,H);
+  const blob=(cx,cy,r,col)=>{const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(0,0,W,H)};
+  blob(120,180,900,'rgba(198,242,78,.42)');blob(1040,520,900,'rgba(74,114,214,.55)');blob(420,1100,700,'rgba(159,219,116,.18)');
+  x.fillStyle='rgba(255,255,255,.07)';for(let yy=22;yy<H;yy+=44)for(let xx=22;xx<W;xx+=44){x.beginPath();x.arc(xx,yy,2.4,0,7);x.fill()}
+  const icon=await new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(null);i.src='icon-512.png?v=202610050117'});
+  let y=190;if(icon){x.save();x.shadowColor='rgba(198,242,78,.5)';x.shadowBlur=70;rrect(x,W/2-110,y,220,220,60);x.clip();x.drawImage(icon,W/2-110,y,220,220);x.restore()}y+=300;
+  x.fillStyle='#fff';x.textAlign='center';x.font='800 84px Gabarito';const hl=wrapLines(x,j.text,900,5);for(const l of hl){x.fillText(l,W/2,y);y+=96}y+=40;
+  const paras=str(j.more,600).split(/\n+/).map(t=>t.trim()).filter(Boolean);
+  if(paras.length){x.font='500 40px Figtree';x.textAlign='left';const lines=[];for(const p of paras){for(const l of wrapLines(x,p,780,4))lines.push(l);lines.push('')}lines.pop();
+    const ch=Math.min(H-y-330,80+lines.length*56);const cx=90,cw=900;
+    const cg=x.createLinearGradient(cx,y,cx+cw,y+ch);cg.addColorStop(0,'rgba(78,108,28,.75)');cg.addColorStop(.55,'rgba(40,66,120,.75)');cg.addColorStop(1,'rgba(43,70,156,.8)');
+    rrect(x,cx,y,cw,ch,48);x.fillStyle=cg;x.fill();
+    const bgd=x.createLinearGradient(cx,y,cx+cw,y+ch);bgd.addColorStop(0,'rgba(225,250,140,.8)');bgd.addColorStop(1,'rgba(74,114,214,.85)');x.lineWidth=3;x.strokeStyle=bgd;rrect(x,cx+1.5,y+1.5,cw-3,ch-3,47);x.stroke();
+    const hi=x.createLinearGradient(0,y,0,y+ch*.45);hi.addColorStop(0,'rgba(255,255,255,.12)');hi.addColorStop(1,'rgba(255,255,255,0)');rrect(x,cx,y,cw,ch,48);x.fillStyle=hi;x.fill();
+    x.fillStyle='#EEF3FF';let ly=y+70;for(const l of lines){if(ly>y+ch-20)break;if(l)x.fillText(l,cx+56,ly);ly+=l?56:28}y+=ch}
+  const wm=wordmark(76);x.drawImage(wm,W/2-wm.width/2,H-250);x.textAlign='center';x.fillStyle='rgba(230,240,255,.8)';x.font='600 34px Figtree';
+  x.fillText('Join your campus board',W/2,H-110);x.fillStyle='rgba(230,240,255,.5)';x.font='500 30px Figtree';x.fillText(SITE.replace(/^https?:\/\//,'').replace(/\/$/,''),W/2,H-62);
+  return await new Promise(r=>c.toBlob(r,'image/png'))}
+async function noteCard(j){if(isOrg(j.owner))return tackStoryCard(j);
   try{await Promise.all(['800 180px Gabarito','800 76px Unbounded','700 60px Figtree','600 40px Figtree'].map(f=>document.fonts.load(f)))}catch{}
   const W=1080,H=1920,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),gn=gradNote(j),nc=noteOf(j),left=j.deadline-Date.now();
   x.fillStyle='#060608';x.fillRect(0,0,W,H);
@@ -919,7 +940,7 @@ function viewBoard(D){
   <div class="wallzone ${S.dropping?'dropin':''}">${filtered&&!list.length&&all.length?`<div class="empty"><b>${S.near&&!S.find.q.trim()?'Nothing near you right now':'No jobs match that'}</b><p>${S.near?'Only jobs pinned with a location can show as near you.':'Try another word, like the place, the time or what you need.'}</p><button class="btn2" data-act="clearFind">Show all jobs</button></div>`:list.length?wallHTML(list,D)+`<div class="boardend"><span class="endpin" aria-hidden="true"></span>${filtered?`<p>${list.length} of ${all.length} jobs shown.</p>`:''}<button class="btn2" data-go="post">Pin a job</button></div>`
     :`<div class="empty"><b>Nothing pinned yet</b><p>Pin the first job: a xerox run, a lift down four floors, an hour of help before a submission.</p><button class="cta" data-go="post">Pin a job</button></div>`}</div></div>`;
 }
-function viewTackNote(j,bidArea){const mine=j.owner===S.me.id,st=jobState(j),jp=j.pics?picsOf('j:'+j.key):null;
+function viewTackNote(j,bidArea){if(S.shareImg?.key!==j.key&&!S.shareBusy){S.shareBusy=true;noteCard(j).then(b=>{S.shareBusy=false;if(b)S.shareImg={key:j.key,blob:b,url:URL.createObjectURL(b)}}).catch(()=>{S.shareBusy=false})}const mine=j.owner===S.me.id,st=jobState(j),jp=j.pics?picsOf('j:'+j.key):null;
   const paras=str(j.more,600).split(/\n+/).map(x=>x.trim()).filter(Boolean);
   const enter=S.tkSeen!==j.key;S.tkSeen=j.key;
   return`<div class="tackpage${enter?' enter':''}">
@@ -931,10 +952,12 @@ function viewTackNote(j,bidArea){const mine=j.owner===S.me.id,st=jobState(j),jp=
    </div>
    ${jp&&jp.length?`<div class="tkpics">${jp.map((src,i)=>`<button class="tkpic" data-pic="${esc('j:'+j.key)}" data-i="${i}" style="--k:${i}"><img src="${src}" alt="Photo ${i+1}"></button>`).join('')}</div>`:''}
    ${paras.length?`<div class="tkcard">${paras.map((p,i)=>`<p style="--k:${i}">${esc(p)}</p>`).join('')}</div>`:''}
+   <div class="tkshare"><span class="tklabel">Share</span><div class="slogos">${slogo('ig','Instagram','data-act="tackShare" data-to="ig"')}${slogo('wa','WhatsApp','data-act="tackShare" data-to="wa"')}${slogo('share','More','data-act="tackShare" data-to="sys"')}${slogo('link','Copy link','data-act="tackShare" data-to="copy"')}</div></div>
    <div class="tkbids">${bidArea||''}</div>
    <div class="tkcta">
      <button class="cta" data-go="post">${ic('plus',18,2.4,'var(--on-grad)')} Pin a job</button>
      <button class="btn2 tkghost" data-sheet="invitefriend">${ic('users',17)} Invite a friend</button>
+     <button class="btn2 tkghost" data-act="tackFeedback">${ic('chat',17)} Give feedback</button>
    </div>
   </div>`}
 function viewJob(D){
@@ -1869,7 +1892,9 @@ const ACT={
   viewCampus(el){S.viewCampus=el.dataset.id;if(S.sheet?.type==='campus'){S.sheet=null;S.camp={q:''}}try{localStorage.setItem('tack.viewCampus',S.viewCampus)}catch{}S.inv.campus='';toast('Viewing '+campusName(S.viewCampus));render()},
   openShare(el){openShare(el.dataset.key)},
   toggleSave(el){const k=el.dataset.key,was=isSaved(k),l=(S.priv.saved||[]).filter(x=>x!==k);if(!was)l.unshift(k);if(S.sheet?.type==='jobmenu')S.sheet=null;savePriv({saved:l.slice(0,100)});toast(was?'Removed from saved':'Saved. Find it under Profile, Saved jobs')},
-  async shareTo(el){const j=derive().jobByKey[S.sheet?.key];if(!j)return;const to=el.dataset.to,text=jobShareText(j),img=S.shareImg?.key===j.key?S.shareImg:null;
+  async tackShare(el){const j=derive().jobByKey[S.openJob];if(!j)return;if(S.shareImg?.key!==j.key){toast('Making the image, try again in a second.');return}await ACT.shareTo(el,j.key)},
+  tackFeedback(){S.help={kind:'feedback',job:null,why:'',note:'',sent:null};S.err={};go('help')},
+  async shareTo(el,key){const j=derive().jobByKey[key||S.sheet?.key];if(!j)return;const to=el.dataset.to,text=jobShareText(j),img=S.shareImg?.key===j.key?S.shareImg:null;
     const f=img&&typeof File==='function'?new File([img.blob],'tack-job.png',{type:'image/png'}):null,files=f&&navigator.canShare?.({files:[f]})?[f]:null;
     try{if(to==='wa'){if(files)await navigator.share({files,text});else window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener')}
       else if(to==='ig'){if(files)await navigator.share({files});else{saveImg();toast(img?'Image saved. Add it to your Instagram story.':'Making the image, try again in a second.')}}

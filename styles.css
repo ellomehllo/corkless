@@ -1311,3 +1311,8 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .tkbg i{will-change:transform}
 .tkbids .bidcard,.tkbids .pitchbox,.tkbids .field,.tkbids .row{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(14,16,26,.82)}
 @media (prefers-reduced-motion:reduce){.tkcard::after{animation:none;display:none}}
+
+/* share row and feedback on tack's page */
+.tkshare{display:flex;flex-direction:column;gap:10px}
+.tklabel{font-size:var(--fs-c);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:rgba(230,240,255,.6)}
+.tkshare .slogos{justify-content:space-between}
