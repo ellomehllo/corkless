@@ -1363,3 +1363,117 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 /* Late-night safety note on the I'm free sheet */
 .nightnote{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:var(--r-sm);background:var(--surface2);font-size:var(--t-12);font-weight:500;line-height:1.45;color:var(--fg2);text-align:left}
 .nightnote svg{flex:none;margin-top:1px;color:var(--accent)}
+
+/* tack light mode. Same brand gradient and note colours, on a soft paper-white board. */
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#F3F4F6; --surface:#FFFFFF; --surface2:#ECEEF1; --tile:#FFFFFF; --rail:#FAFAFB; --in:#EEF0F3;
+  --fg:#121317; --fg2:#4B4F58; --soft:#2B2E35; --muted:#666B75; --dim:#8B909A; --edge:#D2D5DB;
+  --line:rgba(18,19,23,.09);
+  --accent:#4C7A00; --violet-ink:#4C7A00; --money:#0F8A52; --danger:#D23A22; --coral-ink:#C93349; --cyan-ink:#0A7F7C; --pink-ink:#B42A86; --amber-ink:#9A6200;
+  --dots:radial-gradient(circle,rgba(18,19,23,.09) 0 1.2px,transparent 1.7px);
+}
+:root[data-theme="light"] body{background:var(--bg)}
+:root[data-theme="light"] .main{background-image:radial-gradient(80% 34% at 15% -8%,rgba(74,114,214,.14),rgba(74,114,214,0) 70%),radial-gradient(70% 30% at 90% -6%,rgba(170,226,84,.22),rgba(170,226,84,0) 70%)}
+:root[data-theme="light"] .main[data-view="post"],:root[data-theme="light"] .main[data-view="job"]{background-image:var(--dots),radial-gradient(80% 34% at 15% -8%,rgba(74,114,214,.14),rgba(74,114,214,0) 70%);background-size:22px 22px,auto}
+/* Job page cover: fade into the light page, no dark text shadow */
+:root[data-theme="light"] .jhead .h1{text-shadow:0 1px 14px rgba(255,255,255,.6)}
+:root[data-theme="light"] .jcover::after{background:linear-gradient(180deg,rgba(255,255,255,.2),rgba(255,255,255,0) 28%,rgba(255,255,255,0) 70%,var(--bg))}
+:root[data-theme="light"] .jcover .tbg.ph::after{background:linear-gradient(180deg,rgba(8,16,44,.45) 0%,rgba(8,16,44,.15) 40%,rgba(8,16,44,.1) 70%,var(--bg) 100%)}
+:root[data-theme="light"] :focus-visible{outline-color:#2A45EE}
+
+/* Notes: pastel paper in the note's colour, dark ink */
+:root[data-theme="light"] .tile.ntile:not(.tacknote){border-color:color-mix(in srgb,var(--nc) 40%,rgba(18,19,23,.06));
+  background:linear-gradient(155deg,color-mix(in srgb,var(--nc) 30%,#FFFFFF) 0%,color-mix(in srgb,var(--nc) 14%,#FFFFFF) 60%,color-mix(in srgb,var(--nc) 22%,#FFFFFF) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 10px 24px -14px color-mix(in srgb,var(--nc) 60%,rgba(18,19,23,.35)),0 1px 2px rgba(18,19,23,.06)}
+:root[data-theme="light"] .tile.ntile p,:root[data-theme="light"] .tile.ntile .price{color:#121317}
+:root[data-theme="light"] .tile.ntile .where{color:oklch(from var(--nc) .42 .06 h / .85)}
+:root[data-theme="light"] .tile.ntile .by{color:oklch(from var(--nc) .3 .04 h / .9)}
+:root[data-theme="light"] .tile.ntile .by .n{color:oklch(from var(--nc) .42 .05 h / .75)}
+/* Photo notes and tack notes keep their dark, vivid look with white text */
+:root[data-theme="light"] .tile.ntile:has(.tbg.ph) p,:root[data-theme="light"] .tile.ntile:has(.tbg.ph) .price{color:#fff}
+:root[data-theme="light"] .tile.ntile:has(.tbg.ph) .where,:root[data-theme="light"] .tile.ntile:has(.tbg.ph) .by,:root[data-theme="light"] .tile.ntile:has(.tbg.ph) .by .n{color:rgba(255,255,255,.85)}
+/* tack's own notes: the lime-to-blue gradient as light paper */
+:root[data-theme="light"] .tile.ntile.tacknote{background:linear-gradient(150deg,#ECFBC0 0%,#DDF3CF 38%,#D3DEFF 72%,#C4D2FF 100%) padding-box,linear-gradient(135deg,#B9E83A,#8FD06A 45%,#4A72D6) border-box;
+  box-shadow:0 0 24px -10px rgba(150,210,60,.55),0 14px 28px -18px rgba(74,114,214,.55)}
+:root[data-theme="light"] .tile.ntile.tacknote p{color:#121317}
+:root[data-theme="light"] .tile.ntile.tacknote .where,:root[data-theme="light"] .tile.ntile.tacknote .by .n{color:rgba(30,45,90,.6)}
+:root[data-theme="light"] .tile.ntile.tacknote .by .nm{color:#3E6400}
+
+/* Softer shadows on light */
+:root[data-theme="light"] .tile{box-shadow:0 10px 24px -16px rgba(18,19,23,.28),0 1px 2px rgba(18,19,23,.05)}
+:root[data-theme="light"] .sheet{box-shadow:0 -12px 40px -18px rgba(18,19,23,.25)}
+:root[data-theme="light"] .scrim{background:rgba(18,19,23,.32)}
+:root[data-theme="light"] .bignote{box-shadow:0 22px 44px -26px rgba(18,19,23,.4),0 0 46px -12px var(--glow,transparent)}
+
+/* Bits that were drawn in white-on-dark */
+:root[data-theme="light"] .campbtn{text-decoration-color:rgba(18,19,23,.25)}
+:root[data-theme="light"] .comchip.cnewchip{border-color:rgba(18,19,23,.22)}
+:root[data-theme="light"] .in .mwave{background:rgba(18,19,23,.12)}
+:root[data-theme="light"] .bnpics .pic{box-shadow:0 0 0 1px rgba(18,19,23,.1)}
+:root[data-theme="light"] .bnpics .pic.add{border-color:rgba(18,19,23,.2);background:rgba(255,255,255,.6)}
+:root[data-theme="light"] .gate.anim::before,:root[data-theme="light"] .gate.anim::after,
+:root[data-theme="light"] .gate:has(> .loading)::before,:root[data-theme="light"] .gate:has(> .loading)::after{background-image:radial-gradient(circle,rgba(18,19,23,.12) 0 1.2px,transparent 1.7px)}
+
+/* Bars, cards and glass buttons */
+:root[data-theme="light"] .tabbar{background:rgba(250,250,251,.92)}
+:root[data-theme="light"] .momentroot{background:rgba(243,244,246,.95)}
+:root[data-theme="light"] .authcard{background:rgba(255,255,255,.9);box-shadow:0 24px 60px -30px rgba(18,19,23,.3)}
+:root[data-theme="light"] .jhint,:root[data-theme="light"] .jhero .back,:root[data-theme="light"] .jtool,:root[data-theme="light"] .ebtn,:root[data-theme="light"] .tktop .back,:root[data-theme="light"] .tkghost{background:rgba(255,255,255,.72);color:var(--fg)}
+
+/* tack's page: a bright lime-and-blue wash with dark ink */
+:root[data-theme="light"] .tkbg{background:radial-gradient(circle,rgba(18,19,23,.07) 0 1.2px,transparent 1.7px) 0 0/22px 22px,linear-gradient(180deg,#F2FADC 0%,#EAF0FF 55%,var(--bg) 100%)}
+:root[data-theme="light"] .tkbg i{opacity:.55}
+:root[data-theme="light"] .tkbg .tb1{background:radial-gradient(closest-side,rgba(198,242,78,.7),rgba(198,242,78,0))}
+:root[data-theme="light"] .tkbg .tb2{background:radial-gradient(closest-side,rgba(110,145,240,.55),rgba(110,145,240,0))}
+:root[data-theme="light"] .tkicon{box-shadow:0 0 0 1px rgba(18,19,23,.06),0 0 36px rgba(198,242,78,.6),0 16px 34px -14px rgba(74,114,214,.55)}
+:root[data-theme="light"] .tkh{background:linear-gradient(120deg,#16210A 0%,#2C4A0C 40%,#1E3A9E 100%);-webkit-background-clip:text;background-clip:text}
+:root[data-theme="light"] .tkbadge{background:rgba(255,255,255,.7);border-color:rgba(120,170,30,.4);color:#3E6400}
+:root[data-theme="light"] .tkcard,:root[data-theme="light"] .tackpage:not(.enter) .tkcard{
+  background:linear-gradient(150deg,rgba(236,250,196,.92),rgba(222,232,255,.92) 55%,rgba(206,220,255,.95)) padding-box,linear-gradient(135deg,rgba(160,215,40,.8),rgba(140,180,255,.7) 50%,rgba(74,114,214,.8)) border-box;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 18px 40px -24px rgba(74,114,214,.45),0 0 34px -18px rgba(170,226,84,.6)}
+:root[data-theme="light"] .tkcard p{color:#1B2233}
+:root[data-theme="light"] .tkcard::before{background:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,0) 42%)}
+:root[data-theme="light"] .tkcard::after{background:linear-gradient(100deg,transparent,rgba(255,255,255,.55) 45%,rgba(240,255,200,.35) 55%,transparent)}
+:root[data-theme="light"] .tklabel{color:rgba(27,34,51,.55)}
+:root[data-theme="light"] .tkpic{box-shadow:0 16px 34px -18px rgba(18,19,23,.4),0 0 0 1px rgba(18,19,23,.06)}
+:root[data-theme="light"] .tkbids .bidcard,:root[data-theme="light"] .tkbids .pitchbox,:root[data-theme="light"] .tkbids .field,:root[data-theme="light"] .tkbids .row{background:rgba(255,255,255,.85)}
+
+/* Gradient text needs deeper ink on white */
+:root[data-theme="light"]{--grad-ink:linear-gradient(115deg,#5A8F00 0%,#3F8B3C 45%,#2A45EE 100%)}
+:root[data-theme="light"] .act,:root[data-theme="light"] .gnote .price,:root[data-theme="light"] .gnote .big,:root[data-theme="light"] .gnote .jmprice{background:var(--grad-ink);-webkit-background-clip:text;background-clip:text}
+/* Tiny notes in Activity */
+:root[data-theme="light"] .mininote{background:linear-gradient(165deg,color-mix(in oklab,var(--nc) 45%,#fff),color-mix(in oklab,var(--nc) 25%,#fff));box-shadow:0 6px 12px -6px rgba(18,19,23,.35)}
+:root[data-theme="light"] .mininote b{color:#121317}
+:root[data-theme="light"] .mininote .mnl{background:rgba(18,19,23,.4)}
+:root[data-theme="light"] .mininote .mnl.s{background:rgba(18,19,23,.25)}
+
+/* Theme picker after sign-up */
+#themeRoot{position:fixed;inset:0;z-index:50}
+.tpbody{flex:1;display:flex;flex-direction:column;justify-content:center;gap:12px;max-width:440px;width:100%;margin:0 auto}
+.tpbody h1{margin:0;font-family:var(--display);font-size:var(--t-40);font-weight:700;letter-spacing:-.04em;line-height:1.02}
+.tpbody p{margin:0 0 14px;font-size:var(--t-16);line-height:1.5;color:var(--fg2);max-width:38ch}
+.tpopts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tpopt{display:flex;flex-direction:column;align-items:center;gap:10px;padding:10px 10px 14px;border-radius:22px;background:var(--surface);border:2px solid transparent;font-weight:600;color:var(--fg)}
+.tpopt.on{border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
+.tpprev{position:relative;width:100%;aspect-ratio:3/4;border-radius:14px;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;align-content:start;gap:7px;padding:26px 9px 9px}
+.tpprev::before{content:"tack";position:absolute;top:8px;left:10px;font-family:var(--display);font-weight:800;font-size:12px;letter-spacing:-.03em}
+.tpprev i{display:block;height:46px;border-radius:9px}
+.tpprev i:nth-child(2){height:62px}.tpprev i:nth-child(3){height:52px;margin-top:-16px}
+.tpprev b{position:absolute;left:50%;bottom:9px;width:22px;height:22px;margin-left:-11px;border-radius:50%;background:linear-gradient(135deg,#D2F55E,#4A72D6)}
+.tp-dark{background:#060608;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}.tp-dark::before{color:#F3F4F6}
+.tp-dark i:nth-child(1){background:linear-gradient(155deg,#3a4a1c,#1a1f12)}.tp-dark i:nth-child(2){background:linear-gradient(155deg,#2a2550,#15141f)}.tp-dark i:nth-child(3){background:linear-gradient(155deg,#173f40,#101a1b)}.tp-dark i:nth-child(4){background:linear-gradient(155deg,#4a2236,#1c1218)}
+.tp-light{background:#F3F4F6;box-shadow:inset 0 0 0 1px rgba(18,19,23,.08)}.tp-light::before{color:#121317}
+.tp-light i:nth-child(1){background:linear-gradient(155deg,#EFFBC6,#F8FDE8)}.tp-light i:nth-child(2){background:linear-gradient(155deg,#E6E1FF,#F4F2FF)}.tp-light i:nth-child(3){background:linear-gradient(155deg,#D6F7F6,#EEFCFB)}.tp-light i:nth-child(4){background:linear-gradient(155deg,#FFDDE9,#FFF0F5)}
+/* Appearance switch on the profile */
+.menu .themerow{display:flex;align-items:center;gap:12px;padding:11px 12px 11px 16px;border-top:1px solid var(--line);font-size:var(--t-14);font-weight:500}
+.seg{margin-left:auto;display:inline-flex;padding:3px;border-radius:999px;background:var(--surface2);gap:2px}
+.seg button{padding:6px 11px;border-radius:999px;font-size:var(--t-12);font-weight:600;color:var(--muted);border-top:0}
+.seg button.on{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+:root[data-theme="light"] .seg button.on{box-shadow:0 1px 3px rgba(18,19,23,.15)}
+/* Intro scenes in light */
+:root[data-theme="light"] .inote{background:linear-gradient(165deg,oklch(.95 .06 var(--h)),oklch(.98 .025 var(--h)));border-color:oklch(.82 .08 var(--h) / .6);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 14px 28px -16px oklch(.5 .1 var(--h) / .45)}
+:root[data-theme="light"] .inote em{color:oklch(.45 .06 var(--h) / .85)}
+:root[data-theme="light"] .ichip{background:rgba(120,170,30,.14)}
+:root[data-theme="light"] .ibubble,:root[data-theme="light"] .ipay{box-shadow:0 12px 28px -14px rgba(18,19,23,.3)}

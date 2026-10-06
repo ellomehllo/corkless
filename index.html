@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#060608">
+<script>/* Set the theme before anything draws, so there's no flash. */(function(){var p='dark';try{p=localStorage.getItem('tack.theme')||'dark'}catch(e){}var t=p==='system'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):p;document.documentElement.dataset.theme=t;if(t==='light')document.querySelector('meta[name="theme-color"]').content='#F3F4F6'})()</script>
 <meta name="robots" content="noindex,nofollow">
 <title>tack</title>
 <link rel="icon" type="image/png" href="favicon.png?v=202610050117">
@@ -15,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400..800&family=Gabarito:wght@600..900&family=Unbounded:wght@800&display=swap">
-<link rel="stylesheet" href="styles.css?v=202610052330">
+<link rel="stylesheet" href="styles.css?v=202610061200">
 </head>
 <body>
 <div id="gate" class="gate"><div class="loading"><div class="mark">tack</div></div></div>
@@ -28,6 +29,6 @@
 <div id="sheetRoot"></div>
 <div id="toast" class="toast" role="status" hidden></div>
 <noscript><p style="color:#F2F5FB;padding:24px;font-family:sans-serif">tack needs JavaScript turned on.</p></noscript>
-<script type="module" src="app.js?v=202610052330"></script>
+<script type="module" src="app.js?v=202610061200"></script>
 </body>
 </html>

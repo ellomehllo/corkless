@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610052330';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610052330';
-import {modHit,MOD_CAT} from './mod.js?v=202610052330';
+import {makeDb} from './db.js?v=202610061200';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610061200';
+import {modHit,MOD_CAT} from './mod.js?v=202610061200';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -64,7 +64,8 @@ const I={
  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
  camera:'<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.5" r="3.5"/>',
  eyeoff:'<path d="M10.6 5.1A9.7 9.7 0 0 1 12 5c6.5 0 10 7 10 7a17.4 17.4 0 0 1-2.4 3.3M6.6 6.6C3.6 8.5 2 12 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="m3 3 18 18"/>',
- ban:'<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>'
+ ban:'<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
+ moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/>'
 };
 const SAY_MAX=3500,SAY_WORDS=500,words=t=>(String(t||'').trim().match(/\S+/g)||[]).length,sayOver=t=>SAY_MAX<1000?String(t||'').length>SAY_MAX:words(t)>SAY_WORDS,sayCount=t=>SAY_MAX<1000?`${String(t||'').length} / ${SAY_MAX} characters`:`${words(t)} / ${SAY_WORDS} words`;
 const ic=(n,s=20,w=2,c='currentColor',fill='none')=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="${fill}" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
@@ -150,6 +151,13 @@ const freeUntilOf=uid=>num(S.freeDocs?.[uid]?.until),freeNow=uid=>freeUntilOf(ui
 // but asks then only reach people who are free.
 const IST=198e5,quietNow=()=>{const h=new Date(Date.now()+IST).getUTCHours();return h>=23||h<7},freeEnd=h=>Date.now()+h*36e5;
 const restricted=()=>arr(S.priv.restricted).filter(u=>typeof u==='string');
+// Theme: 'dark' (default for existing members), 'light' or 'system'. Kept on this device and in private settings.
+const THEMES=['dark','light','system'],lightMQ=matchMedia('(prefers-color-scheme: light)');
+const themePref=()=>{try{const t=localStorage.getItem('tack.theme');return THEMES.includes(t)?t:''}catch{return''}};
+function applyTheme(p){const t=p==='system'?(lightMQ.matches?'light':'dark'):p==='light'?'light':'dark';document.documentElement.dataset.theme=t;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content',t==='light'?'#F3F4F6':'#060608')}
+function setTheme(p,save=true){if(!THEMES.includes(p))return;try{localStorage.setItem('tack.theme',p)}catch{}applyTheme(p);if(save&&S.me)savePriv({theme:p});else render()}
+lightMQ.addEventListener?.('change',()=>{if(themePref()==='system')applyTheme('system')});
 const freeAudience=()=>({all:'Anyone on your campus can see it and ask you for a favour.',none:'Nobody can ask you for favours right now. You can change this in Settings.'})[asksOf(S.me.id)]||'People you’ve finished a job with can see it and ask you for a favour.';
 // An ask with no yes after 3 hours reads the same whether it was declined or ignored.
 const askStale=o=>Date.now()-num(o.at)>3*36e5;
@@ -502,6 +510,7 @@ function afterData(){
     if(!S.me.isOwner&&S.myInvite&&S.myInvite.uid!==me)updateDoc(doc(S.db,'invites',S.me.email),{uid:me,joinedAt:Date.now()}).catch(()=>{});
     if(S.myDoc&&S.myDoc.removed)saveMine(d=>{delete d.removed;return d});
   }
+  if(THEMES.includes(S.priv.theme)&&S.priv.theme!==themePref()){try{localStorage.setItem('tack.theme',S.priv.theme)}catch{}applyTheme(S.priv.theme)}
   computePhase();render();
   if(S.phase==='app'&&!S.introChecked&&!S.joining&&!needTerms()){S.introChecked=true;if(!S.priv.introSeen)setTimeout(()=>{if(!S.intro.on&&S.phase==='app'&&!S.priv.introSeen&&!S.joining)openIntro()},700)}
 }
@@ -1276,6 +1285,7 @@ function viewPerson(uid,D){
        <button data-go="reviews">${ic('star',18)} Your reviews${(()=>{const l=reviewsOf(S.me.id);return l&&l.length?`<span class="menuval">${l.length}</span>`:''})()}<span class="chev">${ic('chev',16)}</span></button>
        <button data-act="${pushOn()?'pushOff':'pushOn'}" ${S.busy?'disabled':''}>${ic('bell',18)} Notifications<span class="menuval">${pushOn()?'On':'Off'}</span></button>
        ${S.me.isOwner?`<button data-go="invites">${ic('users',18)} Invites and members<span class="chev">${ic('chev',16)}</span></button>`:''}
+       <div class="themerow">${ic('moon',18)} Appearance<span class="seg" role="group" aria-label="Appearance">${[['dark','Dark'],['light','Light'],['system','Auto']].map(([k,l])=>`<button data-act="setThemeTo" data-k="${k}" class="${(themePref()||'dark')===k?'on':''}" aria-pressed="${(themePref()||'dark')===k}"${k==='system'?' title="Match your phone"':''}>${l}</button>`).join('')}</span></div>
        <button data-act="replayIntro">${ic('board',18)} How tack works<span class="chev">${ic('chev',16)}</span></button>
        <button data-go="settings">${ic('shield',18)} Settings and privacy<span class="chev">${ic('chev',16)}</span></button>
        <button data-go="help">${ic('flag',18)} Report or feedback<span class="chev">${ic('chev',16)}</span></button>
@@ -1636,7 +1646,18 @@ function renderIntro(dir=1){let r=$('introRoot');
   r.querySelector('.iskip').style.visibility=last?'hidden':'';
   const fb=r.querySelector('.ibtns'),fh=introFoot(i);if(fb.dataset.h!==fh){const had=!!fb.dataset.h;fb.dataset.h=fh;fb.innerHTML=fh;if(had&&last&&!reduceMotion.matches)fb.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'none'}],{duration:320,delay:250,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'})}
   requestAnimationFrame(()=>r.querySelector('.inext')?.focus({preventScroll:true}))}
-function openIntro(back){if(S.intro.on)return;if(S.momentOn||S.joining){setTimeout(()=>openIntro(back),200);return}S.intro={on:true,i:0,back:back||null};renderIntro()}
+// New members pick dark or light first, then see the intro.
+let themePick=null;
+function openThemePick(then){if(themePick)return;themePick={sel:themePref()||(lightMQ.matches?'light':'dark'),then};applyTheme(themePick.sel);renderThemePick()}
+function renderThemePick(){let r=$('themeRoot');
+  if(!themePick){if(r)r.remove();return}
+  const sel=themePick.sel,opt=k=>`<button class="tpopt ${sel===k?'on':''}" data-act="pickTheme" data-k="${k}" aria-pressed="${sel===k}"><span class="tpprev tp-${k}" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></span>${k==='dark'?'Dark':'Light'}</button>`;
+  const html=`<div class="iw" role="dialog" aria-modal="true" aria-labelledby="tpT"><div class="itop"><span class="mark">tack</span></div>
+    <div class="tpbody"><h1 id="tpT">Dark or light?</h1><p>Pick how tack looks. You can switch any time on your profile.</p><div class="tpopts">${opt('dark')}${opt('light')}</div></div>
+    <div class="ifoot"><div class="ibtns"><button class="cta inext" data-act="themeDone">Continue</button></div></div></div>`;
+  if(!r){r=document.createElement('div');r.id='themeRoot';document.body.appendChild(r);r.innerHTML=html;if(!reduceMotion.matches)r.firstElementChild.animate([{opacity:0},{opacity:1}],{duration:260,easing:'ease'})}
+  else r.innerHTML=html}
+function openIntro(back){if(S.intro.on)return;if(S.momentOn||S.joining){setTimeout(()=>openIntro(back),200);return}if(!back&&!S.priv.theme&&!themePref()&&!themePick){openThemePick(()=>openIntro());return}if(themePick)return;S.intro={on:true,i:0,back:back||null};renderIntro()}
 function introStep(d){const i=S.intro.i+d;if(i<0||i>=INTRO.length)return;S.intro.i=i;renderIntro(d)}
 function closeIntro(to){const back=S.intro.back;S.intro={on:false,i:0};renderIntro();if(!S.priv.introSeen)savePriv({introSeen:Date.now()});go(to||back||'board')}
 function moment(title,sub,ms=1300){
@@ -1875,6 +1896,10 @@ const ACT={
     try{await S.fb.rpc('add_my_campus',{p_college:c.ncol.trim(),p_city:c.ncity.trim()});S.cpick=null;handleUser(S.user)}catch(e){c.busy=false;c.err='Couldn’t make the board. Try again.';render()}},
   introPush(){closeIntro('board');setTimeout(enablePush,350)},
   replayIntro(){openIntro(S.view)},
+  pickTheme(el){if(!themePick)return;themePick.sel=el.dataset.k;applyTheme(themePick.sel);renderThemePick()},
+  themeDone(){if(!themePick)return;const {sel,then}=themePick;themePick=null;setTheme(sel);const r=$('themeRoot');
+    if(r&&!reduceMotion.matches){r.firstElementChild.animate([{opacity:1},{opacity:0}],{duration:200,easing:'ease',fill:'forwards'});setTimeout(()=>r.remove(),210)}else r?.remove();then&&setTimeout(then,220)},
+  setThemeTo(el){setTheme(el.dataset.k)},
   hideSteps(){savePriv({stepsHidden:true})},
   acceptTerms(){savePriv({terms:{v:TERMS_V,at:Date.now()}});$('termsRoot')?.remove();
     if(!S.introChecked){S.introChecked=true;if(!S.priv.introSeen)setTimeout(()=>{if(!S.intro.on)openIntro()},400)}},
