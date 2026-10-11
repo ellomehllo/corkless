@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610112136';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610112136';
-import {modHit,MOD_CAT} from './mod.js?v=202610112136';
+import {makeDb} from './db.js?v=202610112142';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610112142';
+import {modHit,MOD_CAT} from './mod.js?v=202610112142';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -1283,22 +1283,26 @@ function viewChat(D){
   return`<div class="pad" style="padding-bottom:10px"><div style="display:flex;align-items:center;gap:10px">
      <button class="back" data-go="chats" aria-label="Back to chats" style="padding:0">${ic('back',20)}</button>
      <button class="rowmain" data-person="${esc(c.other)}" data-hold="${esc(c.other)}">${ring(c.other,42)}<span class="rowtext"><span style="font-size:var(--t-16);font-weight:600;letter-spacing:-.015em">${esc(shortName(c.other))}</span>
-       <span style="font-size:var(--t-12);font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${onlineNow(c.other)?'Active now':(c.keys||[]).length>1?`${c.keys.length} jobs together on tack`:j?`<span style="color:var(--fg);font-weight:600">₹${fmt(j.agreed||j.price)}</span> · ${esc(j.text)}`:esc(metaOf(c.other)||campus())}</span></span></button>
+       <span style="font-size:var(--t-12);font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${onlineNow(c.other)?'Active now':esc(metaOf(c.other)||campus())}</span></span></button>
      <button class="iconbtn" data-sheet="who" data-about="${esc(c.other)}" aria-label="Restrict, block or report">${ic('flag',17)}</button></div></div>
   <div class="msgs">
-   ${accepted?`<div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${payOf(j)?.ok?`Paid ✓ · ₹${fmt(j.agreed)}`:`Bid accepted · ₹${fmt(j.agreed)} · pay on UPI after`}</div>`:''}
-   ${j&&!accepted&&(c.keys||[]).length<2?`<button class="banner" style="background:color-mix(in srgb,${noteOf(j)} 14%,var(--surface2));color:${noteOf(j)}" data-job="${esc(j.key)}">About: ${esc(j.text.slice(0,40))}${j.text.length>40?'…':''}</button>`:''}
    ${!c.msgs.length?`<p class="note" style="margin:10px 0">${c.loaded?'Say hi. Sort out the time and place here.':'Loading messages…'}</p>`:''}
    ${(()=>{const lastOut=[...c.msgs].reverse().find(m=>m.by===me),readAt=num(((S.threadDocs[lastOut?.thread||c.key]||{}).read||{})[c.other]),seen=pref('receipts')&&lastOut&&readAt>=lastOut.at;
-     const multi=(c.keys||[]).length>1,jobLine=jk=>{const x=D.jobByKey[jk];return x?`₹${fmt(x.agreed||x.price)} · ${esc(str(x.text,48))}`:'An earlier job'};
+     // Like Fiverr: a card in the timeline when a gig with this person starts and when it's done. Tap it for the details.
+     const gigs=[];for(const k of c.keys||[c.key]){const x=D.jobByKey[parseKey(k)?.jobKey];if(!x||!x.pick||!x.accepted)continue;
+       if(!((x.owner===me&&x.accepted===c.other)||(x.owner===c.other&&x.accepted===me)))continue;
+       const st=num(x.pick.at)||x.takenAt;if(st)gigs.push({at:st,done:false,j:x});const dn=x.pick.status==='done'?num(x.pick.doneAt)||x.doneAt:0;if(dn)gigs.push({at:dn,done:true,j:x})}
+     gigs.sort((x,y)=>x.at-y.at);let gi=0;
+     const gigCard=g=>`<button class="gigcard${g.done?' done':''}" data-gig="${esc(g.j.key)}"><span class="gigic">${ic(g.done?'tick':'bids',18,2.2)}</span><span class="gigtext"><b>${g.done?'Gig completed':'Gig started'}</b><span>₹${fmt(g.j.agreed||g.j.price)} · ${esc(str(g.j.text,60))}</span></span><span class="gigchev">${ic('chev',14,2.4)}</span></button>`;
+     const gigsUpTo=t=>{let h='';while(gi<gigs.length&&gigs[gi].at<=t){h+=gigCard(gigs[gi]);gi++}return h};
      const byId=new Map(c.msgs.map(m=>[m.id,m]));
      // Like Instagram: one centred time above a group, when the chat starts, after an hour's gap or on a new day.
      const gap=(a,b)=>!a||b.at-a.at>36e5||new Date(a.at).toDateString()!==new Date(b.at).toDateString();
      return c.msgs.map((m,i)=>{const rx=Object.values(m.reactions||{}).filter(e=>REACTS.includes(e)),q=m.replyTo?byId.get(m.replyTo):null;
-       const p=c.msgs[i-1],n=c.msgs[i+1],ctx=multi&&(!p||p.thread!==m.thread),nctx=multi&&!!n&&n.thread!==m.thread,head=gap(p,m),mine=m.by===me,cont=!head&&!ctx&&p.by===m.by&&!q,more=!!n&&!gap(m,n)&&!nctx&&n.by===m.by&&!n.replyTo,lastOfRun=!n||gap(m,n)||nctx||n.by!==m.by;
+       const p=c.msgs[i-1],n=c.msgs[i+1],cards=gigsUpTo(m.at),ncard=!!n&&gi<gigs.length&&gigs[gi].at<=n.at,head=gap(p,m),mine=m.by===me,cont=!head&&!cards&&p.by===m.by&&!q,more=!!n&&!gap(m,n)&&!ncard&&n.by===m.by&&!n.replyTo,lastOfRun=!n||gap(m,n)||ncard||n.by!==m.by;
        const lab=q?`<p class="rlabel">${mine?(q.by===me?'You replied to yourself':'You replied to '+esc(firstName(q.by))):esc(firstName(m.by))+(q.by===me?' replied to you':' replied')}</p><button class="rquote" data-act="jumpMsg" data-to="${q.id}"><span>${esc(msgSnip(q))}</span></button>`:'';
        const acts=`<span class="macts">${S.rxFor===m.id?`<span class="rxbar" role="group" aria-label="React">${REACTS.map(e=>`<button data-act="reactMsg" data-to="${m.id}" data-e="${e}" aria-label="React with ${e}">${e}</button>`).join('')}</span>`:''}<button data-act="rxOpen" data-to="${m.id}" data-tip="React" aria-label="React">${ic('smile',18)}</button><button data-act="replyMsg" data-to="${m.id}" data-tip="Reply" aria-label="Reply">${ic('reply',18)}</button><button data-act="msgMore" data-to="${m.id}" data-tip="More" aria-label="More">${ic('dots',18)}</button></span>`;
-       return`${head?`<p class="tstamp">${chatStamp(m.at)}</p>`:''}${ctx?`<button class="ctxmark" data-job="${esc(m.jobKey||'')}">${jobLine(m.jobKey)}</button>`:''}<div class="mrow ${mine?'mine':'theirs'}${cont?' cont':''}${more?' more':''}${rx.length?' hasrx':''}">${mine?'':`<span class="mav">${lastOfRun?face(m.by,28):''}</span>`}<div class="mcol">${lab}<div class="mline"><div class="${mine?'out':'in'}${m.kind!=='text'?' media '+m.kind:''}" data-mid="${m.id}">${msgBody(m)}${rx.length?`<span class="rx${S.rxPop===m.id?' pop':''}">${[...new Set(rx)].join('')}${rx.length>1?`<b>${rx.length}</b>`:''}</span>`:''}</div>${acts}</div></div></div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`}).join('')})()}
+       return`${head?`<p class="tstamp">${chatStamp(m.at)}</p>`:''}${cards}<div class="mrow ${mine?'mine':'theirs'}${cont?' cont':''}${more?' more':''}${rx.length?' hasrx':''}">${mine?'':`<span class="mav">${lastOfRun?face(m.by,28):''}</span>`}<div class="mcol">${lab}<div class="mline"><div class="${mine?'out':'in'}${m.kind!=='text'?' media '+m.kind:''}" data-mid="${m.id}">${msgBody(m)}${rx.length?`<span class="rx${S.rxPop===m.id?' pop':''}">${[...new Set(rx)].join('')}${rx.length>1?`<b>${rx.length}</b>`:''}</span>`:''}</div>${acts}</div></div></div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`}).join('')+gigsUpTo(Infinity)})()}
    ${S.chatUp?`<div class="out media pending">${S.chatUp==='photo'?'Sending photo…':'Sending voice message…'}</div>`:''}
   </div>
   ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats happen inside jobs: pin a job, or open ${esc(firstName(c.other))}\u2019s profile and tap Message if you\u2019ve worked together.`}</p></div>`:`
@@ -1306,7 +1310,7 @@ function viewChat(D){
     <button class="cbtn" data-act="recCancel" aria-label="Cancel recording">${ic('trash',19)}</button>
     <span class="recbar"><i class="recdot"></i><span id="recT">${recClock()}</span><span class="muted">Recording</span></span>
     <button class="csend" data-act="recSend" aria-label="Send voice message">${ic('send',19,2,'var(--on-grad)')}</button></div>`
-   :`${(c.keys||[]).filter(k=>chatCan(k,c.other,D)).length>1?`<button class="ctxpick" data-sheet="chatctx">About ${j?`₹${fmt(j.agreed||j.price)} · ${esc(str(j.text,40))}`:'this chat'} ${ic('chev',12,2.4)}</button>`:''}${S.chatDraft.reply?replyBar(S.chatDraft.reply):''}<div class="composer igc ${S.chatDraft.text.trim()?'hastext':''}" id="composer"><div class="igpill">
+   :`${S.chatDraft.reply?replyBar(S.chatDraft.reply):''}<div class="composer igc ${S.chatDraft.text.trim()?'hastext':''}" id="composer"><div class="igpill">
     <button class="igcam" data-act="pickChatPhoto" aria-label="Send a photo">${ic('camera',18,2,'var(--bub-ink)')}</button>
     <label class="field" for="msg"><input id="msg" type="text" maxlength="1000" placeholder="Message…" value="${esc(S.chatDraft.text)}" data-bind="chatDraft.text" aria-label="Message ${esc(firstName(c.other))}" autocomplete="off"></label>
     <button class="igicon cmic" data-act="recStart" aria-label="Record a voice message">${ic('mic',22)}</button>
@@ -1492,9 +1496,11 @@ function sheetHTML(D){
   const s=S.sheet;if(!s)return'';let b='';
   const j=S.openJob?D.jobByKey[S.openJob]:null;
   switch(s.type){
-  case'chatctx':{const c=S.chat,l=(c.keys||[]).filter(k=>chatCan(k,c.other,D));
-    b=`<h2 id="sheetT">Which job is this about?</h2><p>Your messages go to ${esc(firstName(c.other))} in this one chat either way. This just keeps each job's details together.</p>
-    <div class="menu">${l.map(k=>{const x=D.jobByKey[parseKey(k)?.jobKey];return`<button data-act="chatCtx" data-k="${esc(k)}">${k===c.key?ic('tick',16,2.6,'var(--accent)'):'<span style="width:16px"></span>'} <span class="cn">${x?`₹${fmt(x.agreed||x.price)} · ${esc(str(x.text,60))}`:'An earlier job'}</span></button>`}).join('')}</div>`;break}
+  case'gig':{const x=D.jobByKey[s.key];if(!x||!x.pick){b='<h2 id="sheetT">This gig is no longer here</h2>';break}const pk=x.pick,pay=payOf(x),sent=sentOf(x),me=S.me.id,done=pk.status==='done';
+    const row=(l,v)=>`<div class="gigrow"><span>${l}</span><b>${v}</b></div>`;
+    b=`<p class="gigtag${done?' done':''}">${done?'Completed':'In progress'}</p><h2 id="sheetT">${esc(x.text)}</h2>
+    <div class="gigrows">${row('Agreed','₹'+fmt(x.agreed||x.price))}${x.where||x.when?row('Where · when',esc([x.where,x.when].filter(Boolean).join(' · '))):''}${row('Posted by',x.owner===me?'You':esc(shortName(x.owner)))}${row('Done by',x.accepted===me?'You':esc(shortName(x.accepted)))}${row('Started',stamp(num(pk.at)||x.takenAt))}${done?row('Completed',stamp(num(pk.doneAt)||x.doneAt)):''}${row('Payment',pay?.ok?'Paid':sent?'Sent, waiting for them to confirm':pay&&!pay.ok?'Not arrived yet':'Not paid yet')}</div>
+    <button class="cta" data-gigopen="${esc(x.key)}">Open the job</button>`;break}
   case'msgmenu':{const m=chatMsg(s.mid);if(!m){b='<h2 id="sheetT">This message is gone</h2>';break}const mine=m.reactions?.[S.me.id];
     b=`<p id="sheetT" class="msgprev">${esc(msgSnip(m))}</p><p class="msgwhen">${m.by===S.me.id?'Sent':'Received'} ${stamp(m.at)}</p><div class="rxpick" role="group" aria-label="React">${REACTS.map(e=>`<button class="${mine===e?'on':''}" data-act="reactMsg" data-to="${m.id}" data-e="${e}" aria-label="React with ${e}" aria-pressed="${mine===e}">${e}</button>`).join('')}</div>
     <div class="menu"><button data-act="replyMsg" data-to="${m.id}">${ic('reply',18)} Reply</button>${m.kind==='text'?`<button data-act="copyMsg" data-to="${m.id}">${ic('copy',18)} Copy</button>`:''}${m.by===S.me.id?`<button class="danger" data-act="unsendMsg" data-to="${m.id}">${ic('trash',18)} Unsend</button>`:''}</div>`;break}
@@ -2069,7 +2075,6 @@ const ACT={
   rxOpen(el){const id=+el.dataset.to;S.rxFor=S.rxFor===id?null:id;render()},
   msgMore(el){S.rxFor=null;S.sheet={type:'msgmenu',mid:+el.dataset.to};render()},
   pickChatPhoto(){chatPicker.click()},
-  chatCtx(el){const k=el.dataset.k;S.chat.key=k;S.chat.jobKey=parseKey(k)?.jobKey||null;S.sheet=null;render()},
   cancelReply(){S.chatDraft.reply=null;render()},
   copyMsg(el){const m=chatMsg(+el.dataset.to);S.sheet=null;render();if(m)navigator.clipboard?.writeText(m.t).then(()=>toast('Copied'),()=>toast('Couldn\u2019t copy that.'))},
   unsendMsg(el){const id=+el.dataset.to,c=S.chat;S.sheet=null;c.msgs=c.msgs.filter(x=>x.id!==id);for(const k in c.parts||{})c.parts[k]=c.parts[k].filter(x=>x.id!==id);if(S.chatDraft.reply?.id===id)S.chatDraft.reply=null;render();
@@ -2123,7 +2128,7 @@ const ACT={
 };
 
 document.addEventListener('click',e=>{
-  const el=e.target.closest('[data-com],[data-cnote],[data-doc],[data-pref],[data-helpkind],[data-helpjob],[data-helpwhy],[data-acttab],[data-pic],[data-review],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen],[data-msgwith]');
+  const el=e.target.closest('[data-com],[data-cnote],[data-doc],[data-pref],[data-helpkind],[data-helpjob],[data-helpwhy],[data-acttab],[data-pic],[data-review],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen],[data-msgwith],[data-gig],[data-gigopen]');
   if(!el)return;const ds=el.dataset;
   if(ds.ask!==undefined){if(ds.ask===S.me?.id)return;S.offer={to:ds.ask,prevJob:ds.prev||null,text:'',price:'',when:'Next hour',where:''};S.err={};S.sheet={type:'offer'};render();return}
   if(ds.ofwhen!==undefined){S.offer.when=ds.ofwhen;render();return}
@@ -2154,6 +2159,8 @@ document.addEventListener('click',e=>{
   const D=derive(),me=S.me.id;
   if(ds.thread!==undefined){const t=D.threads.find(x=>x.key===ds.thread);if(t)openThread(t);return}
   if(ds.threadJob!==undefined){const j=D.jobByKey[S.openJob];if(j&&canMessage({key:jobThreadKey(j.key,me),other:j.owner,jobKey:j.key},D))openThread({key:jobThreadKey(j.key,me),other:j.owner,jobKey:j.key});return}
+  if(ds.gig!==undefined){S.sheet={type:'gig',key:ds.gig};render();return}
+  if(ds.gigopen!==undefined){S.sheet=null;S.openJob=ds.gigopen;S.bid={key:null};go('job');return}
   if(ds.msgwith!==undefined){const j=workedWith(ds.msgwith,D).sort((a,b)=>num(b.takenAt||b.at)-num(a.takenAt||a.at))[0];if(j)openThread({key:jobThreadKey(j.key,j.accepted),other:ds.msgwith,jobKey:j.key});return}
   if(ds.threadWith!==undefined){const j=D.jobByKey[S.openJob];if(j)openThread({key:jobThreadKey(j.key,ds.threadWith),other:ds.threadWith,jobKey:j.key});return}
 });
