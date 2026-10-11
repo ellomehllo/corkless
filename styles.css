@@ -1045,7 +1045,7 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 /* chat fills the screen like a messenger: header on top, messages in between, composer where the tab bar was */
 .app:has(> .main[data-view="chat"]) .tabbar{display:none}
 .main[data-view="chat"]{display:flex;flex-direction:column}
-.main[data-view="chat"] > .pad:first-child{position:sticky;top:0;z-index:3;background:var(--bg);padding-top:calc(14px + env(safe-area-inset-top,0px));padding-bottom:10px;box-shadow:0 1px 0 var(--line)}
+.main[data-view="chat"] > .pad:first-child{position:sticky;top:0;z-index:3;background:var(--bg);padding-top:14px;padding-bottom:10px;box-shadow:0 1px 0 var(--line)}
 .main[data-view="chat"] .msgs{flex:1 0 auto;justify-content:flex-end;padding-top:12px}
 .main[data-view="chat"] .foot{position:sticky;bottom:0;z-index:3;background:var(--bg)!important;box-shadow:0 -1px 0 var(--line);padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
 
@@ -1144,6 +1144,7 @@ svg[aria-hidden="true"]{stroke-width:1.6}
   .tabbar{margin:0;border-radius:0;background:rgba(6,6,8,.92);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
     border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));box-shadow:none}
   .typing .tabbar,.kb .tabbar{display:none!important}
+  html{padding-bottom:0}
 }
 @media (max-width:899px){.tabbar .fab{width:44px;height:44px;box-shadow:0 0 16px rgba(170,226,84,.35)}}
 

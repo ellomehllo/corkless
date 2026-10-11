@@ -1236,7 +1236,7 @@ function inviteCard(D,big){
   if(false)return big?'<div class="empty" style="margin:8px 0"><b>No chats yet</b><p>Bid on a job, or tap Ask on someone who\u2019s free, to start talking.</p></div>':'';
   const used=0;
   return`<div class="${big?'empty':'box stack'}" style="${big?'margin:8px 0':'gap:10px'}">
-    ${big?'<b>No chats yet</b><p>Chats open when you work with someone: message your bidders, or hire someone again from their profile. Bring your friends onto the board too.</p>':'<span class="t1" style="font-size:var(--t-16)">Invite friends to tack</span><span class="t2">More people on the board means jobs get picked up faster. Friends from ${esc(campus())} join with their college email.</span>'}
+    ${big?'<b>No chats yet</b><p>Chats open when you work with someone: message your bidders, or hire someone again from their profile. Bring your friends onto the board too.</p>':'<span class="t1" style="font-size:var(--t-16)">Invite friends to tack</span><span class="t2">More people on the board means jobs get picked up faster. Friends from '+esc(campus())+' join with their college email.</span>'}
     <button class="${big?'cta noglow':'btn2'}" data-sheet="invitefriend">Invite a friend</button>
     ${used?`<p class="note">${used} ${used===1?'person has':'people have'} joined with your links.</p>`:''}</div>`}
 function dateGroups(list,at){const d0=new Date().setHours(0,0,0,0),grp=t=>!t?'Earlier':t>=d0?'Today':t>=d0-864e5?'Yesterday':t>=d0-6*864e5?'Last 7 days':t>=d0-29*864e5?'Last 30 days':'Earlier',out=[];
