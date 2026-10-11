@@ -1515,8 +1515,8 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 
 /* Messages, Instagram style: solid bubbles, grouped runs, avatar on the last message of theirs,
    replies quoted above the bubble, react / reply / more beside it on hover */
-:root{--bub:#4A5CF0;--bub-in:#262629}
-:root[data-theme="light"]{--bub:#3F55EE;--bub-in:#EFEFF1}
+:root{--bub:#C6F24E;--bub-ink:#0E1406;--bub-grad:linear-gradient(180deg,#DDF870 0%,#C6F24E 55%,#A3DE6A 100%);--bub-in:#262629;--bub-send:#C6F24E}
+:root[data-theme="light"]{--bub-in:#EFEFF1;--bub-send:#4C7A00}
 .mrow{display:flex;align-items:flex-end;gap:8px;margin-top:8px;max-width:100%}
 .mrow.cont{margin-top:2px}
 .mrow.mine{justify-content:flex-end}
@@ -1528,14 +1528,14 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .mline{display:flex;align-items:center;gap:4px;max-width:100%;min-width:0}
 .mine .mline{flex-direction:row-reverse}
 .mrow .in,.mrow .out{max-width:100%;border-radius:22px;padding:8px 14px;font-size:15px;line-height:1.35;font-weight:400}
-.mrow .out{background:var(--bub);color:#fff}
+.mrow .out{background:var(--bub-grad);background-attachment:fixed;color:var(--bub-ink);font-weight:500}
 .mrow .in{background:var(--bub-in);color:var(--fg)}
 .theirs.cont .in{border-top-left-radius:6px}.theirs.more .in{border-bottom-left-radius:6px}
 .mine.cont .out{border-top-right-radius:6px}.mine.more .out{border-bottom-right-radius:6px}
 .mrow .media.photo{padding:0;background:none}
 .mrow .media.photo .mphoto{border-radius:18px}
-.mrow .out .mplay{background:rgba(255,255,255,.2)}
-.mrow .out .mwave{background:rgba(255,255,255,.3)}
+.mrow .out .mplay{background:rgba(14,20,6,.12)}
+.mrow .out .mwave{background:rgba(14,20,6,.18)}
 .rlabel{margin:8px 6px 4px;font-size:12px;color:var(--muted)}
 .rquote{position:relative;max-width:100%;margin-bottom:3px;padding:7px 13px;border-radius:18px;background:var(--bub-in);color:var(--muted);font-size:14px;line-height:1.3;text-align:left}
 .rquote span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1566,8 +1566,7 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .igpill .field input{padding:10px 0;font-size:15px;background:none}
 .igcam{width:36px;height:36px;flex-shrink:0;border-radius:50%;background:var(--bub);display:flex;align-items:center;justify-content:center}
 .igicon{width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--fg);border-radius:50%}
-.igsend{display:none;padding:0 10px;height:36px;color:var(--bub);font-size:15px;font-weight:700}
-:root:not([data-theme="light"]) .igsend{color:#8C9CFF}
+.igsend{display:none;padding:0 10px;height:36px;color:var(--bub-send);font-size:15px;font-weight:700}
 .composer.igc.hastext .igsend{display:block}.composer.igc.hastext .cmic,.composer.igc.hastext .cimg{display:none}
 .main[data-view="chat"] .foot{box-shadow:none}
 .main[data-view="chat"] > .pad:first-child .iconbtn{background:none}

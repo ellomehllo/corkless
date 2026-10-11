@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610112122';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610112122';
-import {modHit,MOD_CAT} from './mod.js?v=202610112122';
+import {makeDb} from './db.js?v=202610112129';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610112129';
+import {modHit,MOD_CAT} from './mod.js?v=202610112129';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -1291,7 +1291,7 @@ function viewChat(D){
     <span class="recbar"><i class="recdot"></i><span id="recT">${recClock()}</span><span class="muted">Recording</span></span>
     <button class="csend" data-act="recSend" aria-label="Send voice message">${ic('send',19,2,'var(--on-grad)')}</button></div>`
    :`${S.chatDraft.reply?replyBar(S.chatDraft.reply):''}<div class="composer igc ${S.chatDraft.text.trim()?'hastext':''}" id="composer"><div class="igpill">
-    <button class="igcam" data-act="pickChatPhoto" aria-label="Send a photo">${ic('camera',18,2,'#fff')}</button>
+    <button class="igcam" data-act="pickChatPhoto" aria-label="Send a photo">${ic('camera',18,2,'var(--bub-ink)')}</button>
     <label class="field" for="msg"><input id="msg" type="text" maxlength="1000" placeholder="Message…" value="${esc(S.chatDraft.text)}" data-bind="chatDraft.text" aria-label="Message ${esc(firstName(c.other))}" autocomplete="off"></label>
     <button class="igicon cmic" data-act="recStart" aria-label="Record a voice message">${ic('mic',22)}</button>
     <button class="igicon cimg" data-act="pickChatPhoto" aria-label="Send a photo">${ic('image',22)}</button>
