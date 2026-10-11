@@ -1571,3 +1571,6 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .main[data-view="chat"] .foot{box-shadow:none}
 .main[data-view="chat"] > .pad:first-child .iconbtn{background:none}
 .igpill,.igpill .field{min-width:0}.igpill .field input{width:100%;min-width:0}
+/* one chat per person: a small marker where the talk moves to another job, and which job you're sending about */
+.ctxmark{align-self:center;max-width:86%;margin:16px 0 2px;padding:5px 12px;border-radius:999px;background:var(--surface2);color:var(--fg2);font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctxpick{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;max-width:100%;margin:0 0 8px 6px;padding:4px 10px;border-radius:999px;background:var(--surface2);color:var(--fg2);font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

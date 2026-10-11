@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610112131';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610112131';
-import {modHit,MOD_CAT} from './mod.js?v=202610112131';
+import {makeDb} from './db.js?v=202610112136';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610112136';
+import {modHit,MOD_CAT} from './mod.js?v=202610112136';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -195,7 +195,7 @@ function derive(){
   for(const[k,pk]of Object.entries(S.picks)){const j=jobByKey[k];if(!j||!pk||typeof pk.doer!=='string')continue;
     j.accepted=pk.doer;j.agreed=num(pk.agreed);j.pick=pk;if(pk.doneAt)j.doneAt=num(pk.doneAt)}
   const D={members,jobs,jobByKey,bidsByJob,blocked};
-  D.threads=threadsOf(D);D.unread=D.threads.filter(t=>t.unread).length;
+  D.threads=threadsOf(D);D.convos=convosOf(D.threads);D.unread=D.convos.filter(t=>t.unread).length;
   D.notes=notesOf(D);D.newNotes=S.view==='bids'?0:D.notes.filter(n=>n.at>num(S.priv.actSeen)&&n.at<=Date.now()+6e4).length;
   D.toConfirm=jobs.filter(j=>j.accepted===me&&j.status==='done'&&!payOf(j)?.ok).length;
   D.offersWaiting=offerList(S.offersIn).filter(o=>o.status==='pending'&&D.members.includes(o.owner)&&!D.blocked.has(o.owner)).length;
@@ -321,6 +321,11 @@ function threadsOf(D){
     .filter(t=>t.last||t.job).sort((a,b)=>(b.last?.at||b.job?.at||0)-(a.last?.at||a.job?.at||0));
 }
 
+// One conversation per person: every job thread with them (bids, deals, old jobs) shows as one chat.
+function convosOf(threads){const by={};for(const t of threads)(by[t.other]=by[t.other]||[]).push(t);const when=t=>t.last?.at||t.job?.at||0;
+  return Object.values(by).map(l=>{l.sort((a,b)=>when(b)-when(a));const last=l.map(x=>x.last).filter(Boolean).sort((a,b)=>b.at-a.at)[0]||null;
+    return{...l[0],keys:l.map(x=>x.key),n:l.length,last,unread:l.some(x=>x.unread),sub:last?(last.from===S.me.id?'You: ':'')+last.text:l[0].sub}}).sort((a,b)=>when(b)-when(a))}
+const chatCan=(k,other,D)=>canMessage({key:k,other,jobKey:parseKey(k)?.jobKey||null},D);
 const queues={};
 function enqueue(k,fn){const q=(queues[k]||Promise.resolve()).catch(()=>{}).then(fn);queues[k]=q;return q}
 function writeErr(e){
@@ -634,19 +639,26 @@ function viewCNote(D){const n0=S.cnotes[S.cnote];if(!S.cid||!n0)return viewCBoar
       ${x.by===me||owner?`<button class="linkbtn" data-act="ccomDel" data-id="${esc(x.id)}">Delete</button>`:''}</div></div>`).join('')}</div>
     <div class="composer ccomposer ${S.cdraft.comment.trim()?'hastext':''}" id="ccomposer"><label class="field" for="ccomIn"><input id="ccomIn" maxlength="500" placeholder="Add a comment…" value="${esc(S.cdraft.comment)}" data-bind="cdraft.comment" autocomplete="off"></label>
       <button class="csend" data-act="ccomSend" aria-label="Post comment">${ic('send',19,2,'var(--on-grad)')}</button></div></div>`}
-function closeThread(){if(S.chat.unsub)try{S.chat.unsub()}catch{};if(S.rec)recStop(false);if(S.audio){S.audio.pause();S.playing=null}S.chat={key:null}}
+function closeThread(){(S.chat.unsubs||[]).forEach(u=>{try{u()}catch{}});if(S.rec)recStop(false);if(S.audio){S.audio.pause();S.playing=null}S.chat={key:null}}
 function openThread(t){
-  const {collection,query,orderBy,limit,onSnapshot}=S.fb;
+  const {collection,query,orderBy,limit,onSnapshot}=S.fb,D=derive(),other=t.other;
   closeThread();S.chatDraft={text:''};
-  const k=t.key;
-  S.chat={key:k,other:t.other,jobKey:t.jobKey||null,msgs:[],loaded:false,unsub:null};
-  S.chat.unsub=onSnapshot(query(collection(S.db,'threads',k,'msgs'),orderBy('at','desc'),limit(300)),snap=>{
-    if(S.chat.key!==k)return;
-    S.chat.msgs=snap.docs.map(d=>({...d.data(),id:Number(d.id)})).filter(m=>m&&typeof m.t==='string'&&m.kind!=='unsent').map(m=>({id:m.id,t:m.t.slice(0,1000),at:num(m.at),by:str(m.by,128),kind:['photo','audio'].includes(m.kind)?m.kind:'text',media:typeof m.media==='string'?m.media:'',dur:num(m.dur),
-      replyTo:num(m.replyTo)||null,reactions:m.reactions&&typeof m.reactions==='object'?m.reactions:{}})).reverse();
-    S.chat.loaded=true;markSeen();render();
-    requestAnimationFrame(()=>{const m=$('main');if(S.view==='chat')m.scrollTop=m.scrollHeight});
-  },e=>{S.chat.loaded=true;render();console.warn(e)});
+  const keys=[...new Set([t.key,...D.threads.filter(x=>x.other===other).map(x=>x.key)])];
+  // Send into the thread you came from; if that one is closed, the most recent one that's still open.
+  let key=t.key;if(!chatCan(key,other,D))key=D.threads.filter(x=>x.other===other).map(x=>x.key).find(k=>chatCan(k,other,D))||t.key;
+  S.chat={key,other,jobKey:parseKey(key)?.jobKey||null,keys,parts:{},msgs:[],loaded:false,unsubs:[]};
+  let waiting=keys.length;
+  for(const k of keys){const jobKey=parseKey(k)?.jobKey||null;let first=true;
+    S.chat.unsubs.push(onSnapshot(query(collection(S.db,'threads',k,'msgs'),orderBy('at','desc'),limit(300)),snap=>{
+      if(S.chat.other!==other||!S.chat.keys?.includes(k))return;
+      S.chat.parts[k]=snap.docs.map(d=>({...d.data(),id:Number(d.id)})).filter(m=>m&&typeof m.t==='string'&&m.kind!=='unsent').map(m=>({id:m.id,t:m.t.slice(0,1000),at:num(m.at),by:str(m.by,128),kind:['photo','audio'].includes(m.kind)?m.kind:'text',media:typeof m.media==='string'?m.media:'',dur:num(m.dur),
+        replyTo:num(m.replyTo)||null,reactions:m.reactions&&typeof m.reactions==='object'?m.reactions:{},thread:k,jobKey})).reverse();
+      S.chat.msgs=Object.values(S.chat.parts).flat().sort((x,y)=>x.at-y.at||x.id-y.id);
+      if(first){first=false;waiting--}if(waiting>0)return;
+      const wasLoaded=S.chat.loaded;S.chat.loaded=true;markSeen();render();
+      if(!wasLoaded)requestAnimationFrame(()=>{const m=$('main');if(S.view==='chat')m.scrollTop=m.scrollHeight});
+    },e=>{if(first){first=false;waiting--}if(waiting<=0){S.chat.loaded=true;render()}console.warn(e)}));
+  }
   go('chat',true);
 }
 function mediaUrl(path){S.media=S.media||{};const v=S.media[path];if(v!==undefined)return v;S.media[path]=null;
@@ -661,7 +673,7 @@ const msgSnip=m=>m.kind==='photo'?'Photo':m.kind==='audio'?'Voice message':str(m
 const quoteHTML=q=>`<button class="mquote" data-act="jumpMsg" data-to="${q.id}"><b>${q.by===S.me.id?'You':esc(firstName(q.by))}</b><span>${esc(msgSnip(q))}</span></button>`;
 const replyBar=r=>`<div class="replybar"><span class="rowtext"><span class="t1">Replying to ${r.by===S.me.id?'yourself':esc(firstName(r.by))}</span><span class="t2">${esc(msgSnip(r))}</span></span><button class="iconbtn" data-act="cancelReply" aria-label="Cancel reply">${ic('x',14,2.4)}</button></div>`;
 const chatMsg=id=>S.chat.msgs?.find(x=>x.id===id);
-function startReply(id){const m=chatMsg(id);if(!m)return;S.chatDraft.reply={id,by:m.by,t:m.t,kind:m.kind};S.sheet=null;render();requestAnimationFrame(()=>$('msg')?.focus())}
+function startReply(id){const m=chatMsg(id);if(!m)return;if(m.thread&&m.thread!==S.chat.key&&chatCan(m.thread,S.chat.other,derive())){S.chat.key=m.thread;S.chat.jobKey=m.jobKey}S.chatDraft.reply={id,by:m.by,t:m.t,kind:m.kind};S.sheet=null;render();requestAnimationFrame(()=>$('msg')?.focus())}
 function reactTo(id,e,force){const m=chatMsg(id);if(!m)return;const me=S.me.id,cur=m.reactions?.[me];if(force&&cur===e)return;const next=cur===e?null:e;
   m.reactions={...(m.reactions||{})};if(next)m.reactions[me]=next;else delete m.reactions[me];S.rxPop=next?id:null;render();setTimeout(()=>{if(S.rxPop===id)S.rxPop=null},600);
   S.fb.rpc('react_msg',{p_id:id,p_emoji:next}).catch(()=>toast('Couldn\u2019t react. Try again.'))}
@@ -694,10 +706,11 @@ function playVoice(path){const u=S.media?.[path];if(!u)return;S.audio=S.audio||n
   a.src=u;S.playing=path;S.playPct=0;a.ontimeupdate=()=>{S.playPct=a.duration?Math.round(a.currentTime/a.duration*100):0;const b=document.querySelector(`[data-src="${CSS.escape(path)}"]`)?.parentElement?.querySelector('.mwave i');if(b)b.style.width=S.playPct+'%'};
   a.onended=()=>{S.playing=null;S.playPct=0;render()};a.play().catch(()=>{S.playing=null;toast('Couldn\u2019t play that.')});render()}
 function markSeen(){
-  const c=S.chat;if(!c.key||S.view!=='chat')return;
-  const last=Math.max(0,...c.msgs.filter(m=>m.by!==S.me.id).map(m=>m.at));
-  if(last>num((S.priv.seen||{})[c.key]))savePriv({seen:{[c.key]:last}});
-  if(pref('receipts')&&threadOpen(c.key)&&last>num(((S.threadDocs[c.key]||{}).read||{})[S.me.id]))S.fb.rpc('thread_read',{p_thread:c.key,p_at:last}).catch(()=>{});
+  const c=S.chat;if(!c.key||S.view!=='chat')return;const me=S.me.id,patch={};
+  for(const k of c.keys||[c.key]){const last=Math.max(0,...(c.parts?.[k]||[]).filter(m=>m.by!==me).map(m=>m.at));if(!last)continue;
+    if(last>num((S.priv.seen||{})[k]))patch[k]=last;
+    if(pref('receipts')&&threadOpen(k)&&last>num(((S.threadDocs[k]||{}).read||{})[me]))S.fb.rpc('thread_read',{p_thread:k,p_at:last}).catch(()=>{})}
+  if(Object.keys(patch).length)savePriv({seen:patch});
 }
 function sendMsg(){
   const c=S.chat,t=S.chatDraft.text.trim();if(!c.key||!t)return;
@@ -1255,11 +1268,11 @@ function dateGroups(list,at){const d0=new Date().setHours(0,0,0,0),grp=t=>!t?'Ea
   for(const x of list){const g=grp(at(x));if(!out.length||out[out.length-1][0]!==g)out.push([g,[]]);out[out.length-1][1].push(x)}return out}
 function viewChats(D){
   return`<div class="pad narrow"><h1 class="pageh">Chats</h1>
-  ${D.threads.length?`<div class="ifeed">${dateGroups(D.threads,t=>t.last?.at||t.job?.at||0).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(t=>`<button class="item" data-thread="${esc(t.key)}" data-hold="${esc(t.other)}">${ring(t.other,46)}
-    <span class="itext"><span class="t1">${esc(shortName(t.other))}${t.job?` <span style="color:var(--fg)">· ₹${fmt(t.job.agreed||t.job.price)}</span>`:''}</span><span class="t2" style="${t.unread?'color:var(--fg);font-weight:500':''}">${esc(t.sub)}</span></span>
+  ${D.convos.length?`<div class="ifeed">${dateGroups(D.convos,t=>t.last?.at||t.job?.at||0).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(t=>`<button class="item" data-thread="${esc(t.key)}" data-hold="${esc(t.other)}">${ring(t.other,46)}
+    <span class="itext"><span class="t1">${esc(shortName(t.other))}</span><span class="t2" style="${t.unread?'color:var(--fg);font-weight:500':''}">${esc(t.sub)}</span></span>
     <span class="iend"><span class="time">${t.last?ago(t.last.at):''}</span>${t.unread?'<span class="udot" aria-label="Unread"></span>':''}</span></button>`).join('')}</section>`).join('')}</div>`
    :inviteCard(D,true)}
-  ${D.threads.length?`<div style="margin-top:18px">${inviteCard(D,false)}</div>`:''}
+  ${D.convos.length?`<div style="margin-top:18px">${inviteCard(D,false)}</div>`:''}
   </div><div style="height:24px"></div>`;
 }
 function viewChat(D){
@@ -1270,21 +1283,22 @@ function viewChat(D){
   return`<div class="pad" style="padding-bottom:10px"><div style="display:flex;align-items:center;gap:10px">
      <button class="back" data-go="chats" aria-label="Back to chats" style="padding:0">${ic('back',20)}</button>
      <button class="rowmain" data-person="${esc(c.other)}" data-hold="${esc(c.other)}">${ring(c.other,42)}<span class="rowtext"><span style="font-size:var(--t-16);font-weight:600;letter-spacing:-.015em">${esc(shortName(c.other))}</span>
-       <span style="font-size:var(--t-12);font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${j?`<span style="color:var(--fg);font-weight:600">₹${fmt(j.agreed||j.price)}</span> · ${esc(j.text)}`:esc(metaOf(c.other)||campus())}</span></span></button>
+       <span style="font-size:var(--t-12);font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${onlineNow(c.other)?'Active now':(c.keys||[]).length>1?`${c.keys.length} jobs together on tack`:j?`<span style="color:var(--fg);font-weight:600">₹${fmt(j.agreed||j.price)}</span> · ${esc(j.text)}`:esc(metaOf(c.other)||campus())}</span></span></button>
      <button class="iconbtn" data-sheet="who" data-about="${esc(c.other)}" aria-label="Restrict, block or report">${ic('flag',17)}</button></div></div>
   <div class="msgs">
    ${accepted?`<div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${payOf(j)?.ok?`Paid ✓ · ₹${fmt(j.agreed)}`:`Bid accepted · ₹${fmt(j.agreed)} · pay on UPI after`}</div>`:''}
-   ${j&&!accepted?`<button class="banner" style="background:color-mix(in srgb,${noteOf(j)} 14%,var(--surface2));color:${noteOf(j)}" data-job="${esc(j.key)}">About: ${esc(j.text.slice(0,40))}${j.text.length>40?'…':''}</button>`:''}
+   ${j&&!accepted&&(c.keys||[]).length<2?`<button class="banner" style="background:color-mix(in srgb,${noteOf(j)} 14%,var(--surface2));color:${noteOf(j)}" data-job="${esc(j.key)}">About: ${esc(j.text.slice(0,40))}${j.text.length>40?'…':''}</button>`:''}
    ${!c.msgs.length?`<p class="note" style="margin:10px 0">${c.loaded?'Say hi. Sort out the time and place here.':'Loading messages…'}</p>`:''}
-   ${(()=>{const lastOut=[...c.msgs].reverse().find(m=>m.by===me),readAt=num(((S.threadDocs[c.key]||{}).read||{})[c.other]),seen=pref('receipts')&&lastOut&&readAt>=lastOut.at;
+   ${(()=>{const lastOut=[...c.msgs].reverse().find(m=>m.by===me),readAt=num(((S.threadDocs[lastOut?.thread||c.key]||{}).read||{})[c.other]),seen=pref('receipts')&&lastOut&&readAt>=lastOut.at;
+     const multi=(c.keys||[]).length>1,jobLine=jk=>{const x=D.jobByKey[jk];return x?`₹${fmt(x.agreed||x.price)} · ${esc(str(x.text,48))}`:'An earlier job'};
      const byId=new Map(c.msgs.map(m=>[m.id,m]));
      // Like Instagram: one centred time above a group, when the chat starts, after an hour's gap or on a new day.
      const gap=(a,b)=>!a||b.at-a.at>36e5||new Date(a.at).toDateString()!==new Date(b.at).toDateString();
      return c.msgs.map((m,i)=>{const rx=Object.values(m.reactions||{}).filter(e=>REACTS.includes(e)),q=m.replyTo?byId.get(m.replyTo):null;
-       const p=c.msgs[i-1],n=c.msgs[i+1],head=gap(p,m),mine=m.by===me,cont=!head&&p.by===m.by&&!q,more=!!n&&!gap(m,n)&&n.by===m.by&&!n.replyTo,lastOfRun=!n||gap(m,n)||n.by!==m.by;
+       const p=c.msgs[i-1],n=c.msgs[i+1],ctx=multi&&(!p||p.thread!==m.thread),nctx=multi&&!!n&&n.thread!==m.thread,head=gap(p,m),mine=m.by===me,cont=!head&&!ctx&&p.by===m.by&&!q,more=!!n&&!gap(m,n)&&!nctx&&n.by===m.by&&!n.replyTo,lastOfRun=!n||gap(m,n)||nctx||n.by!==m.by;
        const lab=q?`<p class="rlabel">${mine?(q.by===me?'You replied to yourself':'You replied to '+esc(firstName(q.by))):esc(firstName(m.by))+(q.by===me?' replied to you':' replied')}</p><button class="rquote" data-act="jumpMsg" data-to="${q.id}"><span>${esc(msgSnip(q))}</span></button>`:'';
        const acts=`<span class="macts">${S.rxFor===m.id?`<span class="rxbar" role="group" aria-label="React">${REACTS.map(e=>`<button data-act="reactMsg" data-to="${m.id}" data-e="${e}" aria-label="React with ${e}">${e}</button>`).join('')}</span>`:''}<button data-act="rxOpen" data-to="${m.id}" data-tip="React" aria-label="React">${ic('smile',18)}</button><button data-act="replyMsg" data-to="${m.id}" data-tip="Reply" aria-label="Reply">${ic('reply',18)}</button><button data-act="msgMore" data-to="${m.id}" data-tip="More" aria-label="More">${ic('dots',18)}</button></span>`;
-       return`${head?`<p class="tstamp">${chatStamp(m.at)}</p>`:''}<div class="mrow ${mine?'mine':'theirs'}${cont?' cont':''}${more?' more':''}${rx.length?' hasrx':''}">${mine?'':`<span class="mav">${lastOfRun?face(m.by,28):''}</span>`}<div class="mcol">${lab}<div class="mline"><div class="${mine?'out':'in'}${m.kind!=='text'?' media '+m.kind:''}" data-mid="${m.id}">${msgBody(m)}${rx.length?`<span class="rx${S.rxPop===m.id?' pop':''}">${[...new Set(rx)].join('')}${rx.length>1?`<b>${rx.length}</b>`:''}</span>`:''}</div>${acts}</div></div></div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`}).join('')})()}
+       return`${head?`<p class="tstamp">${chatStamp(m.at)}</p>`:''}${ctx?`<button class="ctxmark" data-job="${esc(m.jobKey||'')}">${jobLine(m.jobKey)}</button>`:''}<div class="mrow ${mine?'mine':'theirs'}${cont?' cont':''}${more?' more':''}${rx.length?' hasrx':''}">${mine?'':`<span class="mav">${lastOfRun?face(m.by,28):''}</span>`}<div class="mcol">${lab}<div class="mline"><div class="${mine?'out':'in'}${m.kind!=='text'?' media '+m.kind:''}" data-mid="${m.id}">${msgBody(m)}${rx.length?`<span class="rx${S.rxPop===m.id?' pop':''}">${[...new Set(rx)].join('')}${rx.length>1?`<b>${rx.length}</b>`:''}</span>`:''}</div>${acts}</div></div></div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`}).join('')})()}
    ${S.chatUp?`<div class="out media pending">${S.chatUp==='photo'?'Sending photo…':'Sending voice message…'}</div>`:''}
   </div>
   ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats happen inside jobs: pin a job, or open ${esc(firstName(c.other))}\u2019s profile and tap Message if you\u2019ve worked together.`}</p></div>`:`
@@ -1292,7 +1306,7 @@ function viewChat(D){
     <button class="cbtn" data-act="recCancel" aria-label="Cancel recording">${ic('trash',19)}</button>
     <span class="recbar"><i class="recdot"></i><span id="recT">${recClock()}</span><span class="muted">Recording</span></span>
     <button class="csend" data-act="recSend" aria-label="Send voice message">${ic('send',19,2,'var(--on-grad)')}</button></div>`
-   :`${S.chatDraft.reply?replyBar(S.chatDraft.reply):''}<div class="composer igc ${S.chatDraft.text.trim()?'hastext':''}" id="composer"><div class="igpill">
+   :`${(c.keys||[]).filter(k=>chatCan(k,c.other,D)).length>1?`<button class="ctxpick" data-sheet="chatctx">About ${j?`₹${fmt(j.agreed||j.price)} · ${esc(str(j.text,40))}`:'this chat'} ${ic('chev',12,2.4)}</button>`:''}${S.chatDraft.reply?replyBar(S.chatDraft.reply):''}<div class="composer igc ${S.chatDraft.text.trim()?'hastext':''}" id="composer"><div class="igpill">
     <button class="igcam" data-act="pickChatPhoto" aria-label="Send a photo">${ic('camera',18,2,'var(--bub-ink)')}</button>
     <label class="field" for="msg"><input id="msg" type="text" maxlength="1000" placeholder="Message…" value="${esc(S.chatDraft.text)}" data-bind="chatDraft.text" aria-label="Message ${esc(firstName(c.other))}" autocomplete="off"></label>
     <button class="igicon cmic" data-act="recStart" aria-label="Record a voice message">${ic('mic',22)}</button>
@@ -1478,6 +1492,9 @@ function sheetHTML(D){
   const s=S.sheet;if(!s)return'';let b='';
   const j=S.openJob?D.jobByKey[S.openJob]:null;
   switch(s.type){
+  case'chatctx':{const c=S.chat,l=(c.keys||[]).filter(k=>chatCan(k,c.other,D));
+    b=`<h2 id="sheetT">Which job is this about?</h2><p>Your messages go to ${esc(firstName(c.other))} in this one chat either way. This just keeps each job's details together.</p>
+    <div class="menu">${l.map(k=>{const x=D.jobByKey[parseKey(k)?.jobKey];return`<button data-act="chatCtx" data-k="${esc(k)}">${k===c.key?ic('tick',16,2.6,'var(--accent)'):'<span style="width:16px"></span>'} <span class="cn">${x?`₹${fmt(x.agreed||x.price)} · ${esc(str(x.text,60))}`:'An earlier job'}</span></button>`}).join('')}</div>`;break}
   case'msgmenu':{const m=chatMsg(s.mid);if(!m){b='<h2 id="sheetT">This message is gone</h2>';break}const mine=m.reactions?.[S.me.id];
     b=`<p id="sheetT" class="msgprev">${esc(msgSnip(m))}</p><p class="msgwhen">${m.by===S.me.id?'Sent':'Received'} ${stamp(m.at)}</p><div class="rxpick" role="group" aria-label="React">${REACTS.map(e=>`<button class="${mine===e?'on':''}" data-act="reactMsg" data-to="${m.id}" data-e="${e}" aria-label="React with ${e}" aria-pressed="${mine===e}">${e}</button>`).join('')}</div>
     <div class="menu"><button data-act="replyMsg" data-to="${m.id}">${ic('reply',18)} Reply</button>${m.kind==='text'?`<button data-act="copyMsg" data-to="${m.id}">${ic('copy',18)} Copy</button>`:''}${m.by===S.me.id?`<button class="danger" data-act="unsendMsg" data-to="${m.id}">${ic('trash',18)} Unsend</button>`:''}</div>`;break}
@@ -2052,9 +2069,10 @@ const ACT={
   rxOpen(el){const id=+el.dataset.to;S.rxFor=S.rxFor===id?null:id;render()},
   msgMore(el){S.rxFor=null;S.sheet={type:'msgmenu',mid:+el.dataset.to};render()},
   pickChatPhoto(){chatPicker.click()},
+  chatCtx(el){const k=el.dataset.k;S.chat.key=k;S.chat.jobKey=parseKey(k)?.jobKey||null;S.sheet=null;render()},
   cancelReply(){S.chatDraft.reply=null;render()},
   copyMsg(el){const m=chatMsg(+el.dataset.to);S.sheet=null;render();if(m)navigator.clipboard?.writeText(m.t).then(()=>toast('Copied'),()=>toast('Couldn\u2019t copy that.'))},
-  unsendMsg(el){const id=+el.dataset.to,c=S.chat;S.sheet=null;c.msgs=c.msgs.filter(x=>x.id!==id);if(S.chatDraft.reply?.id===id)S.chatDraft.reply=null;render();
+  unsendMsg(el){const id=+el.dataset.to,c=S.chat;S.sheet=null;c.msgs=c.msgs.filter(x=>x.id!==id);for(const k in c.parts||{})c.parts[k]=c.parts[k].filter(x=>x.id!==id);if(S.chatDraft.reply?.id===id)S.chatDraft.reply=null;render();
     S.fb.rpc('unsend_msg',{p_id:id}).then(path=>{if(path)S.sb.storage.from('chat').remove([path]).catch(()=>{});toast('Unsent')}).catch(()=>toast('Couldn\u2019t unsend that. Try again.'))},
   jumpMsg(el){const t=document.querySelector(`.msgs [data-mid="${el.dataset.to}"]`);if(!t)return;t.scrollIntoView({block:'center',behavior:'smooth'});t.classList.remove('flash');void t.offsetWidth;t.classList.add('flash')},
   toggleOnline(){savePriv({hideOnline:!S.priv.hideOnline});toast(S.priv.hideOnline?'Nobody sees when you’re online now':'People you’ve made a deal with can see when you’re online')},
