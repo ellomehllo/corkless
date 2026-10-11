@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610112102';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS,RULES_V,RULES} from './legal.js?v=202610112102';
-import {modHit,MOD_CAT} from './mod.js?v=202610112102';
+import {makeDb} from './db.js?v=202610112105';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610112105';
+import {modHit,MOD_CAT} from './mod.js?v=202610112105';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -85,7 +85,7 @@ const S={
   offer:{to:null,prevJob:null,text:'',price:'',when:'Next hour',where:''}, invites:{}, reports:[], myInvite:null,
   myDoc:null, pendingMine:0,
   view:'board', openJob:null, personOf:null, sort:'high', find:{q:''}, near:false,
-  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, pw:{cur:'',nw:''}, pwOpen:false, help:{kind:null,job:null,why:'',note:'',sent:null}, actTab:'all', actSeenAt:0, intro:{on:false}, fresh:null, chatDraft:{text:''}, pay:{upi:null,ref:''},
+  draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, pw:{cur:'',nw:''}, pwOpen:false, help:{kind:null,job:null,why:'',note:'',sent:null}, actTab:'all', actSeenAt:0, intro:{on:false,i:0}, fresh:null, chatDraft:{text:''}, pay:{upi:null,ref:''},
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',banner:'',adult:false,rules:false},
   inv:{email:'',campus:'',camp:''}, camp:{q:''}, coms:{}, cmine:{}, cinv:{}, cid:null, cnote:null, cnotes:{}, ccoms:{}, cmembers:{}, cdraft:{name:'',about:'',text:'',more:'',color:'#7FA2FF',handle:'',comment:''}, lastInvite:null, myCampus:null, campuses:{}, viewCampus:(()=>{try{return localStorage.getItem('tack.viewCampus')||''}catch{return''}})(),
   picks:{}, repDocs:{},
@@ -1356,7 +1356,6 @@ function viewSettings(D){const me=S.me.id,blocked=arr(S.priv.blocked).filter(u=>
    </div></section>
    <section class="setsec"><h2 class="seth">Legal</h2><div class="setcard">
      ${row('Privacy Policy','','data-doc="privacy"')}
-     ${row('Community guidelines','','data-doc="rules"')}
      ${row('Terms of Use','','data-doc="terms"')}
      <div class="setrow static"><span class="rowtext"><span class="t2">${t.at?`You accepted the current Terms on ${new Date(num(t.at)).toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}.`:`Effective ${EFFECTIVE}.`}</span></span></div>
    </div></section>
@@ -1393,7 +1392,7 @@ function viewHelp(D){const h=S.help,me=S.me.id;
 }
 function openDoc(k){let r=$('docRoot');if(!r){r=document.createElement('div');r.id='docRoot';document.body.appendChild(r)}
   r.innerHTML=`<div class="docview" role="dialog" aria-modal="true" aria-labelledby="docT"><div class="dochead"><span class="mark">tack</span><button class="iconbtn" data-act="closeDoc" aria-label="Close">${ic('x',18,2.4)}</button></div>
-    <div class="docscroll"><article class="prose legal"><h1 id="docT" class="pageh">${k==='terms'?'Terms of Use':k==='rules'?'Community guidelines':'Privacy Policy'}</h1>${k==='rules'?'':`<p class="effective">Effective ${EFFECTIVE}</p>`}${k==='terms'?TERMS:k==='rules'?RULES:PRIVACY}</article></div></div>`;
+    <div class="docscroll"><article class="prose legal"><h1 id="docT" class="pageh">${k==='terms'?'Terms of Use':'Privacy Policy'}</h1><p class="effective">Effective ${EFFECTIVE}</p>${k==='terms'?TERMS:PRIVACY}</article></div></div>`;
   requestAnimationFrame(()=>r.querySelector('.iconbtn')?.focus({preventScroll:true}))}
 function closeDoc(){$('docRoot')?.remove()}
 function renderTermsGate(){let r=$('termsRoot');
@@ -1501,7 +1500,7 @@ function sheetHTML(D){
     <button class="cta destructive" data-act="confirmDelReview">Delete review</button><button class="linkbtn" data-act="closeSheet">Keep it</button>`;break;
   case'blocked':b=`<h2 id="sheetT">That can\u2019t go on tack</h2><p>Your ${esc(MOD_AREA[s.area]||'post')} includes words about ${esc(MOD_CAT[s.cat]||'something that isn\u2019t allowed')}, which tack doesn\u2019t allow. Nothing was posted.</p>
     <div class="modwarn"><b>This attempt has been recorded${s.n>1?` (${s.n} so far)`:''}.</b> Repeated attempts to post hate, abuse or illegal content can get your account removed from tack.</div>
-    <button class="cta" data-act="closeSheet">Edit it</button><button class="linkbtn" data-doc="rules">Read the rules</button>`;break;
+    <button class="cta" data-act="closeSheet">Edit it</button><button class="linkbtn" data-doc="terms">Read the rules</button>`;break;
   case'pic':{const l=S.pics[s.k]||[],src=l[s.i];
     b=`<h2 id="sheetT" class="sr">Photo ${s.i+1} of ${l.length}</h2>${src?`<img class="bigpic" src="${src}" alt="Photo ${s.i+1} of ${l.length}">`:''}
     ${l.length>1?`<button class="btn2" data-act="nextPic">Show photo ${(s.i+1)%l.length+1} of ${l.length}</button>`:''}<button class="linkbtn" data-act="closeSheet">Close</button>`;break}
@@ -1598,94 +1597,70 @@ function sheetHTML(D){
 
 const VIEWS={cboard:viewCBoard,cnote:viewCNote,board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewSettings,settings:viewSettings,help:viewHelp,invites:viewInvites,saved:viewSaved,reviews:viewReviews,review:viewReview,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
 let lastView=null,lastSheet=null;const scrollMem={};
-// New members read the community guidelines, then try tack in a practice run. The practice run never writes anything.
-const SIM_JOBS=[
-  {t:'Print 40 pages at Sai Xerox before 5',p:120,w:'Today',at:'Gate 1',h:128},
-  {t:'Grab 2 vada pav from the canteen',p:60,w:'Next hour',at:'Canteen',h:40},
-  {t:'Lend me a scientific calculator for tomorrow',p:50,w:'Tomorrow',at:'Library',h:205},
-  {t:'Click 20 photos at our club event',p:300,w:'This week',at:'Hostel B',h:300}];
-const SIM_BID={who:'Sana',meta:'SY Design',t:'Carry my model down four floors',p:150,w:'Today',at:'Design block',h:190,
-  says:['I’m free after 3 and can do it in 20 minutes.','I’ll bring a friend so nothing gets bumped on the stairs.','Done this before for my roommate, no damage.']};
-const SIM_STEPS=['post','posted','bid','placed','end'];
-const blankSim=()=>({text:'',price:'',when:'',where:'',h:262,amt:'',say:''});
-const rulesAccepted=()=>S.priv.rules?.v===RULES_V;
-const clip=(t,n)=>t.length>n?t.slice(0,n-1).trimEnd()+'…':t;
-function simPrices(){const j=SIM_JOBS.find(x=>x.t===S.sim.text.trim()),b=j?j.p:100;return[...new Set([Math.max(20,Math.round(b*.6/10)*10),b,Math.round(b*1.4/10)*10])]}
+const INTRO=[
+  {k:'board',t:'This is the board.',b:'Classmates pin small jobs here. A print run, a lift down four floors, an hour of help before a deadline. People you’ve made a deal with show up at the top when they’re online.'},
+  {k:'pin',t:'Need something? Pin it.',b:'Write it on a note, set a price, pick a colour. It goes up for everyone on campus to see.'},
+  {k:'bid',t:'Bid what it’s worth.',b:'Name your price and pitch yourself in a line. Only the poster sees your bid.'},
+  {k:'pick',t:'Get picked. Pay safely.',b:'The poster picks one person and you plan it in chat. Pay on UPI or cash and confirm it in tack. tack never touches the money.'},
+  {k:'safe',t:'Keep it safe.',b:'tack is for students who are 18 or older. No assignments or exam work. Report or block anyone in two taps, and abusive posts never go up.'},
+  {k:'rate',t:'Rate each other.',b:'When it’s done, you both rate the other. Profiles show the averages, never who gave them.'},
+  {k:'end'}];
 const inote=(h,p,t,meta,cls='',st='')=>`<span class="inote ${cls}" style="--h:${h};${st}"><span class="ipinhead"></span><b>${p}</b><i>${t}</i>${meta?`<em>${meta}</em>`:''}</span>`;
-function introScene(k){const me=S.me?.id,s=S.sim;
-  if(k==='posted')return`<div class="isc isc-board" aria-hidden="true">
-    ${inote(SIM_BID.h,'₹'+SIM_BID.p,SIM_BID.t,SIM_BID.at+' · '+SIM_BID.w,'n1')}${inote(300,'₹300','20 photos at golden hour','Lawn · Tomorrow','n2')}
-    ${inote(s.h,'₹'+fmt(digits(s.price)),esc(clip(s.text.trim(),40)),esc([s.when,s.where].filter(Boolean).join(' · ')),'n3 mine')}
-    <span class="ichip c1">${ic('shield',13,2.2)} Bids come in privately. You pick one.</span></div>`;
-  if(k==='placed')return`<div class="isc isc-bid" aria-hidden="true">${inote(SIM_BID.h,'₹'+SIM_BID.p,SIM_BID.t,'','n1')}
-    <span class="ibubble c1">${me?face(me,28):''}<b>₹${fmt(digits(s.amt))}</b><span>${esc(clip(s.say.trim()||'Placed just now',24))}</span></span><span class="ichip c2">${ic('shield',13,2.2)} Only ${SIM_BID.who} sees this</span></div>`;
+function introScene(k){const me=S.me?.id;
+  if(k==='board')return`<div class="isc isc-board" aria-hidden="true">
+    ${inote(128,'₹120','Print 40 pages at Sai Xerox','Gate 1 · Today','n1')}${inote(262,'₹300','20 photos at golden hour','Lawn · Tomorrow','n2')}${inote(350,'₹60','Parcel from Gate 1','Hostel B · Now','n3')}
+    <span class="ichip c1"><span class="ilive"></span>Online now</span></div>`;
+  if(k==='pin')return`<div class="isc isc-pin" aria-hidden="true">
+    <span class="inote ibig"><span class="ipinhead"></span><b class="iprice">₹150</b><i class="itype">Xerox 40 pages by 5</i><em>Design block · Now</em></span>
+    <span class="ihue"><span class="ithumb"></span></span><span class="ipinit">Pin it</span></div>`;
+  if(k==='bid')return`<div class="isc isc-bid" aria-hidden="true">${inote(75,'₹150','Help me move a cupboard','','n1')}
+    <span class="ibubble c1">${me?face(me,28):''}<b>₹120</b><span>I can do it by 5</span></span><span class="ichip c2">${ic('shield',13,2.2)} Only the poster sees this</span></div>`;
+  if(k==='pick')return`<div class="isc isc-pick" aria-hidden="true">
+    <span class="iwho w1">${me?face(me,52):''}</span><span class="ilink"></span><span class="iwho w2"><span class="av av-empty" style="width:52px;height:52px;font-size:20px">S</span></span>
+    <span class="ibubble c1 msg">On my way. 10 minutes.</span>
+    <span class="ipay c2"><span class="ipayrow"><span>UPI · ₹120 sent</span><span class="iok">${ic('tick',13,3)} Confirmed</span></span></span></div>`;
+  if(k==='safe')return`<div class="isc isc-safe" aria-hidden="true"><span class="ishield">${ic('shield',44,1.8)}</span>
+    <span class="irules"><span class="ichip r1">18+ only</span><span class="ichip r2">No assignments or exams</span><span class="ichip r3">${ic('flag',12,2.2)} Report or block in two taps</span></span></div>`;
+  if(k==='rate')return`<div class="isc isc-rate" aria-hidden="true"><span class="istars">${[0,1,2,3,4].map(i=>`<span class="ist" style="--i:${i}">${ic('star',30,2,'currentColor','currentColor')}</span>`).join('')}</span>
+    <span class="ichip c2">${ic('shield',13,2.2)} Anonymous, always</span></div>`;
   return`<div class="isc isc-end" aria-hidden="true"><span class="iicon"></span></div>`}
 function introPushState(){if(pushOn())return'on';if(isIOS()&&!standalone())return'ios';return pushReady()?'ask':'none'}
-function introBody(){const st=S.intro.step,s=S.sim,me=S.me?.id,fn=esc(me?firstName(me):'');
-  const head=(k,t,b)=>`<div class="itext simhead"><span class="ik">${k}</span><h1 class="ia">${t}</h1>${b?`<p class="ib">${b}</p>`:''}</div>`;
-  const chips=(k,list,lab,show=v=>v)=>`<div class="simsec"><span class="formlabel">${lab}</span><div class="chips" role="group" aria-label="${lab}">${list.map(v=>`<button class="chip ${s[k]===String(v)?'on':''}" data-act="simSet" data-k="${k}" data-v="${esc(v)}" aria-pressed="${s[k]===String(v)}">${esc(show(v))}</button>`).join('')}</div></div>`;
-  if(st==='rules')return`${head('Before you start','Community guidelines','Read to the end. These keep you and everyone else on tack safe.')}<article class="prose legal rules">${RULES}</article>`;
-  if(st==='post')return`${head('1 of 2 · Practice run','Pin your first job','Tap a suggestion or write your own. Nothing gets posted.')}
-    <div class="inote simnote" style="--h:${s.h}"><span class="ipinhead"></span>
-      <label class="simprice ${digits(s.price)?'':'blank'}" for="simP"><span>₹</span><input id="simP" type="text" inputmode="numeric" maxlength="5" placeholder="100" value="${esc(s.price)}" data-bind="sim.price" aria-label="You'll pay, in rupees" autocomplete="off"></label>
-      <textarea id="simT" rows="2" maxlength="${NOTE_MAX}" placeholder="What do you need?" data-bind="sim.text" aria-label="What do you need?">${esc(s.text)}</textarea>
-      <em>${esc([s.when,s.where].filter(Boolean).join(' · ')||'When · where')}</em>
-      <span class="simby">${me?face(me,20):''}${fn}</span></div>
-    <div class="simsec"><span class="formlabel">Suggestions</span><div class="chips">${SIM_JOBS.map((j,i)=>`<button class="chip sug ${s.text===j.t?'on':''}" data-act="simJob" data-i="${i}" aria-pressed="${s.text===j.t}">${esc(j.t)}</button>`).join('')}</div></div>
-    ${chips('price',simPrices(),'Price',v=>'₹'+fmt(v))}${chips('when',WHENS.slice(0,4),'By when')}${chips('where',WHERES.slice(0,4),'Where')}`;
-  if(st==='posted')return`${introScene('posted')}${head('1 of 2 · Practice run','That’s how you pin a job.',`For real, everyone on your campus would see it. Classmates bid privately, then you pick one person and plan it in chat. This one wasn’t posted.`)}`;
-  if(st==='bid')return`${head('2 of 2 · Practice run','Now bid on a job',`${SIM_BID.who} needs a hand. Name your price and say why you. Nothing gets sent.`)}
-    <div class="inote simnote simjob" style="--h:${SIM_BID.h}"><span class="ipinhead"></span><b>₹${SIM_BID.p}</b><i>${SIM_BID.t}</i><em>${SIM_BID.at} · ${SIM_BID.w}</em>
-      <span class="simby"><span class="av av-empty" style="width:20px;height:20px;font-size:9px">${SIM_BID.who[0]}</span>${SIM_BID.who} · ${SIM_BID.meta}</span></div>
-    <div class="simsec"><label class="field" for="simA"><span class="fl">Your bid ₹</span><input id="simA" type="text" inputmode="numeric" maxlength="5" placeholder="${SIM_BID.p}" value="${esc(s.amt)}" data-bind="sim.amt" aria-label="Your bid in rupees" autocomplete="off"></label>
-      <div class="chips">${[SIM_BID.p,SIM_BID.p-20,SIM_BID.p-30].map((v,i)=>`<button class="chip ${s.amt===String(v)?'on':''}" data-act="simSet" data-k="amt" data-v="${v}" aria-pressed="${s.amt===String(v)}">₹${v}${i?'':' · their price'}</button>`).join('')}</div></div>
-    <div class="pitchbox"><label class="pitchlabel" for="simS">Pitch yourself <span class="labelhint">· only ${SIM_BID.who} sees this</span></label>
-      <textarea id="simS" rows="3" maxlength="300" placeholder="Why you? When can you do it?" data-bind="sim.say">${esc(s.say)}</textarea></div>
-    <div class="chips">${SIM_BID.says.map(v=>`<button class="chip sug ${s.say===v?'on':''}" data-act="simSet" data-k="say" data-v="${esc(v)}" aria-pressed="${s.say===v}">${esc(v)}</button>`).join('')}</div>`;
-  if(st==='placed')return`${introScene('placed')}${head('2 of 2 · Practice run','Bid placed.',`If ${SIM_BID.who} picks you, a chat opens and you plan the rest there. You get paid in UPI or cash, straight to you. tack never touches the money.`)}`;
+function introSlideHTML(i){const sl=INTRO[i],fn=esc(S.me?firstName(S.me.id):'');
+  if(sl.k!=='end')return`${introScene(sl.k)}<div class="itext"><span class="ik">${i+1} of ${INTRO.length-1}</span><h1 class="ia">${sl.t}</h1><p class="ib">${sl.b}</p></div>`;
   const ps=introPushState();
-  return`${introScene('end')}<div class="itext"><h1 class="ia">You’re ready${fn?', '+fn:''}.</h1>
-    <p class="ib">${ps==='ios'?'One last thing. To get a ping when someone bids or picks you, add tack to your Home Screen: tap Share, then Add to Home Screen, and open tack from there.':ps==='ask'?'One last thing. Turn on notifications so you know the moment someone bids, picks you or messages.':'Pin something you need, or find something to do. The board is yours.'}</p></div>`}
-function introFoot(){const st=S.intro.step,ps=introPushState();
-  if(st==='rules')return S.intro.read?`<button class="cta inext" data-act="rulesOk">I understand</button>`
-    :`<span class="rhint">${ic('chev',14,2.4)} Scroll to the end to continue</span><button class="cta inext wait" data-act="rulesOk" aria-disabled="true">I understand</button>`;
-  if(st==='post')return`<button class="cta inext" data-act="simPost" data-need="simPost">Pin it</button>`;
-  if(st==='posted')return`<button class="cta inext" data-act="simNext">Next: bid on a job</button>`;
-  if(st==='bid')return`<button class="cta inext" data-act="simBid" data-need="simBid">Place bid</button>`;
-  if(st==='placed')return`<button class="cta inext" data-act="simNext">Finish</button>`;
+  return`${introScene('end')}<div class="itext"><h1 class="ia">You’re in${fn?', '+fn:''}.</h1>
+    <p class="ib">${ps==='on'?'Pin something you need, or find something to do. The board is yours.':ps==='ios'?'One last thing. To get a ping when someone bids or picks you, add tack to your Home Screen: tap Share, then Add to Home Screen, and open tack from there.':ps==='ask'?'One last thing. Turn on notifications so you know the moment someone bids, picks you or messages.':'Pin something you need, or find something to do. The board is yours.'}</p></div>`}
+function introFoot(i){const last=INTRO[i].k==='end',ps=introPushState();
+  if(!last)return`<button class="cta inext" data-act="introNext">${i===INTRO.length-2?'Got it':'Next'}</button>`;
   return ps==='ask'?`<button class="cta inext" data-act="introPush">${ic('bell',16)} Turn on notifications</button><button class="btn2 inext2" data-act="introPost">Pin my first job</button><button class="linkbtn inow" data-act="introDone">Not now</button>`
     :`<button class="cta inext" data-act="introDone">Show me the board</button><button class="btn2 inext2" data-act="introPost">Pin my first job</button>`}
-// The I understand button only wakes up once the guidelines have been scrolled to the end.
-function rulesWatch(r){const sc=r.querySelector('.islide.st-rules:not(.gone)');if(!sc||sc.dataset.w)return;sc.dataset.w='1';
-  const chk=()=>{if(S.intro.read||S.intro.step!=='rules')return;if(sc.scrollTop+sc.clientHeight<sc.scrollHeight-24)return;S.intro.read=true;
-    const fb=r.querySelector('.ibtns'),fh=introFoot();fb.dataset.h=fh;fb.innerHTML=fh;if(!reduceMotion.matches)fb.animate([{opacity:.4},{opacity:1}],{duration:260,easing:'ease'})};
-  sc.addEventListener('scroll',chk,{passive:true});requestAnimationFrame(chk)}
 let introAnim=null;
 function renderIntro(dir=1){let r=$('introRoot');
   if(!S.intro.on){if(r){const w=r.firstElementChild;if(reduceMotion.matches||!w)r.remove();else w.animate([{opacity:1},{opacity:0}],{duration:220,easing:'ease',fill:'forwards'}).finished.then(()=>r.remove(),()=>r.remove())}return}
-  const st=S.intro.step,key=S.intro.mode+':'+st;
-  const slide=()=>{const d=document.createElement('div');d.className='islide st-'+st+(['rules','post','bid'].includes(st)?' scroll':'');d.innerHTML=introBody();return d};
-  let moved=false;
+  const i=S.intro.i,last=INTRO[i].k==='end';
   if(!r){r=document.createElement('div');r.id='introRoot';document.body.appendChild(r);
-    r.innerHTML=`<div class="iw" role="dialog" aria-modal="true"><div class="itop"><span class="mark">tack</span><span class="itopr"></span></div><div class="istage"></div><div class="ifoot"><div class="ibtns"></div></div></div>`;
-    r.querySelector('.istage').appendChild(slide());r.dataset.k=key;moved=true;
-    if(!reduceMotion.matches)r.firstElementChild.animate([{opacity:0},{opacity:1}],{duration:260,easing:'ease'})}
-  else if(r.dataset.k!==key){r.dataset.k=key;moved=true;const stage=r.querySelector('.istage');
+    let x0=null;r.addEventListener('touchstart',e=>{x0=e.touches[0].clientX},{passive:true});
+    r.addEventListener('touchend',e=>{if(x0==null)return;const dx=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(dx)>50)introStep(dx<0?1:-1)},{passive:true});
+    r.innerHTML=`<div class="iw" role="dialog" aria-modal="true" aria-label="How tack works">
+      <div class="itop"><span class="mark">tack</span><button class="linkbtn iskip" data-act="introSkip">Skip</button></div>
+      <div class="istage"><div class="islide">${introSlideHTML(i)}</div></div>
+      <div class="ifoot"><div class="idots" aria-hidden="true">${INTRO.slice(0,-1).map(()=>'<span></span>').join('')}</div><div class="ibtns">${introFoot(i)}</div></div></div>`;
+    if(!reduceMotion.matches)r.firstElementChild.animate([{opacity:0},{opacity:1}],{duration:260,easing:'ease'});
+    r.dataset.i=i}
+  else if(+r.dataset.i!==i){r.dataset.i=i;const stage=r.querySelector('.istage');
     if(introAnim){introAnim.finish()}
-    const old=stage.querySelector('.islide:not(.gone)'),nx=slide();
+    const old=stage.querySelector('.islide:not(.gone)'),nx=document.createElement('div');nx.className='islide';nx.innerHTML=introSlideHTML(i);
     if(reduceMotion.matches||!old){old?.remove();stage.appendChild(nx)}
     else{old.classList.add('gone');nx.classList.add('wait');nx.style.opacity='0';stage.appendChild(nx);
       const a=old.animate([{opacity:1,transform:'translateX(0)'},{opacity:0,transform:`translateX(${-28*dir}px)`}],{duration:180,easing:'cubic-bezier(.4,0,1,1)',fill:'forwards'});
       const done=()=>{old.remove();nx.style.opacity='';nx.classList.remove('wait');introAnim=null};
       introAnim={finish:()=>{a.cancel();done()}};
       a.finished.then(()=>{if(!introAnim)return;done();nx.animate([{opacity:0,transform:`translateX(${28*dir}px)`},{opacity:1,transform:'translateX(0)'}],{duration:280,easing:'cubic-bezier(.2,.8,.2,1)'})},()=>{})}}
-  else{const cur=r.querySelector('.islide:not(.gone)');if(cur){const y=cur.scrollTop;cur.innerHTML=introBody();cur.scrollTop=y}}
-  r.firstElementChild.setAttribute('aria-label',st==='rules'?'Community guidelines':'Practice run');
-  r.querySelector('.itopr').innerHTML=st==='rules'||st==='end'?'':'<button class="linkbtn iskip" data-act="introSkip">Skip</button>';
-  const fb=r.querySelector('.ibtns'),fh=introFoot();if(fb.dataset.h!==fh){fb.dataset.h=fh;fb.innerHTML=fh;if(moved&&st==='end'&&!reduceMotion.matches)fb.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'none'}],{duration:320,delay:250,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'})}
-  if(st==='rules')rulesWatch(r);
-  syncNeed();
-  if(moved)requestAnimationFrame(()=>{const f=st==='rules'?r.querySelector('.islide:not(.gone)'):r.querySelector('.inext');if(f){if(st==='rules')f.tabIndex=-1;f.focus({preventScroll:true})}})}
+  r.querySelectorAll('.idots span').forEach((d,j)=>d.classList.toggle('on',j===i));
+  r.querySelector('.idots').style.visibility=last?'hidden':'';
+  r.querySelector('.iskip').style.visibility=last?'hidden':'';
+  const fb=r.querySelector('.ibtns'),fh=introFoot(i);if(fb.dataset.h!==fh){const had=!!fb.dataset.h;fb.dataset.h=fh;fb.innerHTML=fh;if(had&&last&&!reduceMotion.matches)fb.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'none'}],{duration:320,delay:250,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'})}
+  requestAnimationFrame(()=>r.querySelector('.inext')?.focus({preventScroll:true}))}
 // New members pick dark or light first, then see the intro.
 let themePick=null;
 function openThemePick(then){if(themePick)return;themePick={sel:themePref()||(lightMQ.matches?'light':'dark'),then};applyTheme(themePick.sel);renderThemePick()}
@@ -1697,11 +1672,9 @@ function renderThemePick(){let r=$('themeRoot');
     <div class="ifoot"><div class="ibtns"><button class="cta inext" data-act="themeDone">Continue</button></div></div></div>`;
   if(!r){r=document.createElement('div');r.id='themeRoot';document.body.appendChild(r);r.innerHTML=html;if(!reduceMotion.matches)r.firstElementChild.animate([{opacity:0},{opacity:1}],{duration:260,easing:'ease'})}
   else r.innerHTML=html}
-function openIntro(back){if(S.intro.on)return;if(S.momentOn||S.joining){setTimeout(()=>openIntro(back),200);return}if(!back&&!S.priv.theme&&!themePref()&&!themePick){openThemePick(()=>openIntro());return}if(themePick)return;
-  const rules=!back&&!rulesAccepted();S.sim=blankSim();S.intro={on:true,mode:rules?'rules':'sim',step:rules?'rules':'post',read:false,back:back||null};renderIntro()}
-function introGo(step,dir=1){S.intro.mode='sim';S.intro.step=step;renderIntro(dir)}
-function introBack(){const i=SIM_STEPS.indexOf(S.intro.step);if(S.intro.mode==='sim'&&i>0)introGo(SIM_STEPS[i-1],-1)}
-function closeIntro(to){const back=S.intro.back;S.intro={on:false};renderIntro();if(!S.priv.introSeen)savePriv({introSeen:Date.now()});go(to||back||'board')}
+function openIntro(back){if(S.intro.on)return;if(S.momentOn||S.joining){setTimeout(()=>openIntro(back),200);return}if(!back&&!S.priv.theme&&!themePref()&&!themePick){openThemePick(()=>openIntro());return}if(themePick)return;S.intro={on:true,i:0,back:back||null};renderIntro()}
+function introStep(d){const i=S.intro.i+d;if(i<0||i>=INTRO.length)return;S.intro.i=i;renderIntro(d)}
+function closeIntro(to){const back=S.intro.back;S.intro={on:false,i:0};renderIntro();if(!S.priv.introSeen)savePriv({introSeen:Date.now()});go(to||back||'board')}
 function moment(title,sub,ms=1300){
   const r=document.createElement('div');r.className='momentroot';r.setAttribute('role','status');
   r.innerHTML=`<div class="moment"><span class="bigpin"></span><h2>${esc(title)}</h2>${sub?`<p>${esc(sub)}</p>`:''}</div>`;
@@ -1721,8 +1694,6 @@ const NEED={
   login:()=>validEmail(S.form.email.trim())&&!!S.form.pw,
   reset:()=>validEmail(S.form.email.trim()),
   handle:()=>S.hcheck?.st==='ok',
-  simPost:()=>S.sim.text.trim().length>=3&&digits(S.sim.price)>0,
-  simBid:()=>digits(S.sim.amt)>0,
   join:()=>(S.hcheck?.st==='ok')&&S.onb.name.trim().length>=2&&!!S.onb.year&&!!S.onb.branch.trim()&&!!S.onb.adult&&!!S.onb.rules,
   profile:()=>(handleLockedUntil()||['ok','mine'].includes(S.hcheck?.st||'mine'))&&!!S.onb.year&&!!S.onb.branch.trim(),
   bid:()=>{const a=digits(S.bid.amt);return a>=1&&a<=50000},
@@ -1901,14 +1872,7 @@ const ACT={
   confirmDelReview(){const s=S.sheet;if(!s?.rid)return;S.fb.rpc('delete_review',{p_id:s.rid}).then(()=>{delete S.revs[s.about];toast('Review deleted');render()}).catch(writeErr);
     S.sheet=null;render()},
   allReviews(el){S.allRevs=el.dataset.uid;render()},
-  rulesOk(){const sc=document.querySelector('#introRoot .st-rules:not(.gone)');if(!S.intro.read&&sc&&sc.scrollTop+sc.clientHeight>=sc.scrollHeight-24)S.intro.read=true;
-    if(!S.intro.read){sc?.scrollBy({top:sc.clientHeight*.8,behavior:reduceMotion.matches?'auto':'smooth'});return}
-    savePriv({rules:{v:RULES_V,at:Date.now()}});introGo('post')},
-  simJob(el){const j=SIM_JOBS[+el.dataset.i];if(!j)return;Object.assign(S.sim,{text:j.t,price:String(j.p),when:j.w,where:j.at,h:j.h});renderIntro()},
-  simSet(el){const k=el.dataset.k;if(!['price','when','where','amt','say'].includes(k))return;S.sim[k]=el.dataset.v;renderIntro()},
-  simPost(){if(!NEED.simPost())return;S.sim.when=S.sim.when||'Today';S.sim.where=S.sim.where||'Gate 1';introGo('posted')},
-  simBid(){if(!NEED.simBid())return;introGo('placed')},
-  simNext(){introGo(SIM_STEPS[SIM_STEPS.indexOf(S.intro.step)+1]||'end')},
+  introNext(){if(S.intro.i>=INTRO.length-1)return closeIntro();introStep(1)},
   introSkip(){closeIntro()},
   introDone(){closeIntro('board')},
   introPost(){closeIntro('post')},
@@ -2200,13 +2164,13 @@ document.addEventListener('focusout',e=>{if(e.target.closest?.('#notewrap'))setT
 ['pointerup','pointercancel'].forEach(t=>document.addEventListener(t,()=>$('notewrap')?.classList.remove('straight')));
 window.__tackBack=()=>{
   if($('docRoot')){closeDoc();return true}
-  if(S.intro.on){introBack();return true}
+  if(S.intro.on){introStep(-1);return true}
   if(S.sheet){closeSheet();return true}
   const b=document.querySelector('#main .back[data-go]');if(b){b.click();return true}
   return false};
 document.addEventListener('keydown',e=>{
   if($('docRoot')){if(e.key==='Escape')closeDoc();return}
-  if(S.intro.on){if(e.key==='Escape'&&S.intro.mode==='sim')closeIntro();return}
+  if(S.intro.on){if(e.key==='ArrowRight'){e.preventDefault();introStep(1)}else if(e.key==='ArrowLeft'){e.preventDefault();introStep(-1)}else if(e.key==='Escape')closeIntro();return}
   if(e.key==='Escape'&&S.sheet){closeSheet();return}
   if(e.key==='Enter'&&e.target.id==='msg'){e.preventDefault();sendMsg();return}
   if(e.key==='Enter'&&e.target.id==='invE'){e.preventDefault();ACT.invite();return}
