@@ -6,7 +6,7 @@ import {modHit,MOD_CAT} from './mod.js?v=202610110830';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
-const SITE = location.origin + location.pathname.replace(/index\.html$/, '');
+const SITE = window.__TACK_SITE || location.origin + location.pathname.replace(/index\.html$/, '');
 
 const RINGS=['#C6F24E','#A18CFF','#FF5B6E','#4FE3E0','#FF7AD1','#FFC53D'];
 const GLOW={'#A18CFF':'rgba(161,140,255,.45)','#FF5B6E':'rgba(255,91,110,.5)','#FFC53D':'rgba(255,197,61,.35)','#4FE3E0':'rgba(79,227,224,.4)','#FF7AD1':'rgba(255,122,209,.38)','#C6F24E':'rgba(170,226,84,.32)'};
@@ -2156,6 +2156,12 @@ document.addEventListener('change',async e=>{
 document.addEventListener('pointerdown',e=>{if(e.target.id==='jhue')$('notewrap')?.classList.add('straight')});
 document.addEventListener('focusout',e=>{if(e.target.closest?.('#notewrap'))setTimeout(()=>{const w=$('notewrap');if(w&&!noteHeld())w.classList.remove('flat')},0)});
 ['pointerup','pointercancel'].forEach(t=>document.addEventListener(t,()=>$('notewrap')?.classList.remove('straight')));
+window.__tackBack=()=>{
+  if($('docRoot')){closeDoc();return true}
+  if(S.intro.on){introStep(-1);return true}
+  if(S.sheet){closeSheet();return true}
+  const b=document.querySelector('#main .back[data-go]');if(b){b.click();return true}
+  return false};
 document.addEventListener('keydown',e=>{
   if($('docRoot')){if(e.key==='Escape')closeDoc();return}
   if(S.intro.on){if(e.key==='ArrowRight'){e.preventDefault();introStep(1)}else if(e.key==='ArrowLeft'){e.preventDefault();introStep(-1)}else if(e.key==='Escape')closeIntro();return}
