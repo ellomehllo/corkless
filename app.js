@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610112129';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610112129';
-import {modHit,MOD_CAT} from './mod.js?v=202610112129';
+import {makeDb} from './db.js?v=202610112131';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610112131';
+import {modHit,MOD_CAT} from './mod.js?v=202610112131';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -208,6 +208,7 @@ function canMessage(t,D){const me=S.me.id;
   const j=D.jobByKey[t.jobKey];if(!j)return threadOpen(t.key);return j.owner===me||j.accepted===me||threadOpen(t.key)}
 function workedWith(uid,D){const me=S.me.id;return D.jobs.filter(j=>(j.status==='assigned'||j.status==='done')&&((j.owner===me&&j.accepted===uid)||(j.owner===uid&&j.accepted===me)))}
 function lastJobFor(uid,D){return D.jobs.filter(j=>j.owner===S.me.id&&j.accepted===uid&&(j.status==='assigned'||j.status==='done')).sort((a,b)=>b.at-a.at)[0]||null}
+const ASKS_ON=false;
 const offerList=o=>Object.entries(o).map(([k,v])=>({key:k,...v})).filter(x=>x&&typeof x.text==='string');
 function bidsFor(D,key){return (D.bidsByJob[key]||[]).filter(b=>!D.blocked.has(b.by))}
 const MOD_AREA={job:'job',bid:'bid',chat:'message',offer:'request',review:'review',profile:'profile'};
@@ -488,8 +489,9 @@ function startSubs(){
   S.subs.push(onSnapshot(collection(db,'campuses'),snap=>{const c={};snap.forEach(x=>{c[x.id]=x.data()});S.campuses=c;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(collection(db,'strikes'),snap=>{const r={};snap.forEach(x=>{r[x.id]=x.data()});S.strikes=r;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(collection(db,'rep'),snap=>{const r={};snap.forEach(x=>{r[x.id]=x.data()});S.repDocs=r;if(S.phase==='app')render()},e=>console.warn(e)));
-  S.subs.push(onSnapshot(query(collection(db,'offers'),where('to','==',me)),snap=>{const o={};snap.forEach(x=>{o[x.id]=x.data()});S.offersIn=o;if(S.phase==='app')render()},e=>console.warn(e)));
-  S.subs.push(onSnapshot(query(collection(db,'offers'),where('owner','==',me)),snap=>{const o={};snap.forEach(x=>{o[x.id]=x.data()});S.offersOut=o;convertOffers();if(S.phase==='app')render()},e=>console.warn(e)));
+  // Asks (favour requests) are switched off for now; offers stay in the database but aren't loaded.
+  if(ASKS_ON)S.subs.push(onSnapshot(query(collection(db,'offers'),where('to','==',me)),snap=>{const o={};snap.forEach(x=>{o[x.id]=x.data()});S.offersIn=o;if(S.phase==='app')render()},e=>console.warn(e)));
+  if(ASKS_ON)S.subs.push(onSnapshot(query(collection(db,'offers'),where('owner','==',me)),snap=>{const o={};snap.forEach(x=>{o[x.id]=x.data()});S.offersOut=o;convertOffers();if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'invcodes'),where('by','==',me)),snap=>{const c={};snap.forEach(x=>{c[x.id]=x.data()});S.myCodes=c;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'pitches'),where('owner','==',me)),snap=>{const p={};snap.forEach(x=>{p[x.id]=x.data()});S.pitchIn=p;if(S.phase==='app')render()},e=>console.warn(e)));
   S.subs.push(onSnapshot(query(collection(db,'pitches'),where('by','==',me)),snap=>{const p={};snap.forEach(x=>{p[x.id]=x.data()});S.pitchMine=p;if(S.phase==='app')render()},e=>console.warn(e)));
@@ -1246,7 +1248,7 @@ function inviteCard(D,big){
   if(false)return big?'<div class="empty" style="margin:8px 0"><b>No chats yet</b><p>Bid on a job, or tap Ask on someone who\u2019s free, to start talking.</p></div>':'';
   const used=0;
   return`<div class="${big?'empty':'box stack'}" style="${big?'margin:8px 0':'gap:10px'}">
-    ${big?'<b>No chats yet</b><p>Chats open when you work with someone: message your bidders, or hire someone again from their profile. Bring your friends onto the board too.</p>':'<span class="t1" style="font-size:var(--t-16)">Invite friends to tack</span><span class="t2">More people on the board means jobs get picked up faster. Friends from '+esc(campus())+' join with their college email.</span>'}
+    ${big?'<b>No chats yet</b><p>Chats open when you work with someone: message your bidders, or message someone you\u2019ve worked with from their profile. Bring your friends onto the board too.</p>':'<span class="t1" style="font-size:var(--t-16)">Invite friends to tack</span><span class="t2">More people on the board means jobs get picked up faster. Friends from '+esc(campus())+' join with their college email.</span>'}
     <button class="${big?'cta noglow':'btn2'}" data-sheet="invitefriend">Invite a friend</button>
     ${used?`<p class="note">${used} ${used===1?'person has':'people have'} joined with your links.</p>`:''}</div>`}
 function dateGroups(list,at){const d0=new Date().setHours(0,0,0,0),grp=t=>!t?'Earlier':t>=d0?'Today':t>=d0-864e5?'Yesterday':t>=d0-6*864e5?'Last 7 days':t>=d0-29*864e5?'Last 30 days':'Earlier',out=[];
@@ -1285,7 +1287,7 @@ function viewChat(D){
        return`${head?`<p class="tstamp">${chatStamp(m.at)}</p>`:''}<div class="mrow ${mine?'mine':'theirs'}${cont?' cont':''}${more?' more':''}${rx.length?' hasrx':''}">${mine?'':`<span class="mav">${lastOfRun?face(m.by,28):''}</span>`}<div class="mcol">${lab}<div class="mline"><div class="${mine?'out':'in'}${m.kind!=='text'?' media '+m.kind:''}" data-mid="${m.id}">${msgBody(m)}${rx.length?`<span class="rx${S.rxPop===m.id?' pop':''}">${[...new Set(rx)].join('')}${rx.length>1?`<b>${rx.length}</b>`:''}</span>`:''}</div>${acts}</div></div></div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`}).join('')})()}
    ${S.chatUp?`<div class="out media pending">${S.chatUp==='photo'?'Sending photo…':'Sending voice message…'}</div>`:''}
   </div>
-  ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats now happen inside jobs: pin a job, or hire ${esc(firstName(c.other))} again from their profile.`}</p></div>`:`
+  ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats happen inside jobs: pin a job, or open ${esc(firstName(c.other))}\u2019s profile and tap Message if you\u2019ve worked together.`}</p></div>`:`
   <div class="foot" style="position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%)">${S.rec?`<div class="composer rec">
     <button class="cbtn" data-act="recCancel" aria-label="Cancel recording">${ic('trash',19)}</button>
     <span class="recbar"><i class="recdot"></i><span id="recT">${recClock()}</span><span class="muted">Recording</span></span>
@@ -1326,7 +1328,7 @@ function viewPerson(uid,D){
        <button data-go="help">${ic('flag',18)} Report or feedback<span class="chev">${ic('chev',16)}</span></button>
        <button data-act="logout">${ic('out',18)} Log out</button></div>
        <p class="note">Logged in as ${esc(S.me.email)}</p>`
-     :`${(()=>{const prev=lastJobFor(uid,D);return prev?`<button class="cta" data-ask="${esc(uid)}" data-prev="${esc(prev.id)}">Hire ${esc(firstName(uid))} again</button>`:''})()}
+     :`${workedWith(uid,D).length?`<button class="cta" data-msgwith="${esc(uid)}">${ic('chat',17,2.2,'var(--on-grad)')} Message ${esc(firstName(uid))}</button>`:''}
        <button class="linkbtn" data-sheet="who" data-about="${esc(uid)}">Restrict, block or report</button>`}
   </div></div><div style="height:24px"></div>`;
 }
@@ -2103,7 +2105,7 @@ const ACT={
 };
 
 document.addEventListener('click',e=>{
-  const el=e.target.closest('[data-com],[data-cnote],[data-doc],[data-pref],[data-helpkind],[data-helpjob],[data-helpwhy],[data-acttab],[data-pic],[data-review],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
+  const el=e.target.closest('[data-com],[data-cnote],[data-doc],[data-pref],[data-helpkind],[data-helpjob],[data-helpwhy],[data-acttab],[data-pic],[data-review],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen],[data-msgwith]');
   if(!el)return;const ds=el.dataset;
   if(ds.ask!==undefined){if(ds.ask===S.me?.id)return;S.offer={to:ds.ask,prevJob:ds.prev||null,text:'',price:'',when:'Next hour',where:''};S.err={};S.sheet={type:'offer'};render();return}
   if(ds.ofwhen!==undefined){S.offer.when=ds.ofwhen;render();return}
@@ -2134,6 +2136,7 @@ document.addEventListener('click',e=>{
   const D=derive(),me=S.me.id;
   if(ds.thread!==undefined){const t=D.threads.find(x=>x.key===ds.thread);if(t)openThread(t);return}
   if(ds.threadJob!==undefined){const j=D.jobByKey[S.openJob];if(j&&canMessage({key:jobThreadKey(j.key,me),other:j.owner,jobKey:j.key},D))openThread({key:jobThreadKey(j.key,me),other:j.owner,jobKey:j.key});return}
+  if(ds.msgwith!==undefined){const j=workedWith(ds.msgwith,D).sort((a,b)=>num(b.takenAt||b.at)-num(a.takenAt||a.at))[0];if(j)openThread({key:jobThreadKey(j.key,j.accepted),other:ds.msgwith,jobKey:j.key});return}
   if(ds.threadWith!==undefined){const j=D.jobByKey[S.openJob];if(j)openThread({key:jobThreadKey(j.key,ds.threadWith),other:ds.threadWith,jobKey:j.key});return}
 });
 let lp=null;
