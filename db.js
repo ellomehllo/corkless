@@ -7,7 +7,7 @@ const COLS={
   config:['id','campus','admin_uid','member_invites','banner'],
   invites:['email','at','by','uid','joined_at','code'],
   invcodes:['code','by','at','used_by','used_at'],
-  free:['id','until','at'],
+  online:['id','at'],
   people:['id','name','photo','year','branch','does','bio','banner','ring','adult','joined_at','removed','asks','handle','handle_at'],
   names:['id','name'],
   jobs:['owner','id','text','more','price','kind','when_label','place','at','deadline','status','done_at','taken_at','edited_at','repick_at','offer','pics','geo','color','dropped','drop_why','campus'],
@@ -28,7 +28,7 @@ const COLS={
   cnotepics:['id','community','pics'],
   ccomments:['id','note','community','by','t','at'],
   threads:['id','members','job','open','last_text','last_at','last_by','read'],
-  msgs:['id','thread','by','t','at','kind','media','dur'],
+  msgs:['id','thread','by','t','at','kind','media','dur','reply_to','reactions'],
   reports:['by','about','why','note','kind','job','at'],
   flags:['by','area','cat','at'],
 };
@@ -41,7 +41,7 @@ const C={
   invites:{t:'invites',pk:k=>({email:k}),key:r=>r.email,strip:['email']},
   invcodes:{t:'invcodes',pk:k=>({code:k}),key:r=>r.code,strip:['code']},
   people:{t:'people',...one()},
-  free:{t:'free',...one()},
+  online:{t:'online',...one()},
   names:{t:'names',...one()},
   private:{t:'private',...one()},
   rep:{t:'rep',...one()},
@@ -76,7 +76,7 @@ function fromRow(col,row){const c=C[col];if(col==='private')return row.data&&typ
   if(c.jobKey&&typeof d.job==='string'&&d.owner)d.job=d.owner+'~'+d.job;
   return d}
 const NN={people:{adult:false,removed:false},jobs:{more:'',kind:'Errand',status:'open'},pitches:{say:''},picks:{rated_doer:false,rated_poster:false,status:'assigned'},
-  offers:{status:'pending'},free:{until:0,at:0},config:{campus:'MIT-WPU',member_invites:true},threads:{open:true,read:{}},invites:{at:0},invcodes:{at:0},jobpics:{at:0},bidpics:{at:0}};
+  offers:{status:'pending'},online:{at:0},config:{campus:'MIT-WPU',member_invites:true},threads:{open:true,read:{}},invites:{at:0},invcodes:{at:0},jobpics:{at:0},bidpics:{at:0}};
 const fullRow=(col,d)=>{const t=C[col].t,r=toRow(col,d),dflt=NN[t]||{};for(const s of COLS[t])if(!(s in r))r[s]=s in dflt?(s==='at'?ms():dflt[s]):null;return r};
 
 export const DEL={__del:1};

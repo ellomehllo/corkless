@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610061200';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610061200';
-import {modHit,MOD_CAT} from './mod.js?v=202610061200';
+import {makeDb} from './db.js?v=202610111200';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610111200';
+import {modHit,MOD_CAT} from './mod.js?v=202610111200';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -65,7 +65,9 @@ const I={
  camera:'<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.5" r="3.5"/>',
  eyeoff:'<path d="M10.6 5.1A9.7 9.7 0 0 1 12 5c6.5 0 10 7 10 7a17.4 17.4 0 0 1-2.4 3.3M6.6 6.6C3.6 8.5 2 12 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="m3 3 18 18"/>',
  ban:'<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
- moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/>'
+ moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/>',
+ reply:'<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+ copy:'<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>'
 };
 const SAY_MAX=3500,SAY_WORDS=500,words=t=>(String(t||'').trim().match(/\S+/g)||[]).length,sayOver=t=>SAY_MAX<1000?String(t||'').length>SAY_MAX:words(t)>SAY_WORDS,sayCount=t=>SAY_MAX<1000?`${String(t||'').length} / ${SAY_MAX} characters`:`${words(t)} / ${SAY_WORDS} words`;
 const ic=(n,s=20,w=2,c='currentColor',fill='none')=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="${fill}" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
@@ -79,7 +81,7 @@ const S={
   authMode:inviteParam||codeParam?'signup':'login', authErr:'', authMsg:'', busy:false,
   form:{name:'',email:inviteParam,pw:'',colq:'',college:'',notListed:false,ncol:'',ncity:''}, cat:null, cpick:null,
   ready:{config:false,people:false,priv:false}, subs:[],
-  config:{}, peopleDocs:{}, priv:{}, threadDocs:{}, pitchIn:{}, pitchMine:{}, offersIn:{}, offersOut:{}, freeDocs:{}, myCodes:{}, lastCode:null,
+  config:{}, peopleDocs:{}, priv:{}, threadDocs:{}, pitchIn:{}, pitchMine:{}, offersIn:{}, offersOut:{}, onlineDocs:{}, myCodes:{}, lastCode:null,
   offer:{to:null,prevJob:null,text:'',price:'',when:'Next hour',where:''}, invites:{}, reports:[], myInvite:null,
   myDoc:null, pendingMine:0,
   view:'board', openJob:null, personOf:null, sort:'high', find:{q:''}, near:false,
@@ -146,10 +148,8 @@ function ringOf(uid){const r=uid===S.me?.id&&S.onb.ring&&(S.phase==='onboard'||S
 function metaOf(uid){const d=pdoc(uid);return [str(d.year,12),str(d.branch,24)].filter(Boolean).join(' ')}
 function face(uid,s){if(isOrg(uid))return tackFace(s);const src=photoOf(uid);return src?`<img class="av" src="${src}" width="${s}" height="${s}" alt="">`:`<span class="av av-empty" style="width:${s}px;height:${s}px;font-size:${Math.round(s*.4)}px">${esc((firstName(uid).replace(/^@/,'')[0]||'?').toUpperCase())}</span>`}
 function liveOf(uid){const n=Date.now();return Object.values(pdoc(uid).jobs||{}).some(j=>j&&j.status==='open'&&num(j.deadline)>n)}
-const freeUntilOf=uid=>num(S.freeDocs?.[uid]?.until),freeNow=uid=>freeUntilOf(uid)>Date.now();
-// Free lasts at most 3 hours. Quiet hours are 11 pm to 7 am, India time: you can still be free (with a safety note),
-// but asks then only reach people who are free.
-const IST=198e5,quietNow=()=>{const h=new Date(Date.now()+IST).getUTCHours();return h>=23||h<7},freeEnd=h=>Date.now()+h*36e5;
+// Online: the database only shows this to people you've made a deal with. S.skew corrects for the phone's clock.
+const onlineAt=uid=>num(S.onlineDocs?.[uid]?.at),onlineNow=uid=>{const t=onlineAt(uid);return uid!==S.me?.id&&t>0&&t>Date.now()+(S.skew||0)-150000};
 const restricted=()=>arr(S.priv.restricted).filter(u=>typeof u==='string');
 // Theme: 'dark' (default for existing members), 'light' or 'system'. Kept on this device and in private settings.
 const THEMES=['dark','light','system'],lightMQ=matchMedia('(prefers-color-scheme: light)');
@@ -158,10 +158,9 @@ function applyTheme(p){const t=p==='system'?(lightMQ.matches?'light':'dark'):p==
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content',t==='light'?'#F3F4F6':'#060608')}
 function setTheme(p,save=true){if(!THEMES.includes(p))return;try{localStorage.setItem('tack.theme',p)}catch{}applyTheme(p);if(save&&S.me)savePriv({theme:p});else render()}
 lightMQ.addEventListener?.('change',()=>{if(themePref()==='system')applyTheme('system')});
-const freeAudience=()=>({all:'Anyone on your campus can see it and ask you for a favour.',none:'Nobody can ask you for favours right now. You can change this in Settings.'})[asksOf(S.me.id)]||'People you’ve finished a job with can see it and ask you for a favour.';
 // An ask with no yes after 3 hours reads the same whether it was declined or ignored.
 const askStale=o=>Date.now()-num(o.at)>3*36e5;
-function ring(uid,s){return `<span class="ring${freeNow(uid)?' live':''}" style="width:${s}px;height:${s}px">${face(uid,s-8)}</span>`}
+function ring(uid,s){return `<span class="ring${onlineNow(uid)?' live':''}" style="width:${s}px;height:${s}px">${face(uid,s-8)}</span>`}
 const campusName=id=>str(S.campuses?.[id]?.name,60)||(id&&id===S.myCampus?.id?str(S.myCampus.name,60):'')||DEFAULT_CAMPUS;
 const curCampus=()=>(S.me?.isOwner&&S.viewCampus&&S.campuses[S.viewCampus]?S.viewCampus:S.myCampus?.id)||'mit-wpu';
 const campusOf=uid=>str(pdoc(uid).campus,40)||'mit-wpu';
@@ -268,10 +267,8 @@ function sortJobs(l){
   return o?[...l.filter(j=>j.owner===o),...l.filter(j=>j.owner!==o)]:l;
 }
 const pref=(k,d=true)=>{const v=(S.priv.prefs||{})[k];return typeof v==='boolean'?v:d};
-const asksOf=u=>{const a=pdoc(u).asks;return a==='all'||a==='none'?a:'past'};
 const needTerms=()=>S.phase==='app'&&!!S.ready?.priv&&!S.joining&&(S.priv.terms||{}).v!==TERMS_V;
-// The database only shows someone's free status to people allowed to ask them.
-function freePeople(D){return D.members.filter(u=>freeNow(u)&&!D.blocked.has(u)&&(u===S.me.id||asksOf(u)!=='none'))}
+function onlinePeople(D){return D.members.filter(u=>onlineNow(u)&&!D.blocked.has(u)).sort((a,b)=>onlineAt(b)-onlineAt(a))}
 function payOf(j){const x=j.pick&&j.pick.paid;return x&&typeof x==='object'&&typeof x.ok==='boolean'?{ok:x.ok,at:num(x.at)}:null}
 const PAY_GRACE=864e5;
 const UPI_RE=/^[a-zA-Z0-9._-]{2,64}@[a-zA-Z][a-zA-Z0-9.-]{1,48}$/;
@@ -433,7 +430,7 @@ async function handleUser(user){
   stopSubs();stopVerifyPoll();S.user=user;S.sb.__uid=user?.uid||null;S.me=null;S.myName=null;S.myNameSaved=false;S.names={};S.dealFail={};S.dealSync=false;S.hcheck=null;firstLoadDone=false;
   if(S.signingUp)return;
   if(!user){if(!S.erased)S.phase='auth';render();return}
-  if(!user.emailVerified){S.phase='verify';render();verifyTimer=setInterval(checkVerified,5000);return}
+  if(!user.emailVerified){S.phase='verify';render();return}
   S.phase='loading';render();
   const {doc,getDoc}=S.fb,email=(user.email||'').toLowerCase();
   let isOwner=false;
@@ -452,11 +449,6 @@ async function handleUser(user){
   S.me={id:user.uid,email,isOwner};
   startSubs();
 }
-async function checkVerified(){
-  const {data}=await S.sb.auth.getSession();const u=userOf(data?.session?.user);
-  if(u&&u.emailVerified){stopVerifyPoll();handleUser(u);return}
-  if(!data?.session&&S.phase==='verify'){stopVerifyPoll();S.authMode='login';S.form.email=S.user?.email||S.form.email;S.authMsg='Confirmed it? Log in with your email and password.';S.phase='auth';render()}
-}
 const savedCode=()=>{try{return localStorage.getItem('tack.code')||''}catch{return''}};
 let retried=false;
 function lostAccess(){if(S.phase==='notinvited')return;stopSubs();
@@ -472,10 +464,14 @@ function startSubs(){
     const d={};snap.forEach(x=>{d[x.id]=x.data()});
     S.peopleDocs=d;if(!S.pendingMine)S.myDoc=d[me]?clone(d[me]):null;S.ready.people=true;afterData();
   },fail));
-  const setFree=snap=>{const f={};snap.forEach(x=>{f[x.id]=x.data()});const mine=S.freeDocs[me];if(mine&&S.freeSaving)f[me]=mine;S.freeDocs=f;if(S.phase==='app')render()};
-  S.subs.push(onSnapshot(collection(db,'free'),setFree,e=>console.warn(e)));
-  // Who may see whom changes with restricts and finished jobs, which don't fire on this table, so refresh now and then.
-  const freeTick=setInterval(()=>{if(!document.hidden)S.fb.getDocs(collection(db,'free')).then(setFree,()=>{})},60000);S.subs.push(()=>clearInterval(freeTick));
+  const setOnline=snap=>{const f={};snap.forEach(x=>{f[x.id]=x.data()});const mine=f[me];if(mine&&num(mine.at)>0&&num(mine.at)!==num(S.onlineDocs[me]?.at)){const k=num(mine.at)-Date.now();if(Math.abs(k)<36e5)S.skew=k}S.onlineDocs=f;if(S.phase==='app')render()};
+  S.subs.push(onSnapshot(collection(db,'online'),setOnline,e=>console.warn(e)));
+  // Heartbeat while tack is open and on screen; going to the background marks you offline straight away.
+  const beat=on=>S.fb.setDoc(S.fb.doc(S.db,'online',me),{at:on?1:0}).catch(()=>{});
+  const tick=()=>{if(!document.hidden)beat(true);S.fb.getDocs(collection(db,'online')).then(setOnline,()=>{})};
+  const vis=()=>{if(document.hidden)beat(false);else tick()};
+  tick();const onlineTick=setInterval(tick,60000);document.addEventListener('visibilitychange',vis);
+  S.subs.push(()=>{clearInterval(onlineTick);document.removeEventListener('visibilitychange',vis);beat(false)});
   S.subs.push(onSnapshot(doc(db,'private',me),s=>{const d=s.exists()?s.data():{};if(S.privPend>0){S.privLast=d;return}S.priv=d;S.ready.priv=true;afterData()},fail));
   const pk={own:{},doer:{}},mergePicks=()=>{S.picks={...pk.doer,...pk.own};if(S.phase==='app')render()};
   S.subs.push(onSnapshot(query(collection(db,'picks'),where('owner','==',me)),snap=>{pk.own={};snap.forEach(x=>{pk.own[x.id]=x.data()});mergePicks()},e=>console.warn(e)));
@@ -533,7 +529,7 @@ const AUTH_ERR={
   'auth/invalid-email':'That doesn’t look like an email address.','auth/too-many-requests':'Too many tries. Wait a few minutes and try again.',
   'auth/network-request-failed':'You look offline. Check your connection.','auth/requires-recent-login':'For safety, log in again first.',
   'auth/password-does-not-meet-requirements':'That password is too simple. Use at least 8 characters.',
-  'auth/email-not-confirmed':'Confirm your email first. Open the link we sent you.','auth/same-password':'That\u2019s your current password. Pick a new one.'
+  'auth/email-not-confirmed':'Confirm your email first with the code we sent you.','auth/same-password':'That\u2019s your current password. Pick a new one.'
 };
 const authMsg=e=>AUTH_ERR[e&&e.code]||'Something went wrong. Try again.';
 async function sendVerify(u){const {error}=await S.sb.auth.resend({type:'signup',email:u.email,options:{emailRedirectTo:SITE}});if(error)throw authErr(error)}
@@ -560,7 +556,17 @@ async function doSignup(){
   if(data?.user&&Array.isArray(data.user.identities)&&!data.user.identities.length)return authFail(AUTH_ERR['auth/email-already-in-use']);
   S.onb.name=name;S.form.pw='';
   if(data?.session)handleUser(userOf(data.user));
-  else{S.user={email,displayName:name,emailVerified:false};S.phase='verify';render();stopVerifyPoll();verifyTimer=setInterval(checkVerified,5000)}
+  else{S.user={email,displayName:name,emailVerified:false};S.form.otp='';S.err={};S.phase='verify';render()}
+}
+// Sign-up is confirmed with a 6-digit code typed in this same tab, so the person lands straight in tack.
+async function doVerifyOtp(){
+  const token=String(S.form.otp||'').replace(/\D/g,''),email=(S.user?.email||'').toLowerCase();
+  if(token.length!==6){S.err={otp:'Enter the 6-digit code from the email.'};render();return}
+  S.busy=true;S.err={};render();
+  const {data,error}=await S.sb.auth.verifyOtp({email,token,type:'signup'});
+  S.busy=false;
+  if(error||!data?.session){S.err={otp:'That code isn\u2019t right, or it has expired. Check the latest email, or send a new code.'};render();return}
+  S.form.otp='';handleUser(userOf(data.session.user));
 }
 async function doLogin(){
   const f=S.form,email=f.email.trim().toLowerCase();
@@ -568,7 +574,7 @@ async function doLogin(){
   if(!f.pw)return authFail('Enter your password.');
   S.busy=true;S.authErr='';render();
   const {error}=await S.sb.auth.signInWithPassword({email,password:f.pw});
-  if(error){const e=authErr(error);if(e.code==='auth/email-not-confirmed'){S.user={email,emailVerified:false};S.phase='verify';S.busy=false;render();return}authFail(authMsg(e))}else{S.form.pw='';S.authMsg=''}
+  if(error){const e=authErr(error);if(e.code==='auth/email-not-confirmed'){S.user={email,emailVerified:false};S.form.otp='';S.err={};S.phase='verify';S.busy=false;render();sendVerify(S.user).catch(()=>{});return}authFail(authMsg(e))}else{S.form.pw='';S.authMsg=''}
   S.busy=false;render();
 }
 async function doReset(){
@@ -628,7 +634,8 @@ function openThread(t){
   S.chat={key:k,other:t.other,jobKey:t.jobKey||null,msgs:[],loaded:false,unsub:null};
   S.chat.unsub=onSnapshot(query(collection(S.db,'threads',k,'msgs'),orderBy('at','desc'),limit(300)),snap=>{
     if(S.chat.key!==k)return;
-    S.chat.msgs=snap.docs.map(d=>d.data()).filter(m=>m&&typeof m.t==='string').map(m=>({t:m.t.slice(0,1000),at:num(m.at),by:str(m.by,128),kind:['photo','audio'].includes(m.kind)?m.kind:'text',media:typeof m.media==='string'?m.media:'',dur:num(m.dur)})).reverse();
+    S.chat.msgs=snap.docs.map(d=>({...d.data(),id:Number(d.id)})).filter(m=>m&&typeof m.t==='string'&&m.kind!=='unsent').map(m=>({id:m.id,t:m.t.slice(0,1000),at:num(m.at),by:str(m.by,128),kind:['photo','audio'].includes(m.kind)?m.kind:'text',media:typeof m.media==='string'?m.media:'',dur:num(m.dur),
+      replyTo:num(m.replyTo)||null,reactions:m.reactions&&typeof m.reactions==='object'?m.reactions:{}})).reverse();
     S.chat.loaded=true;markSeen();render();
     requestAnimationFrame(()=>{const m=$('main');if(S.view==='chat')m.scrollTop=m.scrollHeight});
   },e=>{S.chat.loaded=true;render();console.warn(e)});
@@ -640,12 +647,23 @@ const mmss=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%
 function msgBody(m){if(m.kind==='photo'){const u=mediaUrl(m.media);return u?`<button class="mphoto" data-pic="${esc('m:'+m.media)}" data-i="0" aria-label="Open photo"><img src="${esc(u)}" alt="Photo"></button>`:'<span class="mphoto wait"></span>'}
   if(m.kind==='audio'){const u=mediaUrl(m.media),on=S.playing===m.media;return`<span class="maudio"><button class="mplay" data-act="playVoice" data-src="${esc(m.media)}" ${u?'':'disabled'} aria-label="${on?'Pause':'Play'} voice message">${ic(on?'pause':'play',16,2.2,'currentColor',on?'none':'currentColor')}</button><span class="mwave"><i style="width:${on?S.playPct||0:0}%"></i></span><span class="mdur">${mmss(m.dur)}</span></span>`}
   return esc(m.t)}
+// Replies, reactions and unsending, like Instagram: swipe a message to reply, hold it for reactions and more, double-tap to heart.
+const REACTS=['❤️','😂','😮','😢','👍','🔥'];
+const msgSnip=m=>m.kind==='photo'?'Photo':m.kind==='audio'?'Voice message':str(m.t,90);
+const quoteHTML=q=>`<button class="mquote" data-act="jumpMsg" data-to="${q.id}"><b>${q.by===S.me.id?'You':esc(firstName(q.by))}</b><span>${esc(msgSnip(q))}</span></button>`;
+const replyBar=r=>`<div class="replybar"><span class="rowtext"><span class="t1">Replying to ${r.by===S.me.id?'yourself':esc(firstName(r.by))}</span><span class="t2">${esc(msgSnip(r))}</span></span><button class="iconbtn" data-act="cancelReply" aria-label="Cancel reply">${ic('x',14,2.4)}</button></div>`;
+const chatMsg=id=>S.chat.msgs?.find(x=>x.id===id);
+function startReply(id){const m=chatMsg(id);if(!m)return;S.chatDraft.reply={id,by:m.by,t:m.t,kind:m.kind};S.sheet=null;render();requestAnimationFrame(()=>$('msg')?.focus())}
+function reactTo(id,e,force){const m=chatMsg(id);if(!m)return;const me=S.me.id,cur=m.reactions?.[me];if(force&&cur===e)return;const next=cur===e?null:e;
+  m.reactions={...(m.reactions||{})};if(next)m.reactions[me]=next;else delete m.reactions[me];S.rxPop=next?id:null;render();setTimeout(()=>{if(S.rxPop===id)S.rxPop=null},600);
+  S.fb.rpc('react_msg',{p_id:id,p_emoji:next}).catch(()=>toast('Couldn\u2019t react. Try again.'))}
 async function sendMedia(kind,blob,ext,dur){const c=S.chat;if(!c.key||!canMessage(c,derive()))return;
   const path=`${c.key.replaceAll('~','_')}/${crypto.randomUUID()}.${ext}`,type=kind==='photo'?'image/jpeg':(blob.type||'audio/webm').split(';')[0];
   S.chatUp=kind;render();
   const {error}=await S.sb.storage.from('chat').upload(path,blob,{contentType:type,upsert:false});
   if(error){S.chatUp=null;render();console.warn(error);toast(kind==='photo'?'Couldn\u2019t send the photo. Try again.':'Couldn\u2019t send the voice message. Try again.');return}
-  try{await S.fb.rpc('send_msg',{p_thread:c.key,p_job:c.jobKey||null,p_other:c.other,p_text:'',p_kind:kind,p_media:path,p_dur:dur||null});savePriv({seen:{[c.key]:Date.now()}})}
+  const reply=S.chatDraft.reply?.id||null;S.chatDraft.reply=null;
+  try{await S.fb.rpc('send_msg',{p_thread:c.key,p_job:c.jobKey||null,p_other:c.other,p_text:'',p_kind:kind,p_media:path,p_dur:dur||null,p_reply:reply});savePriv({seen:{[c.key]:Date.now()}})}
   catch(e){console.warn(e);toast('Couldn\u2019t send that. Try again.')}
   S.chatUp=null;render()}
 async function sendChatPhoto(file){try{const d=await readPic(file),b=await (await fetch(d)).blob();sendMedia('photo',b,'jpg')}catch{toast('That photo couldn\u2019t be opened. Try another one.')}}
@@ -674,8 +692,9 @@ function sendMsg(){
   if(modBlock('chat',t))return;
   if(!canMessage(c,derive())){toast('You can\u2019t message them yet.');return}
   const at=Date.now();
-  S.chatDraft.text='';
-  S.fb.rpc('send_msg',{p_thread:c.key,p_job:c.jobKey||null,p_other:c.other,p_text:t.slice(0,1000)}).catch(writeErr);
+  const reply=S.chatDraft.reply?.id||null;
+  S.chatDraft.text='';S.chatDraft.reply=null;if(reply)render();
+  S.fb.rpc('send_msg',{p_thread:c.key,p_job:c.jobKey||null,p_other:c.other,p_text:t.slice(0,1000),p_reply:reply}).catch(writeErr);
   savePriv({seen:{[c.key]:at}});
   requestAnimationFrame(()=>{$('msg')?.focus()});
 }
@@ -799,10 +818,13 @@ function gateHTML(){
   case'setup':return`<div class="gatebox"><div class="mark">tack</div><h1>Almost ready</h1><p>This site isn't connected to its database yet. Add the Supabase project URL and key to <b>supabase-config.js</b> and reload.</p></div>`;
   case'offline':return`<div class="gatebox"><div class="mark">tack</div><h1>Can't reach tack</h1><p>Check your connection and reload the page.</p><button class="cta" data-act="reload">Reload</button></div>`;
   case'auth':return authHTML();
-  case'verify':return`<div class="gatebox"><div class="mark">tack</div><h1>Confirm your email</h1>
-    <p>We sent a link to <b>${email}</b>. Open it to confirm this is your address, then come back here. Check your spam folder if it isn't there in a minute.</p>
-    <button class="cta" data-act="checkVerified">I've confirmed it</button>
-    <button class="btn2" data-act="resendVerify">Send the email again</button>
+  case'verify':return`<div class="gatebox"><div class="mark">tack</div><h1>Check your email</h1>
+    <p>We sent a 6-digit code to <b>${email}</b>. Type it here to get into tack. Check spam if it isn’t there in a minute.</p>
+    <form class="stack" id="authForm" data-form="otp" novalidate style="gap:12px">
+      <input id="fOtp" class="inp otpinp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" value="${esc(S.form.otp||'')}" data-bind="form.otp" aria-label="6-digit code">
+      ${S.err.otp?`<p class="err" role="alert">${esc(S.err.otp)}</p>`:''}
+      <button class="cta" type="submit" ${S.busy?'disabled':''}>${S.busy?'Checking…':'Confirm'}</button></form>
+    <button class="btn2" data-act="resendVerify">Send a new code</button>
     <button class="linkbtn" data-act="logout">Use a different email</button></div>`;
   case'newpw':return`<div class="gatebox"><div class="mark">tack</div><h1>Set a new password</h1>
     <form class="stack" id="authForm" data-form="newpw" novalidate style="gap:14px">
@@ -984,17 +1006,13 @@ function wallHTML(list,D){const n=wideMQ.matches?3:2,cols=Array.from({length:n},
 wideMQ.addEventListener?.('change',()=>{if(S.phase==='app')render()});
 function viewBoard(D){
   const drop=!S.boardDropped&&!S.intro.on&&!S.momentOn&&!S.joining&&S.priv.introSeen&&!reduceMotion.matches;if(drop){S.boardDropped=true;S.dropping=true;setTimeout(()=>{S.dropping=false},2200)}
-  const all=boardJobs(D),list=findJobs(all),filtered=!!(S.find.q.trim()||S.near),free=freePeople(D).filter(u=>u!==S.me.id),meFree=freeNow(S.me.id);
+  const all=boardJobs(D),list=findJobs(all),filtered=!!(S.find.q.trim()||S.near),online=onlinePeople(D);
   return`<div class="boardpage"><header class="top">
     <div><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${S.me.isOwner?`<button class="campbtn" data-sheet="campus">${esc(campus())}${ic('chev',12,2.4)}</button>`:esc(campus())} · ${all.length} pinned</span></div></div>
     <button data-go="me" aria-label="Your profile">${ring(S.me.id,48)}</button>
   </header>
-  <section class="stripwrap" aria-label="Free"><p class="label">Free${free.length?' <span class="labelhint">· tap a face to ask for a favour</span>':''}</p>
-    <div class="strip">
-      <button class="person" data-sheet="free" aria-label="${meFree?'Change when you’re free':'Mark yourself free'}">${meFree?ring(S.me.id,50):`<span class="add">${ic('plus',18)}</span>`}<span>You</span></button>
-      ${free.map(u=>`<button class="person" data-ask="${esc(u)}" data-hold="${esc(u)}" aria-label="Ask ${esc(firstName(u))} for a favour">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}
-
-    </div></section>
+  ${online.length?`<section class="stripwrap" aria-label="Online"><p class="label">Online</p>
+    <div class="strip">${online.map(u=>`<button class="person" data-person="${esc(u)}" data-hold="${esc(u)}" aria-label="${esc(firstName(u))} is online">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}</div></section>`:''}
   ${comChips()}
   ${stepsCard(D)}
   <div class="dhead"><h1 class="h1">The board</h1><span class="muted">${all.length} pinned at ${S.me.isOwner?`<button class="campbtn" data-sheet="campus">${esc(campus())}${ic('chev',12,2.4)}</button>`:esc(campus())}</span></div>
@@ -1151,7 +1169,7 @@ function viewPost(){
      <div class="bnpics">${picEdit('draft',d.pics)}</div>
      <span class="bnfoot"><span class="by">${face(me,22)}<span class="nm">${esc(firstName(me))}</span></span><span class="wc ${d.text.length>=NOTE_MAX?'full':''}" id="jtWc">${noteCount(d.text)}</span></span>
    </div>
-   <div class="huewrap"><input type="range" id="jhue" class="huebar" min="0" max="359" step="1" value="${num(d.hue)}" data-bind="draft.hue" aria-label="Note colour" title="Slide to pick the note colour" style="--thumb:${c}"><button type="button" class="hueclear${d.white?' on':''}" id="jwhite" data-act="noteWhite" aria-label="No colour, white text" aria-pressed="${!!d.white}">${ic('x',12,2)}</button></div></div>
+   ${ph?'':`<div class="huewrap"><input type="range" id="jhue" class="huebar" min="0" max="359" step="1" value="${num(d.hue)}" data-bind="draft.hue" aria-label="Note colour" title="Slide to pick the note colour" style="--thumb:${c}"><button type="button" class="hueclear${d.white?' on':''}" id="jwhite" data-act="noteWhite" aria-label="No colour, white text" aria-pressed="${!!d.white}">${ic('x',12,2)}</button></div>`}</div>
 
    <div class="stack postsec"><h2 class="h2">Tags</h2>
      ${group('By when','when',WHENS)}${group('Where','where',WHERES)}
@@ -1218,7 +1236,7 @@ function inviteCard(D,big){
   if(false)return big?'<div class="empty" style="margin:8px 0"><b>No chats yet</b><p>Bid on a job, or tap Ask on someone who\u2019s free, to start talking.</p></div>':'';
   const used=0;
   return`<div class="${big?'empty':'box stack'}" style="${big?'margin:8px 0':'gap:10px'}">
-    ${big?'<b>No chats yet</b><p>Chats open when you work with someone: message your bidders, or ask someone who\u2019s free for a favour. Bring your friends onto the board too.</p>':'<span class="t1" style="font-size:var(--t-16)">Invite friends to tack</span><span class="t2">More people on the board means jobs get picked up faster. Friends from ${esc(campus())} join with their college email.</span>'}
+    ${big?'<b>No chats yet</b><p>Chats open when you work with someone: message your bidders, or hire someone again from their profile. Bring your friends onto the board too.</p>':'<span class="t1" style="font-size:var(--t-16)">Invite friends to tack</span><span class="t2">More people on the board means jobs get picked up faster. Friends from ${esc(campus())} join with their college email.</span>'}
     <button class="${big?'cta noglow':'btn2'}" data-sheet="invitefriend">Invite a friend</button>
     ${used?`<p class="note">${used} ${used===1?'person has':'people have'} joined with your links.</p>`:''}</div>`}
 function dateGroups(list,at){const d0=new Date().setHours(0,0,0,0),grp=t=>!t?'Earlier':t>=d0?'Today':t>=d0-864e5?'Yesterday':t>=d0-6*864e5?'Last 7 days':t>=d0-29*864e5?'Last 30 days':'Earlier',out=[];
@@ -1247,15 +1265,17 @@ function viewChat(D){
    ${j&&!accepted?`<button class="banner" style="background:color-mix(in srgb,${noteOf(j)} 14%,var(--surface2));color:${noteOf(j)}" data-job="${esc(j.key)}">About: ${esc(j.text.slice(0,40))}${j.text.length>40?'…':''}</button>`:''}
    ${!c.msgs.length?`<p class="note" style="margin:10px 0">${c.loaded?'Say hi. Sort out the time and place here.':'Loading messages…'}</p>`:''}
    ${(()=>{const lastOut=[...c.msgs].reverse().find(m=>m.by===me),readAt=num(((S.threadDocs[c.key]||{}).read||{})[c.other]),seen=pref('receipts')&&lastOut&&readAt>=lastOut.at;
-     return c.msgs.map(m=>`<div class="${m.by===me?'out':'in'}${m.kind!=='text'?' media '+m.kind:''}">${msgBody(m)}<span class="time">${stamp(m.at)}</span></div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`).join('')})()}
+     const byId=new Map(c.msgs.map(m=>[m.id,m]));
+     return c.msgs.map(m=>{const rx=Object.values(m.reactions||{}).filter(e=>REACTS.includes(e)),q=m.replyTo?byId.get(m.replyTo):null;
+       return`<div class="${m.by===me?'out':'in'}${m.kind!=='text'?' media '+m.kind:''}${rx.length?' hasrx':''}" data-mid="${m.id}">${q?quoteHTML(q):''}${msgBody(m)}<span class="time">${stamp(m.at)}</span>${rx.length?`<span class="rx${S.rxPop===m.id?' pop':''}">${[...new Set(rx)].join('')}${rx.length>1?`<b>${rx.length}</b>`:''}</span>`:''}</div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`}).join('')})()}
    ${S.chatUp?`<div class="out media pending">${S.chatUp==='photo'?'Sending photo…':'Sending voice message…'}</div>`:''}
   </div>
-  ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats now happen inside jobs: ask ${esc(firstName(c.other))} for a favour when they're free, or hire them again from their profile.`}</p></div>`:`
+  ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats now happen inside jobs: pin a job, or hire ${esc(firstName(c.other))} again from their profile.`}</p></div>`:`
   <div class="foot" style="position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%)">${S.rec?`<div class="composer rec">
     <button class="cbtn" data-act="recCancel" aria-label="Cancel recording">${ic('trash',19)}</button>
     <span class="recbar"><i class="recdot"></i><span id="recT">${recClock()}</span><span class="muted">Recording</span></span>
     <button class="csend" data-act="recSend" aria-label="Send voice message">${ic('send',19,2,'var(--on-grad)')}</button></div>`
-   :`<div class="composer ${S.chatDraft.text.trim()?'hastext':''}" id="composer">
+   :`${S.chatDraft.reply?replyBar(S.chatDraft.reply):''}<div class="composer ${S.chatDraft.text.trim()?'hastext':''}" id="composer">
     <label class="cbtn" for="chatPic" aria-label="Send a photo">${ic('camera',20)}<input id="chatPic" type="file" accept="image/*" hidden></label>
     <label class="field" for="msg"><input id="msg" type="text" maxlength="1000" placeholder="Message…" value="${esc(S.chatDraft.text)}" data-bind="chatDraft.text" aria-label="Message ${esc(firstName(c.other))}" autocomplete="off"></label>
     <button class="csend cmic" data-act="recStart" aria-label="Record a voice message">${ic('mic',20,2,'var(--on-grad)')}</button>
@@ -1263,7 +1283,7 @@ function viewChat(D){
   </div>`}</div>`}`;
 }
 function viewPerson(uid,D){
-  const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,free=freeNow(uid);
+  const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,online=onlineNow(uid);
   const bio=str(d.bio,BIO_MAX)||str(d.does,60),bn=bannerOk(d.banner)?d.banner:'';
   const tints=[['rgba(79,227,224,.16)','var(--cyan-ink)'],['rgba(255,122,209,.16)','var(--pink-ink)'],['rgba(255,197,61,.16)','var(--amber-ink)'],['rgba(170,226,84,.18)','var(--violet-ink)']];
   return`<div class="pad">${isMe?'':back('board','Back to the board')}
@@ -1274,13 +1294,12 @@ function viewPerson(uid,D){
      ${!isOrg(uid)&&realNameOf(uid)&&handleOf(uid)?`<span class="realname">${esc(realNameOf(uid))}</span>`:''}
      ${bio?`<p class="pbio">${esc(bio)}</p>`:''}
      <div class="chips pchips">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campusName(campusOf(uid)))}</span>
-       ${uid===ownerId()?'<span class="chip vio">Organiser</span>':''}${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${free?'<span class="chip on">Free</span>':''}</div>
+       ${uid===ownerId()?'<span class="chip vio">Organiser</span>':''}${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${online?'<span class="chip on">Online</span>':''}</div>
    </div>
    <div class="stats"><div><b>${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b>${st.avg?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.avg}`:'New'}</b><span>rating</span></div>${isMe?`<div><b class="money">₹${fmt(st.earned)}</b><span>earned</span></div>`:`<div><b>${st.poster.n?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.poster.avg.toFixed(1)}`:'–'}</b><span>as a poster</span></div>`}</div>
    ${st.doer.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a doer · from ${st.doer.n} ${st.doer.n===1?'rating':'ratings'}</span>${st.doer.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
    ${isMe?'':reviewList(uid)}
    ${st.poster.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a poster · from ${st.poster.n} ${st.poster.n===1?'rating':'ratings'}</span>${st.poster.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
-   ${isMe?`<button class="card" data-sheet="free">${ic('clock',20)}<span class="rowtext"><span class="t1">${free?'You’re free until '+clock(freeUntilOf(uid)):'I’m free'}</span><span class="t2">${free?freeAudience()+' Tap to change.':'Mark yourself free for up to 3 hours.'}</span></span><span class="chev">${ic('chev',18)}</span></button>`:''}
    ${isMe?`<div class="menu">
        <button data-go="reviews">${ic('star',18)} Your reviews${(()=>{const l=reviewsOf(S.me.id);return l&&l.length?`<span class="menuval">${l.length}</span>`:''})()}<span class="chev">${ic('chev',16)}</span></button>
        <button data-act="${pushOn()?'pushOff':'pushOn'}" ${S.busy?'disabled':''}>${ic('bell',18)} Notifications<span class="menuval">${pushOn()?'On':'Off'}</span></button>
@@ -1291,15 +1310,11 @@ function viewPerson(uid,D){
        <button data-go="help">${ic('flag',18)} Report or feedback<span class="chev">${ic('chev',16)}</span></button>
        <button data-act="logout">${ic('out',18)} Log out</button></div>
        <p class="note">Logged in as ${esc(S.me.email)}</p>`
-     :`${(()=>{const fn=esc(firstName(uid)),isFree=freeNow(uid),prev=lastJobFor(uid,D);
-        const asks=asksOf(uid),canAsk=isFree;
-        if(asks==='none')return`<p class="note">${fn} isn\u2019t taking favour requests right now.</p>`;
-        return (canAsk?`<button class="cta" data-ask="${esc(uid)}">Ask ${fn} for a favour</button>`:'')
-          +(prev?`<button class="${isFree?'btn2':'cta'}" data-ask="${esc(uid)}" data-prev="${esc(prev.id)}">Hire ${fn} again</button>`:'')})()}
+     :`${(()=>{const prev=lastJobFor(uid,D);return prev?`<button class="cta" data-ask="${esc(uid)}" data-prev="${esc(prev.id)}">Hire ${esc(firstName(uid))} again</button>`:''})()}
        <button class="linkbtn" data-sheet="who" data-about="${esc(uid)}">Restrict, block or report</button>`}
   </div></div><div style="height:24px"></div>`;
 }
-function viewSettings(D){const me=S.me.id,asks=asksOf(me),blocked=arr(S.priv.blocked).filter(u=>typeof u==='string'),rs=restricted(),t=S.priv.terms||{};
+function viewSettings(D){const me=S.me.id,blocked=arr(S.priv.blocked).filter(u=>typeof u==='string'),rs=restricted(),t=S.priv.terms||{};
   const row=(t1,t2,attrs,end='')=>`<button class="setrow" ${attrs}><span class="rowtext"><span class="t1">${t1}</span>${t2?`<span class="t2">${t2}</span>`:''}</span>${end||`<span class="chev">${ic('chev',16)}</span>`}</button>`;
   const tog=(on,t1,t2,attrs)=>`<button class="setrow" role="switch" aria-checked="${on}" ${attrs}><span class="rowtext"><span class="t1">${t1}</span><span class="t2">${t2}</span></span><span class="switch ${on?'on':''}" aria-hidden="true"></span></button>`;
   return`<div class="pad">${back('me','Back')}<div class="stack narrow" style="margin-top:6px;gap:24px">
@@ -1319,15 +1334,14 @@ function viewSettings(D){const me=S.me.id,asks=asksOf(me),blocked=arr(S.priv.blo
      ${tog(pref('near'),'Show Near you on my bids','Tells the poster you were close to the job when you bid. Never your location.','data-pref="near"')}
      ${tog(pref('receipts'),'Read receipts','Let people see when you’ve read their messages. If you turn this off, you won’t see theirs either.','data-pref="receipts"')}
      ${tog(locOptIn(),'Use my location','Shows jobs near you and lets you tag jobs. Your location stays on this device.','data-act="toggleLocPref"')}
-     <div class="setrow static col"><span class="rowtext"><span class="t1">Who sees when you’re free</span><span class="t2">They can ask you for a favour while you’re free. Nobody else is told.</span></span>
-       <div class="chips">${[['past','People I’ve finished a job with'],['all','Anyone on my campus'],['none','No one']].map(([k,l])=>`<button class="chip ${asks===k?'on':''}" data-asks="${k}" aria-pressed="${asks===k}">${l}</button>`).join('')}</div></div>
+     ${tog(!S.priv.hideOnline,'Show when I’m online','People you’ve made a deal with see you at the top of their board while you’re online.','data-act="toggleOnline"')}
    </div></section>
    <section class="setsec"><h2 class="seth">Restricted people</h2><div class="setcard">
-     ${rs.length?rs.map(u=>`<div class="setrow static">${ring(u,34)}<span class="rowtext"><span class="t1">${esc(shortName(u))}</span><span class="t2">They can’t see when you’re free or ask you for favours.</span></span><button class="btn2 setbtn" data-act="unrestrict" data-uid="${esc(u)}">Unrestrict</button></div>`).join('')
+     ${rs.length?rs.map(u=>`<div class="setrow static">${ring(u,34)}<span class="rowtext"><span class="t1">${esc(shortName(u))}</span><span class="t2">They can’t see when you’re online or send you offers.</span></span><button class="btn2 setbtn" data-act="unrestrict" data-uid="${esc(u)}">Unrestrict</button></div>`).join('')
        :`<div class="setrow static"><span class="rowtext"><span class="t2">You haven’t restricted anyone. Hold someone in Chats or open their profile to restrict them.</span></span></div>`}
    </div></section>
    <section class="setsec"><h2 class="seth">Blocked people</h2><div class="setcard">
-     ${blocked.length?blocked.map(u=>`<div class="setrow static">${ring(u,34)}<span class="rowtext"><span class="t1">${esc(shortName(u))}</span><span class="t2">You don’t see their jobs, bids or messages, and they can’t see when you’re free.</span></span><button class="btn2 setbtn" data-act="unblock" data-uid="${esc(u)}">Unblock</button></div>`).join('')
+     ${blocked.length?blocked.map(u=>`<div class="setrow static">${ring(u,34)}<span class="rowtext"><span class="t1">${esc(shortName(u))}</span><span class="t2">You don’t see their jobs, bids or messages, and they can’t see when you’re online.</span></span><button class="btn2 setbtn" data-act="unblock" data-uid="${esc(u)}">Unblock</button></div>`).join('')
        :`<div class="setrow static"><span class="rowtext"><span class="t2">You haven’t blocked anyone.</span></span></div>`}
    </div></section>
    <section class="setsec"><h2 class="seth">Help</h2><div class="setcard">
@@ -1382,7 +1396,7 @@ function renderTermsGate(){let r=$('termsRoot');
     <h1 id="tgT">We’ve updated our terms.</h1>
     <p>To keep using tack, please read and accept the Terms of Use and Privacy Policy. In short:</p>
     <ul><li>tack is a noticeboard. Jobs and payments are agreed directly between members, at their own risk.</li><li>tack never handles money and isn’t responsible for disputes between members.</li>
-      <li>No academic work, nothing illegal or unsafe. Breaking the rules can get your account removed.</li><li>New controls in Settings: read receipts, who can ask you for favours, blocked people and downloading your data.</li></ul>
+      <li>No academic work, nothing illegal or unsafe. Breaking the rules can get your account removed.</li><li>New controls in Settings: read receipts, showing when you’re online, blocked people and downloading your data.</li></ul>
     <div class="tglinks"><button class="btn2" data-doc="terms">Read Terms of Use</button><button class="btn2" data-doc="privacy">Read Privacy Policy</button></div>
     <button class="cta" data-act="acceptTerms">I agree</button><button class="linkbtn" data-act="logout">Log out</button></div></div>`}
 const NEED_EXTRA={cpost:()=>S.draft.text.trim().length>=2,pw:()=>!!S.pw.cur&&S.pw.nw.length>=8,help:()=>{const h=S.help;return h.kind==='past'||h.kind==='board'?!!(h.job&&h.why):h.note.trim().length>=10}};
@@ -1428,14 +1442,11 @@ function viewInvites(D){
   </div></div><div style="height:24px"></div>`;
 }
 function railHTML(D){
-  const free=freePeople(D).filter(u=>u!==S.me.id),me=S.me.id;
+  const online=onlinePeople(D),me=S.me.id;
   const myBids=Object.values(S.pitchMine).filter(p=>p&&num(p.amt)>0).map(p=>({b:{amt:num(p.amt),at:num(p.at)},j:D.jobByKey[p.job]})).filter(x=>x.j&&x.j.owner!==me).sort((a,b)=>num(b.b.at)-num(a.b.at)).slice(0,4);
   return`<span style="font-size:var(--t-12);font-weight:500;color:var(--dim)">${D.members.length} on the board</span>
-  <div class="stack gap8">${free.length?free.map(u=>`<div style="display:flex;align-items:center;gap:10px"><button class="rowmain" data-person="${esc(u)}" data-hold="${esc(u)}">${ring(u,40)}
-     <span class="rowtext"><span style="font-size:var(--t-14);font-weight:600">${esc(shortName(u))}</span><span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc([metaOf(u),str(pdoc(u).does,40)].filter(Boolean).join(' · '))}</span></span></button>
-     <button data-ask="${esc(u)}" style="background:var(--surface2);border-radius:999px;padding:7px 13px;font-size:var(--t-12);font-weight:600">Ask</button></div>`).join('')
-   :''}
-   <button class="btn2" style="padding:10px;font-size:var(--t-12)" data-sheet="free">${freeNow(S.me.id)?'You’re free until '+clock(freeUntilOf(S.me.id)):'I’m free'}</button></div>
+  ${online.length?`<p class="label" style="margin:0">Online</p><div class="stack gap8">${online.map(u=>`<button class="rowmain" data-person="${esc(u)}" data-hold="${esc(u)}">${ring(u,40)}
+     <span class="rowtext"><span style="font-size:var(--t-14);font-weight:600">${esc(shortName(u))}</span><span style="font-size:var(--t-11);font-weight:500;color:var(--muted)">${esc([metaOf(u),str(pdoc(u).does,40)].filter(Boolean).join(' · '))}</span></span></button>`).join('')}</div>`:''}
   <div style="height:1px;background:var(--line)"></div>
   <h2 class="h2">Your bids</h2>
   <div class="stack gap8">${myBids.length?myBids.map(({b,j})=>{const ok=j.accepted===me;return`<button data-job="${esc(j.key)}" style="display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:var(--r-sm);padding:11px 13px;width:100%;text-align:left">
@@ -1449,16 +1460,14 @@ function sheetHTML(D){
   const s=S.sheet;if(!s)return'';let b='';
   const j=S.openJob?D.jobByKey[S.openJob]:null;
   switch(s.type){
-  case'free':{const f=freeNow(S.me.id);
-    b=`<h2 id="sheetT">I’m free</h2><p>For up to 3 hours. ${freeAudience()}</p>
-    ${quietNow()?`<div class="nightnote">${ic('shield',16,2.2)}<span>It’s late. If you meet anyone, stay in well-lit, busy parts of campus and let a friend know where you are. It’s always fine to say no.</span></div>`:''}
-    <div class="stack gap8">${[1,2,3].map(h=>`<button class="btn2" data-free="${h}">${h===1?'For the next hour':`For the next ${h} hours`}</button>`).join('')}
-    ${f?'<button class="btn2 danger" data-free="off">I’m not free any more</button>':''}</div>`;break}
+  case'msgmenu':{const m=chatMsg(s.mid);if(!m){b='<h2 id="sheetT">This message is gone</h2>';break}const mine=m.reactions?.[S.me.id];
+    b=`<p id="sheetT" class="msgprev">${esc(msgSnip(m))}</p><div class="rxpick" role="group" aria-label="React">${REACTS.map(e=>`<button class="${mine===e?'on':''}" data-act="reactMsg" data-to="${m.id}" data-e="${e}" aria-label="React with ${e}" aria-pressed="${mine===e}">${e}</button>`).join('')}</div>
+    <div class="menu"><button data-act="replyMsg" data-to="${m.id}">${ic('reply',18)} Reply</button>${m.kind==='text'?`<button data-act="copyMsg" data-to="${m.id}">${ic('copy',18)} Copy</button>`:''}${m.by===S.me.id?`<button class="danger" data-act="unsendMsg" data-to="${m.id}">${ic('trash',18)} Unsend</button>`:''}</div>`;break}
   case'who':{const u=s.about,rs=restricted().includes(u),bl=arr(S.priv.blocked).includes(u),fn=esc(firstName(u));
     b=`<h2 id="sheetT">${esc(shortName(u))}</h2>
     <div class="menu whomenu">
-      <button data-act="${rs?'unrestrict':'restrict'}" data-uid="${esc(u)}">${ic('eyeoff',18)}<span class="rowtext"><span class="t1">${rs?'Unrestrict':'Restrict'}</span><span class="t2">${rs?`${fn} can see when you’re free again.`:`${fn} won’t see when you’re free or be able to ask you for favours. Chats about jobs still work. They aren’t told.`}</span></span></button>
-      <button class="danger" data-act="${bl?'unblock':'blockWho'}" data-uid="${esc(u)}">${ic('ban',18)}<span class="rowtext"><span class="t1">${bl?'Unblock':'Block'}</span><span class="t2">${bl?`You’ll see ${fn}’s jobs, bids and messages again.`:`You won’t see ${fn}’s jobs, bids or messages, and they can’t see when you’re free. They aren’t told.`}</span></span></button>
+      <button data-act="${rs?'unrestrict':'restrict'}" data-uid="${esc(u)}">${ic('eyeoff',18)}<span class="rowtext"><span class="t1">${rs?'Unrestrict':'Restrict'}</span><span class="t2">${rs?`${fn} can see when you’re online again.`:`${fn} won’t see when you’re online or be able to send you offers. Chats about jobs still work. They aren’t told.`}</span></span></button>
+      <button class="danger" data-act="${bl?'unblock':'blockWho'}" data-uid="${esc(u)}">${ic('ban',18)}<span class="rowtext"><span class="t1">${bl?'Unblock':'Block'}</span><span class="t2">${bl?`You’ll see ${fn}’s jobs, bids and messages again.`:`You won’t see ${fn}’s jobs, bids or messages, and they can’t see when you’re online. They aren’t told.`}</span></span></button>
       <button class="danger" data-sheet="report" data-about="${esc(u)}">${ic('flag',18)}<span class="rowtext"><span class="t1">Report</span><span class="t2">The organiser looks at it. ${fn} isn’t told who reported.</span></span></button></div>`;break}
   case'pick':b=`<h2 id="sheetT">Pick ${esc(firstName(s.uid))} for ₹${fmt(s.amt)}?</h2><p>The job leaves the board and you two can sort out the details in chat. Pay them on UPI or cash after.</p>
     <button class="cta" data-act="confirmPick">Pick ${esc(firstName(s.uid))}</button><button class="linkbtn" data-act="closeSheet">Not yet</button>`;break;
@@ -1494,7 +1503,7 @@ function sheetHTML(D){
   case'uninvite':b=`<h2 id="sheetT">Remove ${esc(s.about)}?</h2><p>They can't sign up with this email, and if they already joined they're locked out straight away and their jobs leave the board.</p>
     <button class="cta destructive" data-act="confirmUninvite">Remove</button><button class="linkbtn" data-act="closeSheet">Keep them</button>`;break;
   case'offer':{const o=S.offer,fn=esc(firstName(o.to));
-    b=`<h2 id="sheetT">${o.prevJob?`Hire ${fn} again`:`Ask ${fn} for a favour`}</h2>
+    b=`<h2 id="sheetT">Hire ${fn} again</h2>
     <p>Only ${fn} sees this. If they accept, it becomes a job between you two, and you can chat about it.</p>
     <textarea id="oft" class="inp" rows="2" maxlength="200" style="resize:none" placeholder="Grab my print-outs from Sai Xerox on your way back?" data-bind="offer.text" aria-label="What do you need?">${esc(o.text)}</textarea>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><label class="field" for="ofp" style="flex:1 1 140px"><span class="fl">You'll pay ₹</span><input id="ofp" inputmode="numeric" maxlength="5" placeholder="60" value="${esc(o.price)}" data-bind="offer.price"></label>
@@ -1568,7 +1577,7 @@ function sheetHTML(D){
   case'report':b=`<h2 id="sheetT">Report ${esc(shortName(s.about))}</h2><p>${esc(organiser())} sees your report and can read chats with them.</p>
     <div class="chips" role="group" aria-label="Reason">${REASONS.map(r=>`<button class="chip ${S.rep.why===r?'on':''}" data-why="${esc(r)}" aria-pressed="${S.rep.why===r}">${esc(r)}</button>`).join('')}</div>
     <input id="repN" class="inp" maxlength="200" placeholder="What happened? (optional)" value="${esc(S.rep.note)}" data-bind="rep.note" aria-label="What happened">
-    <label class="check" for="repB"><input type="checkbox" id="repB" data-bind="rep.block" ${S.rep.block?'checked':''}> Also block them. You won't see their jobs, bids or messages, and they can't see when you're free.</label>
+    <label class="check" for="repB"><input type="checkbox" id="repB" data-bind="rep.block" ${S.rep.block?'checked':''}> Also block them. You won't see their jobs, bids or messages, and they can't see when you're online.</label>
     ${S.err.rep?`<p class="err">${esc(S.err.rep)}</p>`:''}<button class="cta" data-act="confirmReport" data-need="report">Send report</button>
     <button class="linkbtn" data-act="blockOnly">Just block them</button>`;break;
   case'erase':b=`<h2 id="sheetT">Delete your account?</h2><p>This erases your profile, the jobs you pinned, your bids, ratings you gave and your messages, and removes your login. It can't be undone.</p>
@@ -1583,7 +1592,7 @@ function sheetHTML(D){
 const VIEWS={cboard:viewCBoard,cnote:viewCNote,board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewSettings,settings:viewSettings,help:viewHelp,invites:viewInvites,saved:viewSaved,reviews:viewReviews,review:viewReview,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
 let lastView=null,lastSheet=null;const scrollMem={};
 const INTRO=[
-  {k:'board',t:'This is the board.',b:'Classmates pin small jobs here. A print run, a lift down four floors, an hour of help before a deadline. Tap + to mark yourself free, and people you’ve worked with can ask you for a favour.'},
+  {k:'board',t:'This is the board.',b:'Classmates pin small jobs here. A print run, a lift down four floors, an hour of help before a deadline. People you’ve made a deal with show up at the top when they’re online.'},
   {k:'pin',t:'Need something? Pin it.',b:'Write it on a note, set a price, pick a colour. It goes up for everyone on campus to see.'},
   {k:'bid',t:'Bid what it’s worth.',b:'Name your price and pitch yourself in a line. Only the poster sees your bid.'},
   {k:'pick',t:'Get picked. Pay safely.',b:'The poster picks one person and you plan it in chat. Pay on UPI or cash and confirm it in tack. tack never touches the money.'},
@@ -1594,7 +1603,7 @@ const inote=(h,p,t,meta,cls='',st='')=>`<span class="inote ${cls}" style="--h:${
 function introScene(k){const me=S.me?.id;
   if(k==='board')return`<div class="isc isc-board" aria-hidden="true">
     ${inote(128,'₹120','Print 40 pages at Sai Xerox','Gate 1 · Today','n1')}${inote(262,'₹300','20 photos at golden hour','Lawn · Tomorrow','n2')}${inote(350,'₹60','Parcel from Gate 1','Hostel B · Now','n3')}
-    <span class="ichip c1"><span class="ilive"></span>I’m free</span></div>`;
+    <span class="ichip c1"><span class="ilive"></span>Online now</span></div>`;
   if(k==='pin')return`<div class="isc isc-pin" aria-hidden="true">
     <span class="inote ibig"><span class="ipinhead"></span><b class="iprice">₹150</b><i class="itype">Xerox 40 pages by 5</i><em>Design block · Now</em></span>
     <span class="ihue"><span class="ithumb"></span></span><span class="ipinit">Pin it</span></div>`;
@@ -1666,7 +1675,7 @@ function moment(title,sub,ms=1300){
   document.body.appendChild(r);S.momentOn=true;const t=reduceMotion.matches?Math.min(ms,700):ms;
   return new Promise(res=>setTimeout(()=>{r.classList.add('out');setTimeout(()=>{r.remove();S.momentOn=false;res();if(S.phase==='app')render()},reduceMotion.matches?0:260)},t))}
 function stepsCard(D){if(!S.priv.introSeen||S.priv.stepsHidden||S.priv.stepsDone)return'';const me=S.me.id,d=S.myDoc||{};
-  const steps=[[!!d.photo,'Add a profile photo','A real face helps people say yes.','data-go="edit"'],[S.freeDocs[me]!=null,'Mark yourself free','People you’ve worked with can ask you for quick favours.','data-sheet="free"'],
+  const steps=[[!!d.photo,'Add a profile photo','A real face helps people say yes.','data-go="edit"'],[pushOn(),'Turn on notifications','Know the moment someone bids, picks you or messages.','data-act="pushOn"'],
     [D.jobs.some(j=>j.owner===me)||Object.keys(S.pitchMine).length>0,'Pin or bid on a job','The first one is the hardest.','data-go="post"']];
   const n=steps.filter(x=>x[0]).length;
   // Once all three are done the card is gone for good, even if a step is undone later.
@@ -1790,8 +1799,7 @@ const ACT={
   pushOn(){enablePush()},
   pushOff(){disablePush()},
   hideBanner(el){try{localStorage.setItem(el.dataset.k,'1')}catch{}render()},
-  checkVerified(){checkVerified().then(()=>{if(S.phase==='verify')toast('Not confirmed yet. Open the link in the email first.')})},
-  async resendVerify(){try{await sendVerify(S.user);toast('Sent. Check your inbox and spam.')}catch(e){toast(authMsg(e))}},
+  async resendVerify(){try{await sendVerify(S.user);S.form.otp='';S.err={};render();toast('New code sent. Check your inbox and spam.')}catch(e){toast(/rate|seconds/i.test(e?.message||'')?'Wait a minute before asking for another code.':authMsg(e))}},
   clearPhoto(){S.onb.photo='';render()},
   cropUse(){cropDone()},
   cropCancel(){if(S.crop)URL.revokeObjectURL(S.crop.url);S.crop=null;S.cropImg=null;S.sheet=null;render()},
@@ -2017,10 +2025,18 @@ const ACT={
     S.offersOut={...S.offersOut,[key]:d};S.sheet=null;render();
     S.fb.setDoc(S.fb.doc(S.db,'offers',key),d).then(()=>toast('Sent to '+firstName(o.to)+'. You\u2019ll see their answer in Activity.')).catch(e=>{const m={...S.offersOut};delete m[key];S.offersOut=m;render();
       if(!(e&&e.code==='permission-denied')){toast('Couldn\u2019t send it. Try again.');return}
-      S.sb.rpc('ask_block_reason',{p_to:o.to,p_prev:o.prevJob||null}).then(({data})=>toast({quiet:'It\u2019s quiet hours (11 pm to 7 am). You can only ask people who are marked free.',limit:'You can ask up to 5 people a day. Try again tomorrow.',
-        again:'You\u2019ve already asked '+firstName(o.to)+' today.'}[data]||firstName(o.to)+' isn\u2019t free any more.'),()=>toast('Couldn\u2019t send it. Try again.'))})},
+      S.sb.rpc('ask_block_reason',{p_to:o.to,p_prev:o.prevJob||null}).then(({data})=>toast({quiet:'At night (11 pm to 7 am) offers only go to people who are online.',limit:'You can ask up to 5 people a day. Try again tomorrow.',
+        again:'You\u2019ve already asked '+firstName(o.to)+' today.'}[data]||'You can only send this to someone you\u2019ve hired before.'),()=>toast('Couldn\u2019t send it. Try again.'))})},
   acceptOffer(el){const k=el.dataset.key;S.fb.updateDoc(S.fb.doc(S.db,'offers',k),{status:'accepted',respondedAt:Date.now()}).then(()=>toast('Accepted. It\u2019s now a job between you two.')).catch(writeErr)},
   declineOffer(el){const k=el.dataset.key;S.fb.updateDoc(S.fb.doc(S.db,'offers',k),{status:'declined',respondedAt:Date.now()}).then(()=>toast('Declined. They won\u2019t be told.')).catch(writeErr)},
+  reactMsg(el){S.sheet=null;reactTo(+el.dataset.to,el.dataset.e)},
+  replyMsg(el){startReply(+el.dataset.to)},
+  cancelReply(){S.chatDraft.reply=null;render()},
+  copyMsg(el){const m=chatMsg(+el.dataset.to);S.sheet=null;render();if(m)navigator.clipboard?.writeText(m.t).then(()=>toast('Copied'),()=>toast('Couldn\u2019t copy that.'))},
+  unsendMsg(el){const id=+el.dataset.to,c=S.chat;S.sheet=null;c.msgs=c.msgs.filter(x=>x.id!==id);if(S.chatDraft.reply?.id===id)S.chatDraft.reply=null;render();
+    S.fb.rpc('unsend_msg',{p_id:id}).then(path=>{if(path)S.sb.storage.from('chat').remove([path]).catch(()=>{});toast('Unsent')}).catch(()=>toast('Couldn\u2019t unsend that. Try again.'))},
+  jumpMsg(el){const t=document.querySelector(`.msgs [data-mid="${el.dataset.to}"]`);if(!t)return;t.scrollIntoView({block:'center',behavior:'smooth'});t.classList.remove('flash');void t.offsetWidth;t.classList.add('flash')},
+  toggleOnline(){savePriv({hideOnline:!S.priv.hideOnline});toast(S.priv.hideOnline?'Nobody sees when you’re online now':'People you’ve made a deal with can see when you’re online')},
   restrict(el){const u=el.dataset.uid;savePriv({restricted:[...new Set([...restricted(),u])]});S.sheet=null;toast('Restricted. '+firstName(u)+' isn\u2019t told.')},
   unrestrict(el){const u=el.dataset.uid;savePriv({restricted:restricted().filter(x=>x!==u)});if(S.sheet?.type==='who')S.sheet=null;toast('Unrestricted')},
   blockWho(el){const u=el.dataset.uid;savePriv({blocked:[...new Set([...arr(S.priv.blocked),u])]});S.sheet=null;toast('Blocked. '+firstName(u)+' isn\u2019t told.');if(['chat','person'].includes(S.view))go('board')},
@@ -2068,7 +2084,7 @@ const ACT={
 };
 
 document.addEventListener('click',e=>{
-  const el=e.target.closest('[data-com],[data-cnote],[data-doc],[data-pref],[data-asks],[data-helpkind],[data-helpjob],[data-helpwhy],[data-acttab],[data-pic],[data-review],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
+  const el=e.target.closest('[data-com],[data-cnote],[data-doc],[data-pref],[data-helpkind],[data-helpjob],[data-helpwhy],[data-acttab],[data-pic],[data-review],[data-unpic],[data-go],[data-job],[data-sort],[data-set],[data-bump],[data-person],[data-thread],[data-thread-job],[data-thread-with],[data-pick],[data-sheet],[data-act],[data-onb],[data-free],[data-star],[data-why],[data-auth],[data-ask],[data-ofwhen]');
   if(!el)return;const ds=el.dataset;
   if(ds.ask!==undefined){if(ds.ask===S.me?.id)return;S.offer={to:ds.ask,prevJob:ds.prev||null,text:'',price:'',when:'Next hour',where:''};S.err={};S.sheet={type:'offer'};render();return}
   if(ds.ofwhen!==undefined){S.offer.when=ds.ofwhen;render();return}
@@ -2078,7 +2094,6 @@ document.addEventListener('click',e=>{
   if(ds.job!==undefined){const pr=el.classList.contains('tile')&&el.querySelector('.price');if(pr&&document.startViewTransition&&!reduceMotion.matches)pr.style.viewTransitionName='jp';S.openJob=ds.job;S.bid={key:null};for(const k of Object.keys(S.pics))if(k.startsWith('b:'+ds.job+'~'))delete S.pics[k];go('job');return}
   if(ds.doc!==undefined){e.preventDefault();openDoc(ds.doc);return}
   if(ds.pref!==undefined){savePriv({prefs:{...(S.priv.prefs||{}),[ds.pref]:!pref(ds.pref)}});return}
-  if(ds.asks!==undefined){saveMine(d=>{d.asks=ds.asks;return d});render();return}
   if(ds.helpkind!==undefined){S.help={kind:ds.helpkind,job:null,why:'',note:'',sent:null};S.err={};render();return}
   if(ds.helpjob!==undefined){S.help.job=ds.helpjob;S.err={};render();return}
   if(ds.helpwhy!==undefined){S.help.why=ds.helpwhy;render();return}
@@ -2090,11 +2105,6 @@ document.addEventListener('click',e=>{
   if(ds.onb!==undefined){S.onb[ds.onb]=ds.val;render();return}
   if(ds.pick!==undefined){const b=bidsFor(derive(),S.openJob).find(x=>x.by===ds.pick);if(b){S.sheet={type:'pick',uid:b.by,amt:b.amt};render()}return}
   if(ds.sheet!==undefined){if(ds.sheet==='invitefriend')S.lastCode=null;S.err={};S.erase={pw:''};if(ds.sheet==='done'||ds.sheet==='ratePoster'||ds.sheet==='review')S.rate={a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]};if(ds.sheet==='report')S.rep={why:ds.prewhy||'',note:'',block:false};S.sheet={type:ds.sheet,about:ds.about,rid:ds.rid};render();return}
-  if(ds.free!==undefined){const me=S.me.id;
-    const t=ds.free==='off'?0:freeEnd(+ds.free||1),prev=S.freeDocs[me];
-    S.freeDocs={...S.freeDocs,[me]:{until:t}};S.freeSaving=true;S.sheet=null;render();
-    S.fb.setDoc(S.fb.doc(S.db,'free',me),{until:t}).then(()=>toast(t?'You’re free until '+clock(t)+(quietNow()?'. Stay safe.':''):'You’re not marked free any more'),
-      e=>{const f={...S.freeDocs};if(prev)f[me]=prev;else delete f[me];S.freeDocs=f;render();toast('Couldn\u2019t save that. Try again.')}).finally(()=>{S.freeSaving=false});return}
   if(ds.review!==undefined){S.openRev=ds.review;go('review');return}
   if(ds.com!==undefined){openCom(ds.com);return}
   if(ds.cnote!==undefined){S.cnote=ds.cnote;go('cnote');return}
@@ -2110,16 +2120,26 @@ document.addEventListener('click',e=>{
 let lp=null;
 function openJobMenu(k){S.sheet={type:'jobmenu',key:k};render()}
 // Hold a note for its menu, or hold a person (chats, the free row) to restrict, block or report them.
-const holdOpen=t=>{if(t.dataset.job)openJobMenu(t.dataset.job);else if(t.dataset.hold&&t.dataset.hold!==S.me?.id){S.sheet={type:'who',about:t.dataset.hold};render()}};
-document.addEventListener('pointerdown',e=>{const t=e.target.closest('.tile[data-job],[data-hold]');if(!t||e.button>0)return;if(lp)clearTimeout(lp.t);
+const holdOpen=t=>{if(t.dataset.mid){if(S.view==='chat'){S.sheet={type:'msgmenu',mid:+t.dataset.mid};render()}return}if(t.dataset.job)openJobMenu(t.dataset.job);else if(t.dataset.hold&&t.dataset.hold!==S.me?.id){S.sheet={type:'who',about:t.dataset.hold};render()}};
+document.addEventListener('pointerdown',e=>{const t=e.target.closest('.tile[data-job],[data-hold],.msgs [data-mid]');if(!t||e.button>0)return;if(lp)clearTimeout(lp.t);
   lp={x:e.clientX,y:e.clientY,fired:false,t:setTimeout(()=>{lp.fired=true;navigator.vibrate?.(12);holdOpen(t)},480)}});
 document.addEventListener('pointermove',e=>{if(lp&&!lp.fired&&Math.hypot(e.clientX-lp.x,e.clientY-lp.y)>10)clearTimeout(lp.t)});
 ['pointerup','pointercancel'].forEach(n=>document.addEventListener(n,()=>{if(!lp)return;clearTimeout(lp.t);if(lp.fired){lp.until=Date.now()+400;lp.fired=false}}));
 document.addEventListener('click',e=>{if(lp&&lp.until>Date.now()){lp=null;e.stopPropagation();e.preventDefault()}},true);
-document.addEventListener('contextmenu',e=>{const t=e.target.closest('.tile[data-job],[data-hold]');if(!t)return;e.preventDefault();if(lp?.fired||lp?.until>Date.now())return;if(lp)clearTimeout(lp.t);holdOpen(t)});
+document.addEventListener('contextmenu',e=>{const t=e.target.closest('.tile[data-job],[data-hold],.msgs [data-mid]');if(!t)return;e.preventDefault();if(lp?.fired||lp?.until>Date.now())return;if(lp)clearTimeout(lp.t);holdOpen(t)});
+// Swipe a message right to reply to it; double-tap to heart it.
+let sw=null,lastTap=null;
+document.addEventListener('pointerdown',e=>{const t=e.target.closest('.msgs [data-mid]');if(!t||e.button>0){sw=null;return}sw={t,x:e.clientX,y:e.clientY,dx:0,on:false,armed:false}});
+document.addEventListener('pointermove',e=>{if(!sw)return;const dx=e.clientX-sw.x,dy=e.clientY-sw.y;
+  if(!sw.on){if(Math.abs(dy)>12&&Math.abs(dy)>Math.abs(dx)){sw=null;return}if(dx>12&&dx>Math.abs(dy)*1.4){sw.on=true;sw.t.classList.add('swiping');if(lp)clearTimeout(lp.t)}else return}
+  sw.dx=Math.max(0,Math.min(dx,90));sw.t.style.transform=`translateX(${sw.dx}px)`;const armed=sw.dx>56;if(armed!==sw.armed){sw.armed=armed;sw.t.classList.toggle('armed',armed);if(armed)navigator.vibrate?.(8)}});
+['pointerup','pointercancel'].forEach(n=>document.addEventListener(n,()=>{if(!sw)return;const {t,on,armed}=sw;sw=null;if(!on)return;
+  t.classList.remove('swiping','armed');t.style.transform='';lp={until:Date.now()+350,fired:false};if(armed)startReply(+t.dataset.mid)}));
+document.addEventListener('click',e=>{const t=e.target.closest('.msgs [data-mid]');if(!t||e.target.closest('button,a'))return;const id=+t.dataset.mid,now=Date.now();
+  if(lastTap&&lastTap.id===id&&now-lastTap.t<320){lastTap=null;reactTo(id,'❤️',true);return}lastTap={id,t:now}});
 document.addEventListener('submit',e=>{
   const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();
-  if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset,newpw:setNewPw})[f.dataset.form]?.();
+  if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset,newpw:setNewPw,otp:doVerifyOtp})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
 document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='msg'){$('composer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='ccomIn'){$('ccomposer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='q'||e.target.id==='campQ')render();else if(e.target.id==='fCol'||e.target.id==='cpQ')paintCol();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jhue'&&S.draft.white){S.draft.white=false;$('jwhite')?.classList.remove('on')}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});

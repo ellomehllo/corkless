@@ -9,7 +9,7 @@ export const PRIVACY=`
 
 <h2>2. Data we collect</h2>
 <p><b>Account data.</b> Your email address and a password. Your password is handled by our authentication provider and is never visible to us.</p>
-<p><b>Profile data.</b> Your name, profile photo, year, branch, the skills you list, your ring colour and the times you mark yourself free.</p>
+<p><b>Profile data.</b> Your name, profile photo, year, branch, the skills you list, your ring colour, and when you were last online (shown only to people you’ve made a deal with, and you can turn it off in Settings).</p>
 <p><b>Activity data.</b> Jobs you post, bids and pitches you place, favour requests, picks, payment confirmations, ratings, written reviews, reports and feedback you send, and the photos you attach to any of these.</p>
 <p><b>Messages.</b> Messages you send in job chats, and, if read receipts are on, the time you last read a chat.</p>
 <p><b>Location.</b> Only if you choose to tag a job with your location, that spot rounded to about 100 metres. When you bid, only whether you were near the job (yes or no), and only if you allow it in Settings. Your live location is used on your device to show jobs near you and is never sent to us.</p>
