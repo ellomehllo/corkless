@@ -136,3 +136,61 @@ export const TERMS=`
 <h2>18. General</h2>
 <p>If any part of these Terms is found unenforceable, the rest stays in effect. Our not enforcing a right is not a waiver of it. These Terms and the Privacy Policy are the entire agreement between you and tack about your use of the service.</p>
 `;
+
+export const RULES_V='2026-10-11';
+
+export const RULES=`
+<p class="lede">tack only works when everyone can trust the person on the other side of a job. These guidelines apply to every job, bid, chat, review, photo and board on tack. They sit alongside the Terms of Use you accepted.</p>
+
+<h2>1. Be yourself</h2>
+<ul>
+<li>You must be 18 or older and a student at the college you joined with.</li>
+<li>One account per person. Use your real name and a real photo of you.</li>
+<li>Never pretend to be someone else, and never let anyone else use your account.</li>
+</ul>
+
+<h2>2. Only real, legal jobs</h2>
+<p>Pin small, honest tasks and favours. These are never allowed:</p>
+<ul>
+<li>Assignments, exams, projects, proxy attendance or any other academic cheating.</li>
+<li>Alcohol, tobacco, vapes, drugs, weapons, gambling or betting.</li>
+<li>Anything sexual, including dates or paid company.</li>
+<li>Selling accounts, IDs, documents, notes you don’t own, or anyone’s personal data.</li>
+<li>Anything illegal, dangerous, or against your college’s rules.</li>
+</ul>
+
+<h2>3. Respect everyone</h2>
+<ul>
+<li>No harassment, threats, bullying, stalking or unwanted advances.</li>
+<li>No hate or slurs about caste, religion, gender, sexuality, region, language, disability or anything else about who someone is.</li>
+<li>Don’t share anyone’s photos, number or details without their consent.</li>
+<li>Keep chats about the job. If someone says no, stop.</li>
+</ul>
+
+<h2>4. Keep your word</h2>
+<ul>
+<li>Only bid on what you can actually do, and show up when you said you would.</li>
+<li>Pay what you agreed, on time. Confirm payments honestly.</li>
+<li>Ratings and reviews must be honest and about a real job. No fake bids, reviews or payment confirmations.</li>
+</ul>
+
+<h2>5. Stay safe in person</h2>
+<ul>
+<li>Meet in public places on or near campus, and tell a friend where you’re going.</li>
+<li>Never share your password, one-time codes or UPI PIN. You never need a PIN to receive money.</li>
+<li>If something feels wrong, leave. In an emergency, call 112 first.</li>
+</ul>
+
+<h2>6. Report, don’t retaliate</h2>
+<p>If someone breaks these guidelines, report them or block them. Reports go to the organiser and the person you report is never told who reported them. Don’t take matters into your own hands, and never make false reports.</p>
+
+<h2>7. What happens if you break them</h2>
+<ul>
+<li><b>Content removed.</b> Jobs, bids, photos, messages or reviews that break these guidelines are taken down.</li>
+<li><b>Jobs on hold.</b> When several people report you, your jobs are hidden from others until the organiser reviews them.</li>
+<li><b>Suspension or a permanent ban.</b> Your account can be suspended or banned, without warning for serious cases like threats, sexual content, fraud or anything involving a minor. Making a new account to get around a ban gets that account banned too.</li>
+<li><b>Legal action.</b> If the law requires it, such as a valid order from a court or the police, we will share your account details, content and messages with the authorities and keep the records an investigation needs. Where someone’s safety is at risk, we may contact the police ourselves.</li>
+</ul>
+
+<p>By tapping I understand, you agree to follow these guidelines every time you use tack.</p>
+`;
