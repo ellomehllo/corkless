@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610112105';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610112105';
-import {modHit,MOD_CAT} from './mod.js?v=202610112105';
+import {makeDb} from './db.js?v=202610112122';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610112122';
+import {modHit,MOD_CAT} from './mod.js?v=202610112122';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -66,6 +66,9 @@ const I={
  eyeoff:'<path d="M10.6 5.1A9.7 9.7 0 0 1 12 5c6.5 0 10 7 10 7a17.4 17.4 0 0 1-2.4 3.3M6.6 6.6C3.6 8.5 2 12 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="m3 3 18 18"/>',
  ban:'<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
  moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/>',
+ smile:'<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/>',
+ dots:'<path d="M12 5h.01M12 12h.01M12 19h.01" stroke-width="3"/>',
+ image:'<rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="1.8"/><path d="m21 15-4.5-4.5L6 21"/>',
  reply:'<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
  copy:'<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>'
 };
@@ -669,7 +672,11 @@ async function sendMedia(kind,blob,ext,dur){const c=S.chat;if(!c.key||!canMessag
   try{await S.fb.rpc('send_msg',{p_thread:c.key,p_job:c.jobKey||null,p_other:c.other,p_text:'',p_kind:kind,p_media:path,p_dur:dur||null,p_reply:reply});savePriv({seen:{[c.key]:Date.now()}})}
   catch(e){console.warn(e);toast('Couldn\u2019t send that. Try again.')}
   S.chatUp=null;render()}
-async function sendChatPhoto(file){try{const d=await readPic(file),b=await (await fetch(d)).blob();sendMedia('photo',b,'jpg')}catch{toast('That photo couldn\u2019t be opened. Try another one.')}}
+async function sendChatPhoto(file){let b;try{const d=await readPic(file);b=await (await fetch(d)).blob()}catch{toast('That photo couldn\u2019t be opened. Try another one.');return}return sendMedia('photo',b,'jpg')}
+// One file input that lives outside the app's re-rendered regions. Opening the system picker sends the page to the
+// background, which re-renders the chat, so an input inside the composer could be replaced before the photo arrives.
+const chatPicker=(()=>{const i=document.createElement('input');i.type='file';i.accept='image/*';i.multiple=true;i.hidden=true;
+  i.addEventListener('change',async()=>{const fs=[...(i.files||[])].slice(0,10);i.value='';for(const f of fs)await sendChatPhoto(f)});document.body.appendChild(i);return i})();
 const recClock=()=>mmss(S.rec?(Date.now()-S.rec.t0)/1000:0);
 async function recStart(){if(S.rec)return;if(!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==='undefined'){toast('This browser can\u2019t record audio.');return}
   let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:true})}catch{toast('Allow the microphone for tack to send voice messages.');return}
@@ -1272,8 +1279,10 @@ function viewChat(D){
      // Like Instagram: one centred time above a group, when the chat starts, after an hour's gap or on a new day.
      const gap=(a,b)=>!a||b.at-a.at>36e5||new Date(a.at).toDateString()!==new Date(b.at).toDateString();
      return c.msgs.map((m,i)=>{const rx=Object.values(m.reactions||{}).filter(e=>REACTS.includes(e)),q=m.replyTo?byId.get(m.replyTo):null;
-       const p=c.msgs[i-1],n=c.msgs[i+1],head=gap(p,m),cont=!head&&p.by===m.by,more=!!n&&!gap(m,n)&&n.by===m.by;
-       return`${head?`<p class="tstamp">${chatStamp(m.at)}</p>`:''}<div class="${m.by===me?'out':'in'}${m.kind!=='text'?' media '+m.kind:''}${rx.length?' hasrx':''}${cont?' cont':''}${more?' more':''}" data-mid="${m.id}">${q?quoteHTML(q):''}${msgBody(m)}${rx.length?`<span class="rx${S.rxPop===m.id?' pop':''}">${[...new Set(rx)].join('')}${rx.length>1?`<b>${rx.length}</b>`:''}</span>`:''}</div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`}).join('')})()}
+       const p=c.msgs[i-1],n=c.msgs[i+1],head=gap(p,m),mine=m.by===me,cont=!head&&p.by===m.by&&!q,more=!!n&&!gap(m,n)&&n.by===m.by&&!n.replyTo,lastOfRun=!n||gap(m,n)||n.by!==m.by;
+       const lab=q?`<p class="rlabel">${mine?(q.by===me?'You replied to yourself':'You replied to '+esc(firstName(q.by))):esc(firstName(m.by))+(q.by===me?' replied to you':' replied')}</p><button class="rquote" data-act="jumpMsg" data-to="${q.id}"><span>${esc(msgSnip(q))}</span></button>`:'';
+       const acts=`<span class="macts">${S.rxFor===m.id?`<span class="rxbar" role="group" aria-label="React">${REACTS.map(e=>`<button data-act="reactMsg" data-to="${m.id}" data-e="${e}" aria-label="React with ${e}">${e}</button>`).join('')}</span>`:''}<button data-act="rxOpen" data-to="${m.id}" data-tip="React" aria-label="React">${ic('smile',18)}</button><button data-act="replyMsg" data-to="${m.id}" data-tip="Reply" aria-label="Reply">${ic('reply',18)}</button><button data-act="msgMore" data-to="${m.id}" data-tip="More" aria-label="More">${ic('dots',18)}</button></span>`;
+       return`${head?`<p class="tstamp">${chatStamp(m.at)}</p>`:''}<div class="mrow ${mine?'mine':'theirs'}${cont?' cont':''}${more?' more':''}${rx.length?' hasrx':''}">${mine?'':`<span class="mav">${lastOfRun?face(m.by,28):''}</span>`}<div class="mcol">${lab}<div class="mline"><div class="${mine?'out':'in'}${m.kind!=='text'?' media '+m.kind:''}" data-mid="${m.id}">${msgBody(m)}${rx.length?`<span class="rx${S.rxPop===m.id?' pop':''}">${[...new Set(rx)].join('')}${rx.length>1?`<b>${rx.length}</b>`:''}</span>`:''}</div>${acts}</div></div></div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`}).join('')})()}
    ${S.chatUp?`<div class="out media pending">${S.chatUp==='photo'?'Sending photo…':'Sending voice message…'}</div>`:''}
   </div>
   ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats now happen inside jobs: pin a job, or hire ${esc(firstName(c.other))} again from their profile.`}</p></div>`:`
@@ -1281,12 +1290,13 @@ function viewChat(D){
     <button class="cbtn" data-act="recCancel" aria-label="Cancel recording">${ic('trash',19)}</button>
     <span class="recbar"><i class="recdot"></i><span id="recT">${recClock()}</span><span class="muted">Recording</span></span>
     <button class="csend" data-act="recSend" aria-label="Send voice message">${ic('send',19,2,'var(--on-grad)')}</button></div>`
-   :`${S.chatDraft.reply?replyBar(S.chatDraft.reply):''}<div class="composer ${S.chatDraft.text.trim()?'hastext':''}" id="composer">
-    <label class="cbtn" for="chatPic" aria-label="Send a photo">${ic('camera',20)}<input id="chatPic" type="file" accept="image/*" hidden></label>
+   :`${S.chatDraft.reply?replyBar(S.chatDraft.reply):''}<div class="composer igc ${S.chatDraft.text.trim()?'hastext':''}" id="composer"><div class="igpill">
+    <button class="igcam" data-act="pickChatPhoto" aria-label="Send a photo">${ic('camera',18,2,'#fff')}</button>
     <label class="field" for="msg"><input id="msg" type="text" maxlength="1000" placeholder="Message…" value="${esc(S.chatDraft.text)}" data-bind="chatDraft.text" aria-label="Message ${esc(firstName(c.other))}" autocomplete="off"></label>
-    <button class="csend cmic" data-act="recStart" aria-label="Record a voice message">${ic('mic',20,2,'var(--on-grad)')}</button>
-    <button class="csend ctext" data-act="send" aria-label="Send">${ic('send',19,2,'var(--on-grad)')}</button>
-  </div>`}</div>`}`;
+    <button class="igicon cmic" data-act="recStart" aria-label="Record a voice message">${ic('mic',22)}</button>
+    <button class="igicon cimg" data-act="pickChatPhoto" aria-label="Send a photo">${ic('image',22)}</button>
+    <button class="igsend ctext" data-act="send">Send</button>
+  </div></div>`}</div>`}`;
 }
 function viewPerson(uid,D){
   const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,online=onlineNow(uid);
@@ -2035,8 +2045,11 @@ const ACT={
         again:'You\u2019ve already asked '+firstName(o.to)+' today.'}[data]||'You can only send this to someone you\u2019ve hired before.'),()=>toast('Couldn\u2019t send it. Try again.'))})},
   acceptOffer(el){const k=el.dataset.key;S.fb.updateDoc(S.fb.doc(S.db,'offers',k),{status:'accepted',respondedAt:Date.now()}).then(()=>toast('Accepted. It\u2019s now a job between you two.')).catch(writeErr)},
   declineOffer(el){const k=el.dataset.key;S.fb.updateDoc(S.fb.doc(S.db,'offers',k),{status:'declined',respondedAt:Date.now()}).then(()=>toast('Declined. They won\u2019t be told.')).catch(writeErr)},
-  reactMsg(el){S.sheet=null;reactTo(+el.dataset.to,el.dataset.e)},
-  replyMsg(el){startReply(+el.dataset.to)},
+  reactMsg(el){S.sheet=null;S.rxFor=null;reactTo(+el.dataset.to,el.dataset.e)},
+  replyMsg(el){S.rxFor=null;startReply(+el.dataset.to)},
+  rxOpen(el){const id=+el.dataset.to;S.rxFor=S.rxFor===id?null:id;render()},
+  msgMore(el){S.rxFor=null;S.sheet={type:'msgmenu',mid:+el.dataset.to};render()},
+  pickChatPhoto(){chatPicker.click()},
   cancelReply(){S.chatDraft.reply=null;render()},
   copyMsg(el){const m=chatMsg(+el.dataset.to);S.sheet=null;render();if(m)navigator.clipboard?.writeText(m.t).then(()=>toast('Copied'),()=>toast('Couldn\u2019t copy that.'))},
   unsendMsg(el){const id=+el.dataset.to,c=S.chat;S.sheet=null;c.msgs=c.msgs.filter(x=>x.id!==id);if(S.chatDraft.reply?.id===id)S.chatDraft.reply=null;render();
@@ -2141,6 +2154,7 @@ document.addEventListener('pointermove',e=>{if(!sw)return;const dx=e.clientX-sw.
   sw.dx=Math.max(0,Math.min(dx,90));sw.t.style.transform=`translateX(${sw.dx}px)`;const armed=sw.dx>56;if(armed!==sw.armed){sw.armed=armed;sw.t.classList.toggle('armed',armed);if(armed)navigator.vibrate?.(8)}});
 ['pointerup','pointercancel'].forEach(n=>document.addEventListener(n,()=>{if(!sw)return;const {t,on,armed}=sw;sw=null;if(!on)return;
   t.classList.remove('swiping','armed');t.style.transform='';lp={until:Date.now()+350,fired:false};if(armed)startReply(+t.dataset.mid)}));
+document.addEventListener('click',e=>{if(S.rxFor&&!e.target.closest('.rxbar,[data-act="rxOpen"]')){S.rxFor=null;render()}},true);
 document.addEventListener('click',e=>{const t=e.target.closest('.msgs [data-mid]');if(!t||e.target.closest('button,a'))return;const id=+t.dataset.mid,now=Date.now();
   if(lastTap&&lastTap.id===id&&now-lastTap.t<320){lastTap=null;reactTo(id,'❤️',true);return}lastTap={id,t:now}});
 document.addEventListener('submit',e=>{

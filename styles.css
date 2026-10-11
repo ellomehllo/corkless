@@ -136,11 +136,6 @@ button.chip{min-height:34px}
 .in,.out{max-width:min(75%,340px);padding:8px 13px;font-size:15px;line-height:1.35;overflow-wrap:anywhere;white-space:pre-wrap;border-radius:20px}
 .in{align-self:flex-start;background:var(--in)}
 .out{align-self:flex-end;background:var(--grad);color:var(--on-grad);font-weight:500}
-/* a run of messages from one person sits close, with the joining corners tucked in */
-.msgs>.in,.msgs>.out{margin-top:8px}
-.msgs>.cont{margin-top:2px}
-.in.cont{border-top-left-radius:6px}.in.more{border-bottom-left-radius:6px}
-.out.cont{border-top-right-radius:6px}.out.more{border-bottom-right-radius:6px}
 .tstamp{align-self:center;margin:14px 0 2px;font-size:var(--t-11);font-weight:600;color:var(--muted)}
 .msgwhen{margin:-6px 0 4px;text-align:center;font-size:var(--t-12);color:var(--muted)}
 .in .time,.out .time{display:block;margin-top:5px;white-space:normal}
@@ -1517,3 +1512,63 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .rxpick button.on{background:var(--surface2)}
 .sheet-msgmenu .menu button{background:transparent}
 @media (prefers-reduced-motion:reduce){.rx.pop,.msgs [data-mid].flash{animation:none}}
+
+/* Messages, Instagram style: solid bubbles, grouped runs, avatar on the last message of theirs,
+   replies quoted above the bubble, react / reply / more beside it on hover */
+:root{--bub:#4A5CF0;--bub-in:#262629}
+:root[data-theme="light"]{--bub:#3F55EE;--bub-in:#EFEFF1}
+.mrow{display:flex;align-items:flex-end;gap:8px;margin-top:8px;max-width:100%}
+.mrow.cont{margin-top:2px}
+.mrow.mine{justify-content:flex-end}
+.mrow.hasrx{margin-bottom:14px}
+.mav{width:28px;flex-shrink:0;display:flex;align-items:flex-end}
+.mav img,.mav>span{width:28px;height:28px;border-radius:50%}
+.mcol{display:flex;flex-direction:column;align-items:flex-start;min-width:0;max-width:min(75%,440px)}
+.mine .mcol{align-items:flex-end}
+.mline{display:flex;align-items:center;gap:4px;max-width:100%;min-width:0}
+.mine .mline{flex-direction:row-reverse}
+.mrow .in,.mrow .out{max-width:100%;border-radius:22px;padding:8px 14px;font-size:15px;line-height:1.35;font-weight:400}
+.mrow .out{background:var(--bub);color:#fff}
+.mrow .in{background:var(--bub-in);color:var(--fg)}
+.theirs.cont .in{border-top-left-radius:6px}.theirs.more .in{border-bottom-left-radius:6px}
+.mine.cont .out{border-top-right-radius:6px}.mine.more .out{border-bottom-right-radius:6px}
+.mrow .media.photo{padding:0;background:none}
+.mrow .media.photo .mphoto{border-radius:18px}
+.mrow .out .mplay{background:rgba(255,255,255,.2)}
+.mrow .out .mwave{background:rgba(255,255,255,.3)}
+.rlabel{margin:8px 6px 4px;font-size:12px;color:var(--muted)}
+.rquote{position:relative;max-width:100%;margin-bottom:3px;padding:7px 13px;border-radius:18px;background:var(--bub-in);color:var(--muted);font-size:14px;line-height:1.3;text-align:left}
+.rquote span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mine .rquote{margin-right:10px}.theirs .rquote{margin-left:10px}
+.mine .rquote::after,.theirs .rquote::after{content:"";position:absolute;top:4px;bottom:4px;width:3px;border-radius:2px;background:var(--bub-in)}
+.mine .rquote::after{right:-9px}.theirs .rquote::after{left:-9px}
+.macts{position:relative;display:none;align-items:center;gap:0;color:var(--muted);flex-shrink:0}
+@media (hover:hover){.mrow:hover .macts,.macts:has(.rxbar){display:flex}}
+.macts>button{position:relative;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:inherit}
+.macts>button:hover{color:var(--fg);background:var(--surface2)}
+.macts>button[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);padding:6px 10px;border-radius:8px;
+  background:#2A2A2D;color:#fff;font-size:12px;font-weight:600;white-space:nowrap;pointer-events:none;z-index:6;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+.macts>button[data-tip]:hover::before{content:"";position:absolute;bottom:calc(100% + 3px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#2A2A2D;z-index:6}
+.rxbar{position:absolute;bottom:calc(100% + 6px);display:flex;gap:2px;padding:4px 6px;border-radius:999px;background:#2A2A2D;box-shadow:0 6px 20px rgba(0,0,0,.4);z-index:7}
+.mine .rxbar{right:0}.theirs .rxbar{left:0}
+.rxbar button{width:36px;height:36px;font-size:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:transform .12s}
+.rxbar button:hover{transform:scale(1.18)}
+:root[data-theme="light"] .rxbar,:root[data-theme="light"] .macts>button[data-tip]:hover::after{background:#fff;color:#121317;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+:root[data-theme="light"] .macts>button[data-tip]:hover::before{border-top-color:#fff}
+.seen{margin:4px 4px 0 auto;font-size:12px;font-weight:400}
+.tstamp{font-weight:500;font-size:12px;margin:18px 0 4px}
+/* the job banner reads as a quiet line, not a coloured pill */
+.msgs .banner{background:none!important;color:var(--muted)!important;font-size:12px;font-weight:500;padding:4px 10px}
+/* composer: one rounded pill, camera inside, Send appears once there's text */
+.composer.igc{gap:0}
+.igpill{flex:1;display:flex;align-items:center;gap:4px;min-height:46px;padding:4px 8px 4px 5px;border-radius:24px;background:var(--bub-in)}
+.igpill .field{background:none!important;padding:0 6px;border-radius:0}
+.igpill .field input{padding:10px 0;font-size:15px;background:none}
+.igcam{width:36px;height:36px;flex-shrink:0;border-radius:50%;background:var(--bub);display:flex;align-items:center;justify-content:center}
+.igicon{width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--fg);border-radius:50%}
+.igsend{display:none;padding:0 10px;height:36px;color:var(--bub);font-size:15px;font-weight:700}
+:root:not([data-theme="light"]) .igsend{color:#8C9CFF}
+.composer.igc.hastext .igsend{display:block}.composer.igc.hastext .cmic,.composer.igc.hastext .cimg{display:none}
+.main[data-view="chat"] .foot{box-shadow:none}
+.main[data-view="chat"] > .pad:first-child .iconbtn{background:none}
+.igpill,.igpill .field{min-width:0}.igpill .field input{width:100%;min-width:0}
