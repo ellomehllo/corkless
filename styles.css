@@ -132,10 +132,17 @@ button.chip{min-height:34px}
 .time{font-size:var(--t-11);font-weight:500;color:var(--dim)}
 .sect{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:8px}
 
-.msgs{display:flex;flex-direction:column;gap:12px;padding:4px 16px 8px}
-.in,.out{max-width:min(78%,340px);padding:11px 15px;font-size:var(--t-14);line-height:1.42;overflow-wrap:anywhere;white-space:pre-wrap}
-.in{align-self:flex-start;background:var(--in);border-radius:20px 20px 20px 6px}
-.out{align-self:flex-end;background:var(--grad);color:var(--on-grad);border-radius:20px 20px 6px 20px;font-weight:500}
+.msgs{display:flex;flex-direction:column;gap:0;padding:4px 16px 8px}
+.in,.out{max-width:min(75%,340px);padding:8px 13px;font-size:15px;line-height:1.35;overflow-wrap:anywhere;white-space:pre-wrap;border-radius:20px}
+.in{align-self:flex-start;background:var(--in)}
+.out{align-self:flex-end;background:var(--grad);color:var(--on-grad);font-weight:500}
+/* a run of messages from one person sits close, with the joining corners tucked in */
+.msgs>.in,.msgs>.out{margin-top:8px}
+.msgs>.cont{margin-top:2px}
+.in.cont{border-top-left-radius:6px}.in.more{border-bottom-left-radius:6px}
+.out.cont{border-top-right-radius:6px}.out.more{border-bottom-right-radius:6px}
+.tstamp{align-self:center;margin:14px 0 2px;font-size:var(--t-11);font-weight:600;color:var(--muted)}
+.msgwhen{margin:-6px 0 4px;text-align:center;font-size:var(--t-12);color:var(--muted)}
 .in .time,.out .time{display:block;margin-top:5px;white-space:normal}
 .out .time{color:rgba(6,6,8,.6);text-align:right}
 
@@ -576,7 +583,7 @@ button.jcover{cursor:zoom-in}
 .switch.on::after{transform:translateX(18px);background:var(--bg)}
 .sentcard{display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;padding:12px 4px}
 .sentcard p{margin:0;font-size:var(--t-14);line-height:1.55;color:var(--fg2);max-width:40ch}
-.seen{margin:-4px 2px 2px auto;font-size:var(--t-11);font-weight:500;color:var(--muted);text-align:right}
+.seen{margin:3px 2px 2px auto;font-size:var(--t-11);font-weight:500;color:var(--muted);text-align:right}
 .inlink{display:inline;padding:0;font:inherit;color:var(--fg);text-decoration:underline;text-underline-offset:2px}
 /* legal docs */
 #docRoot{position:fixed;inset:0;z-index:60}

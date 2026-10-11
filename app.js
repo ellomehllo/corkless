@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610111934';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS,RULES_V,RULES} from './legal.js?v=202610111934';
-import {modHit,MOD_CAT} from './mod.js?v=202610111934';
+import {makeDb} from './db.js?v=202610112102';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS,RULES_V,RULES} from './legal.js?v=202610112102';
+import {modHit,MOD_CAT} from './mod.js?v=202610112102';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -106,6 +106,9 @@ const validEmail=e=>/^[^\s@/]+@[^\s@/]+\.[^\s@/]{2,}$/.test(e);
 function clock(t){const d=new Date(t),h=d.getHours()%12||12,m=String(d.getMinutes()).padStart(2,'0');return `${h}:${m} ${d.getHours()<12?'am':'pm'}`}
 function ago(t){const s=(Date.now()-t)/1000;if(s<60)return'now';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';const d=new Date(t);return d.toLocaleDateString('en-IN',{day:'numeric',month:'short'})}
 function since(t){const a=ago(t);return a==='now'?'just now':/^\d+[mh]$/.test(a)?a+' ago':'on '+a}
+function chatStamp(t){const d=new Date(t),now=new Date(),day=x=>new Date(x).setHours(0,0,0,0),days=Math.round((day(now)-day(d))/864e5);
+  if(days===0)return clock(t);if(days===1)return'Yesterday '+clock(t);if(days<7)return d.toLocaleDateString('en-IN',{weekday:'short'})+' '+clock(t);
+  return d.toLocaleDateString('en-IN',d.getFullYear()===now.getFullYear()?{day:'numeric',month:'short'}:{day:'numeric',month:'short',year:'numeric'})+', '+clock(t)}
 function stamp(t){const d=new Date(t),today=new Date();return d.toDateString()===today.toDateString()?clock(t):d.toLocaleDateString('en-IN',{day:'numeric',month:'short'})+', '+clock(t)}
 function deadlineFor(when,at){
   const eod=k=>{const x=new Date(at);x.setDate(x.getDate()+k);x.setHours(23,59,59,0);return +x};
@@ -1266,8 +1269,11 @@ function viewChat(D){
    ${!c.msgs.length?`<p class="note" style="margin:10px 0">${c.loaded?'Say hi. Sort out the time and place here.':'Loading messages…'}</p>`:''}
    ${(()=>{const lastOut=[...c.msgs].reverse().find(m=>m.by===me),readAt=num(((S.threadDocs[c.key]||{}).read||{})[c.other]),seen=pref('receipts')&&lastOut&&readAt>=lastOut.at;
      const byId=new Map(c.msgs.map(m=>[m.id,m]));
-     return c.msgs.map(m=>{const rx=Object.values(m.reactions||{}).filter(e=>REACTS.includes(e)),q=m.replyTo?byId.get(m.replyTo):null;
-       return`<div class="${m.by===me?'out':'in'}${m.kind!=='text'?' media '+m.kind:''}${rx.length?' hasrx':''}" data-mid="${m.id}">${q?quoteHTML(q):''}${msgBody(m)}<span class="time">${stamp(m.at)}</span>${rx.length?`<span class="rx${S.rxPop===m.id?' pop':''}">${[...new Set(rx)].join('')}${rx.length>1?`<b>${rx.length}</b>`:''}</span>`:''}</div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`}).join('')})()}
+     // Like Instagram: one centred time above a group, when the chat starts, after an hour's gap or on a new day.
+     const gap=(a,b)=>!a||b.at-a.at>36e5||new Date(a.at).toDateString()!==new Date(b.at).toDateString();
+     return c.msgs.map((m,i)=>{const rx=Object.values(m.reactions||{}).filter(e=>REACTS.includes(e)),q=m.replyTo?byId.get(m.replyTo):null;
+       const p=c.msgs[i-1],n=c.msgs[i+1],head=gap(p,m),cont=!head&&p.by===m.by,more=!!n&&!gap(m,n)&&n.by===m.by;
+       return`${head?`<p class="tstamp">${chatStamp(m.at)}</p>`:''}<div class="${m.by===me?'out':'in'}${m.kind!=='text'?' media '+m.kind:''}${rx.length?' hasrx':''}${cont?' cont':''}${more?' more':''}" data-mid="${m.id}">${q?quoteHTML(q):''}${msgBody(m)}${rx.length?`<span class="rx${S.rxPop===m.id?' pop':''}">${[...new Set(rx)].join('')}${rx.length>1?`<b>${rx.length}</b>`:''}</span>`:''}</div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`}).join('')})()}
    ${S.chatUp?`<div class="out media pending">${S.chatUp==='photo'?'Sending photo…':'Sending voice message…'}</div>`:''}
   </div>
   ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Direct messages are closed. Chats now happen inside jobs: pin a job, or hire ${esc(firstName(c.other))} again from their profile.`}</p></div>`:`
@@ -1462,7 +1468,7 @@ function sheetHTML(D){
   const j=S.openJob?D.jobByKey[S.openJob]:null;
   switch(s.type){
   case'msgmenu':{const m=chatMsg(s.mid);if(!m){b='<h2 id="sheetT">This message is gone</h2>';break}const mine=m.reactions?.[S.me.id];
-    b=`<p id="sheetT" class="msgprev">${esc(msgSnip(m))}</p><div class="rxpick" role="group" aria-label="React">${REACTS.map(e=>`<button class="${mine===e?'on':''}" data-act="reactMsg" data-to="${m.id}" data-e="${e}" aria-label="React with ${e}" aria-pressed="${mine===e}">${e}</button>`).join('')}</div>
+    b=`<p id="sheetT" class="msgprev">${esc(msgSnip(m))}</p><p class="msgwhen">${m.by===S.me.id?'Sent':'Received'} ${stamp(m.at)}</p><div class="rxpick" role="group" aria-label="React">${REACTS.map(e=>`<button class="${mine===e?'on':''}" data-act="reactMsg" data-to="${m.id}" data-e="${e}" aria-label="React with ${e}" aria-pressed="${mine===e}">${e}</button>`).join('')}</div>
     <div class="menu"><button data-act="replyMsg" data-to="${m.id}">${ic('reply',18)} Reply</button>${m.kind==='text'?`<button data-act="copyMsg" data-to="${m.id}">${ic('copy',18)} Copy</button>`:''}${m.by===S.me.id?`<button class="danger" data-act="unsendMsg" data-to="${m.id}">${ic('trash',18)} Unsend</button>`:''}</div>`;break}
   case'who':{const u=s.about,rs=restricted().includes(u),bl=arr(S.priv.blocked).includes(u),fn=esc(firstName(u));
     b=`<h2 id="sheetT">${esc(shortName(u))}</h2>
