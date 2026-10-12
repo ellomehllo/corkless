@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610120755';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610120755';
-import {modHit,MOD_CAT} from './mod.js?v=202610120755';
+import {makeDb} from './db.js?v=202610120909';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610120909';
+import {modHit,MOD_CAT} from './mod.js?v=202610120909';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -92,7 +92,7 @@ const S={
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',banner:'',adult:false,rules:false},
   inv:{email:'',campus:'',camp:''}, camp:{q:''}, coms:{}, cmine:{}, cinv:{}, cid:null, cnote:null, cnotes:{}, ccoms:{}, cmembers:{}, cdraft:{name:'',about:'',text:'',more:'',color:'#7FA2FF',handle:'',comment:''}, lastInvite:null, myCampus:null, campuses:{}, viewCampus:(()=>{try{return localStorage.getItem('tack.viewCampus')||''}catch{return''}})(),
   picks:{}, repDocs:{},
-  sheet:null, rate:{a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]}, rep:{why:'',note:'',block:false}, erase:{pw:''},
+  sheet:null, omenu:null, rate:{a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]}, rep:{why:'',note:'',block:false}, erase:{pw:''},
   chat:{key:null}, err:{}
 };
 
@@ -621,18 +621,17 @@ function cnoteTile(n,i){const c=COLOR_RE.test(n.color||'')?n.color:'#7FA2FF',k=O
 function viewCBoard(D){const id=S.cid,c=S.coms[id];if(!id||!c||!S.cmine[id])return viewBoard(D);
   const notes=Object.entries(S.cnotes).map(([k,v])=>({...v,id:k})).sort((a,b)=>b.at-a.at),n=Object.keys(S.cmembers).length,owner=comOwner(id);
   const cols=wideMQ.matches?3:2,col=Array.from({length:cols},()=>[]);notes.forEach((x,i)=>col[i%cols].push(cnoteTile(x,i)));
-  return`<div class="pad cboard">${back('board',campus())}
+  return`<div class="pad cboard"><div class="ptop">${back('board',campus())}${kebab('cboard',[{i:'users',t:'Members',v:String(n),at:'data-sheet="cmembers"'},owner?{i:'plus',t:'Invite people',at:'data-sheet="cinvite"'}:null],'Board options')}</div>
     <div class="chead"><h1 class="pageh">${esc(c.name)}</h1>${c.about?`<p class="cabout">${esc(c.about)}</p>`:''}
-      <div class="cmeta"><button class="cmembtn" data-sheet="cmembers">${ic('users',15)} ${n} ${n===1?'member':'members'}</button>${owner?`<button class="pick" data-sheet="cinvite">${ic('plus',14,2.4)} Invite</button>`:''}</div></div>
+      <div class="cmeta"><span class="muted">${n} ${n===1?'member':'members'}</span></div></div>
     ${notes.length?`<div class="wall">${col.map(x=>`<div class="wcol">${x.join('')}</div>`).join('')}</div>`:`<div class="empty"><b>No notes yet</b><p>Add the first note for ${esc(c.name)}.</p></div>`}
     <button class="cta cadd" data-act="cnoteStart">${ic('plus',17,2.4,'var(--on-grad)')} Add a note</button></div>`}
 function viewCNote(D){const n0=S.cnotes[S.cnote];if(!S.cid||!n0)return viewCBoard(D);const n={...n0,id:S.cnote},c=COLOR_RE.test(n.color||'')?n.color:'#7FA2FF',me=S.me.id,owner=comOwner(S.cid);
   const coms=Object.entries(S.ccoms).map(([k,v])=>({...v,id:k})).filter(x=>x.note===n.id).sort((a,b)=>a.at-b.at);
-  return`<div class="pad cnotepage">${back('cboard',comName(S.cid))}
+  return`<div class="pad cnotepage"><div class="ptop">${back('cboard',comName(S.cid))}${kebab('cnote',[n.by===me||owner?{i:'trash',t:n.by===me?'Delete this note':'Remove this note',at:'data-act="cnoteDel"',danger:true}:null],'Note options')}</div>
     <div class="tile ntile cnbig" style="--nc:${c};--d:0s"><span class="pin"></span><p>${esc(n.text)}</p>${[n.where,n.when].filter(Boolean).length?`<span class="where">${ic('place',12,2.2)}<span>${esc([n.where,n.when].filter(Boolean).join(' · '))}</span></span>`:''}${n.more?`<p class="cmore">${esc(n.more)}</p>`:''}
       <span class="by">${face(n.by,26)}<span class="nm">${esc(shortName(n.by))}</span><span class="n">${since(n.at)}</span></span></div>
     ${n.pics?picStrip('c:'+n.id,n.pics):''}
-    ${n.by===me||owner?`<button class="linkbtn cdel" data-act="cnoteDel">${n.by===me?'Delete this note':'Remove this note'}</button>`:''}
     <h2 class="h2">${coms.length} ${coms.length===1?'comment':'comments'}</h2>
     <div class="ccoms">${coms.map(x=>`<div class="ccom">${face(x.by,30)}<div class="cbody"><span class="cwho">${esc(shortName(x.by))} <span class="muted">${since(x.at)}</span></span><p>${esc(x.t)}</p>
       ${x.by===me||owner?`<button class="linkbtn" data-act="ccomDel" data-id="${esc(x.id)}">Delete</button>`:''}</div></div>`).join('')}</div>
@@ -915,6 +914,12 @@ function onboardHTML(edit){
 }
 
 function back(to,label){return`<button class="back" data-go="${to}">${ic('back',16)} ${label}</button>`}
+// One overflow menu (⋯) per page, top right. The page keeps its main action in view; everything else lives here.
+// Items: {i:icon,t:label,at:'data-… attributes',danger,v:value} · {sep:1} · {html}
+function kebab(id,items,label='More options',cls=''){
+  items=items.filter(Boolean).filter((x,i,a)=>!(x.sep&&(i===0||a[i-1].sep)));while(items.length&&items[items.length-1].sep)items.pop();
+  if(!items.some(x=>x.at))return'';const open=S.omenu===id;
+  return`<div class="omenu${cls?' '+cls:''}${open?' open':''}"><button class="obtn" data-act="omenu" data-id="${id}" aria-haspopup="menu" aria-expanded="${open}" aria-label="${esc(label)}">${ic('dots',20,2.4)}</button>${open?`<div class="opop" role="menu" aria-label="${esc(label)}">${items.map(x=>x.sep?'<span class="osep" role="separator"></span>':x.html||`<button role="menuitem" class="oitem${x.danger?' danger':''}" ${x.at}>${ic(x.i,18)}<span class="ot">${x.t}</span>${x.v?`<span class="oval">${x.v}</span>`:''}</button>`).join('')}</div>`:''}</div>`}
 const LOGO={
   wa:'<svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><path fill="#fff" d="M16 4.5A11.4 11.4 0 0 0 6.2 21.7L4.6 27.4l5.9-1.5A11.4 11.4 0 1 0 16 4.5Z"/><path fill="#25D366" d="M16 6.6a9.3 9.3 0 0 0-7.9 14.3l.2.4-1 3.4 3.5-.9.4.2A9.3 9.3 0 1 0 16 6.6Z"/><path fill="#fff" d="M12.5 10.6c-.2-.5-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0-1.1 2.7c0 1.6 1.2 3.1 1.3 3.3s2.3 3.6 5.6 4.9c2.8 1.1 3.3.9 4 .8s2-.8 2.2-1.6.3-1.5.2-1.6-.3-.2-.6-.4l-2.1-1c-.3-.1-.5-.2-.7.1l-1 1.2c-.2.2-.4.2-.7.1a7.6 7.6 0 0 1-2.2-1.4 8.4 8.4 0 0 1-1.5-1.9c-.2-.3 0-.5.1-.6l.5-.6.3-.5a.6.6 0 0 0 0-.5l-1-2.4Z"/></svg>',
   ig:'<svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><rect x="5.5" y="5.5" width="21" height="21" rx="6.5" fill="none" stroke="#fff" stroke-width="2.4"/><circle cx="16" cy="16" r="5" fill="none" stroke="#fff" stroke-width="2.4"/><circle cx="21.9" cy="10.1" r="1.5" fill="#fff"/></svg>'};
@@ -1070,19 +1075,19 @@ function viewJob(D){
     assigned:repicking(j)?(mine?'<span class="tag warn">Choose someone else</span>':droppedMe(j)?'<span class="tag">Taken</span>':'<span class="tag">Choosing again</span>'):mine||j.accepted===me?`<span class="tag ok">Picked ${esc(shortName(j.accepted))}</span>`:'<span class="tag">Taken</span>',done:payOf(j)?.ok?'<span class="tag ok">Done · Paid ✓</span>':'<span class="tag ok">Done</span>'}[st]||'';
   let foot='';
   if(mine){
-    if(st==='open')foot=`<div class="foot"><button class="btn2" data-act="editJob" data-key="${esc(j.key)}">Edit job</button><button class="btn2" data-sheet="close">Close this job</button></div>`;
+    if(st==='open')foot='';
     else if(st==='assigned'&&!j.accepted){const left=bids.filter(b=>!j.dropped.includes(b.by)).length;
       foot=`<div class="foot"><div class="banner warnbanner">${left?'Pick someone else from the bids':'Nobody else has bid yet'}</div>
       <p class="note">${left?'The job stays off the board while you choose.':'Put it back on the board so others can bid, or close it.'}</p>
       ${left?'':'<button class="cta" data-act="reopenJob">Put it back on the board</button>'}<button class="btn2" data-sheet="close">Close this job</button></div>`}
     else if(st==='assigned')foot=`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} You picked ${esc(firstName(j.accepted))} for ₹${fmt(j.agreed)}</div>
       <button class="cta" data-sheet="done">Mark as done</button>${posterPay(j)}<button class="btn2" data-thread-with="${esc(j.accepted)}">Message ${esc(firstName(j.accepted))}</button>
-      ${sentOf(j)||payOf(j)?'':`<button class="linkbtn" data-sheet="repick">${esc(firstName(j.accepted))} can’t do it? Pick someone else</button>`}</div>`;
+</div>`;
     else if(st==='done'){const pay=payOf(j),dn=esc(firstName(j.accepted));
       foot=`<div class="foot">${pay?.ok?`<div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${dn} confirmed they got ₹${fmt(j.agreed)}</div>`
         :pay?`<div class="banner warnbanner">${dn} hasn’t got your payment yet</div>`:''}${posterPay(j)}
         ${j.pick?.ratedDoer?`<p class="note">You rated ${dn}${(S.priv.gave||{})[j.key]?' ★'+num(S.priv.gave[j.key]).toFixed(1):''}.</p>`:`<button class="btn2" data-sheet="done">Rate ${dn}</button>`}
-        ${j.pick?.review?`<p class="note">Your review is on ${dn}'s profile, without your name. <button class="linkbtn" style="padding:0" data-sheet="delReview" data-rid="${esc(j.pick.review)}" data-about="${esc(j.accepted)}">Delete it</button></p>`
+        ${j.pick?.review?`<p class="note">Your review is on ${dn}'s profile, without your name.</p>`
           :j.pick?.ratedDoer?`<button class="btn2" data-sheet="review">Write a public review of ${dn}</button>`:''}
         ${j.pick?.noteToPoster?`<div class="box stack" style="gap:4px"><span class="formlabel">${dn}'s private note to you</span><span class="t2" style="color:var(--fg)">${esc(str(j.pick.noteToPoster,200))}</span></div>`:''}</div>`}
     else if(st==='expired')foot=`<div class="foot"><button class="btn2" data-act="repost">Pin it again</button></div>`;
@@ -1095,7 +1100,6 @@ function viewJob(D){
         ${picStrip('b:'+j.key+'~'+me,myBid.pics,'sub')}
         <span class="bidwhen">Placed ${since(myBid.at)}</span>
         <div class="bidbtns"><button class="btn2" data-act="editBid">${ic('edit',15)} Edit bid</button>${threadOpen(jobThreadKey(j.key,me))?`<button class="btn2" data-thread-job>${ic('chat',15)} Message ${esc(firstName(j.owner))}</button>`:''}</div>
-        <button class="linkbtn bidwd" data-act="withdraw">Withdraw my bid</button>
       </div>
       </div>`;
     else if(st==='open')foot=`<div class="foot">
@@ -1114,8 +1118,7 @@ function viewJob(D){
     else if(j.accepted===me&&st==='done'){const pay=payOf(j),pn=esc(firstName(j.owner)),late=!pay?.ok&&Date.now()-(j.doneAt||pay?.at||Date.now())>PAY_GRACE;
       foot=pay?.ok?`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} Paid · you confirmed ₹${fmt(j.agreed)} ${since(pay.at)}</div>
           ${j.pick?.ratedPoster?`<p class="note">You rated ${pn}${(S.priv.gave||{})[j.key]?' ★'+num(S.priv.gave[j.key]).toFixed(1):''}.</p>`:`<button class="cta" data-sheet="ratePoster">Rate ${pn}</button>`}
-          ${j.pick?.noteToDoer?`<div class="box stack" style="gap:4px"><span class="formlabel">${pn}'s private note to you</span><span class="t2" style="color:var(--fg)">${esc(str(j.pick.noteToDoer,200))}</span></div>`:''}
-          <button class="linkbtn" data-act="paid" data-val="no">I marked this by mistake</button></div>`
+          ${j.pick?.noteToDoer?`<div class="box stack" style="gap:4px"><span class="formlabel">${pn}'s private note to you</span><span class="t2" style="color:var(--fg)">${esc(str(j.pick.noteToDoer,200))}</span></div>`:''}</div>`
         :`<div class="foot"><div class="stack gap8 box" style="border:1px solid rgba(170,226,84,.3)">
           <span class="t1" style="font-size:var(--t-16)">Did ${pn} pay you ₹${fmt(j.agreed)}?</span>
           <span class="t2">${sentOf(j)?`${pn} says they sent it ${since(sentOf(j).at)}${sentOf(j).ref==='cash'?' in cash':sentOf(j).ref?' (UPI ref '+esc(sentOf(j).ref)+')':''}. `:''}${pay?'You said not yet. Tap Yes once the money reaches you.':`${pn} marked this job done. Confirm once the money reaches you.`}</span></div>${doerPay(j)}
@@ -1127,7 +1130,17 @@ function viewJob(D){
       <button class="cta" data-thread-job>Message ${esc(firstName(j.owner))}</button>${doerPay(j)}</div>`;
     else foot=`<div class="foot"><p class="note">${st==='assigned'||st==='done'?'This job went to someone else.':'This job is closed.'}</p></div>`;
   }
-  const mod=!mine&&S.me.isOwner&&st!=='removed'?`<button class="linkbtn" data-sheet="remove">Take this job off the board</button>`:'';
+  const menu=kebab('job',[{i:'share',t:'Share',at:`data-act="openShare" data-key="${esc(j.key)}"`},
+    mine?null:{i:'bookmark',t:isSaved(j.key)?'Remove from saved':'Save for later',at:`data-act="toggleSave" data-key="${esc(j.key)}"`},
+    mine&&st==='open'?{i:'edit',t:'Edit job',at:`data-act="editJob" data-key="${esc(j.key)}"`}:null,
+    mine&&st==='assigned'&&j.accepted&&!repicking(j)&&!(sentOf(j)||payOf(j))?{i:'users',t:'Pick someone else',at:'data-sheet="repick"'}:null,
+    !mine&&st==='open'&&myBid?{i:'x',t:'Withdraw my bid',at:'data-act="withdraw"'}:null,
+    j.accepted===me&&st==='done'&&payOf(j)?.ok?{i:'x',t:'I marked paid by mistake',at:'data-act="paid" data-val="no"'}:null,
+    mine&&st==='done'&&j.pick?.review?{i:'trash',t:'Delete my review',at:`data-sheet="delReview" data-rid="${esc(j.pick.review)}" data-about="${esc(j.accepted)}"`}:null,
+    {sep:1},
+    mine&&st==='open'?{i:'x',t:'Close this job',at:'data-sheet="close"',danger:true}:null,
+    mine?null:{i:'flag',t:'Report this job',at:`data-sheet="report" data-about="${esc(j.owner)}"`,danger:true},
+    !mine&&S.me.isOwner&&st!=='removed'?{i:'trash',t:'Take off the board',at:'data-sheet="remove"',danger:true}:null],'Job options','onhero');
   const jp=j.pics?picsOf('j:'+j.key):null,d=-((Date.now()/1000)%32).toFixed(2);
   const hasPh=!!(jp&&jp.length),online=/^online$/i.test(j.where||'');
   const cover=hasPh?`<button class="jcover" data-pic="${esc('j:'+j.key)}" data-i="0" aria-label="See the ${jp.length} ${jp.length===1?'photo':'photos'}"><span class="tbg ph" style="--d:${d}s"><img src="${jp[0]}" alt=""></span></button>`
@@ -1151,7 +1164,7 @@ function viewJob(D){
   </section>`;
   if(isOrg(j.owner))return viewTackNote(j);
   return`<div class="pad jobpage${gcls(j)}${isOrg(j.owner)?' tackjob':''}" style="--nc:${noteOf(j)}${gvars(j)}">
-  <div class="jhero">${cover}${back('board','Board')}<div class="jtools">${mine&&st==='open'?`<button class="jtool" data-act="editJob" data-key="${esc(j.key)}" aria-label="Edit this job">${ic('edit',18)}</button>`:''}<button class="jtool" data-act="openShare" data-key="${esc(j.key)}" aria-label="Share this job">${ic('share',18)}</button>${mine?'':`<button class="jtool ${isSaved(j.key)?'on':''}" data-act="toggleSave" data-key="${esc(j.key)}" aria-label="${isSaved(j.key)?'Remove from saved':'Save this job'}" aria-pressed="${isSaved(j.key)}">${ic('bookmark',18,2,'currentColor',isSaved(j.key)?'currentColor':'none')}</button>`}</div>
+  ${menu}<div class="jhero">${cover}${back('board','Board')}
     <div class="jhead"><h1 class="h1">${esc(j.text)}</h1></div></div>
   <div class="jpwrap">${hasPh?`<button class="jhint" data-pic="${esc('j:'+j.key)}" data-i="0">${hint}</button>`:`<span class="jhint">${hint}</span>`}<button class="jposter" data-person="${esc(j.owner)}"><span class="javwrap"><span class="ring${onlineNow(j.owner)?' live':''}" style="width:68px;height:68px">${face(j.owner,58)}</span>${online?'<span class="onl"><i></i>Online</span>':''}</span>
     <span class="pname">${esc(shortName(j.owner))}</span>
@@ -1162,8 +1175,7 @@ function viewJob(D){
     ${j.more?`<p class="jmore">${esc(j.more)}</p>`:''}
   </div>
   ${mine?bidsSec+foot:foot+(st==='open'?'':bidsSec)}
-  </div>
-  ${!mine?`<div class="reportrow"><button class="linkbtn" data-sheet="report" data-about="${esc(j.owner)}">Report this job</button>${mod}</div>`:''}`;
+  </div>`;
 }
 const NOTE_MAX=100,noteCount=t=>`${String(t||'').length} / ${NOTE_MAX}`;
 const NOTE_WHITE='#FFFFFF';
@@ -1277,7 +1289,7 @@ function viewChat(D){
      <button class="back" data-go="chats" aria-label="Back to chats" style="padding:0">${ic('back',20)}</button>
      <button class="rowmain" data-person="${esc(c.other)}" data-hold="${esc(c.other)}">${ring(c.other,42)}<span class="rowtext"><span style="font-size:var(--t-16);font-weight:600;letter-spacing:-.015em">${esc(shortName(c.other))}</span>
        <span style="font-size:var(--t-12);font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${onlineNow(c.other)?'Active now':esc(metaOf(c.other)||campus())}</span></span></button>
-     <button class="iconbtn" data-sheet="who" data-about="${esc(c.other)}" aria-label="Restrict, block or report">${ic('flag',17)}</button></div></div>
+     ${kebab('chat',[{i:'users',t:'View profile',at:`data-person="${esc(c.other)}"`},{i:'eyeoff',t:'Restrict or block…',at:`data-sheet="who" data-about="${esc(c.other)}"`},{sep:1},{i:'flag',t:'Report',at:`data-sheet="report" data-about="${esc(c.other)}"`,danger:true}],'Chat options')}</div></div>
   <div class="msgs">
    ${!c.msgs.length?`<p class="note" style="margin:10px 0">${c.loaded?'Say hi. Sort out the time and place here.':'Loading messages…'}</p>`:''}
    ${(()=>{const lastOut=[...c.msgs].reverse().find(m=>m.by===me),readAt=num(((S.threadDocs[lastOut?.thread||c.key]||{}).read||{})[c.other]),seen=pref('receipts')&&lastOut&&readAt>=lastOut.at;
@@ -1312,35 +1324,28 @@ function viewChat(D){
   </div></div>`}</div>`}`;
 }
 function viewPerson(uid,D){
-  const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,online=onlineNow(uid);
+  const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id;
   const bio=str(d.bio,BIO_MAX)||str(d.does,60),bn=bannerOk(d.banner)?d.banner:'';
+  const menu=isMe?kebab('me',[{html:`<span class="ohead">Logged in as ${esc(S.me.email)}</span>`},
+     {i:'star',t:'Your reviews',at:'data-go="reviews"',v:(()=>{const l=reviewsOf(S.me.id);return l&&l.length?String(l.length):''})()},
+     {i:'bell',t:'Notifications',at:`data-act="${pushOn()?'pushOff':'pushOn'}"`,v:pushOn()?'On':'Off'},
+     {html:`<div class="themerow orow">${ic('moon',18)} Appearance<span class="seg" role="group" aria-label="Appearance">${[['dark','Dark'],['light','Light'],['system','Auto']].map(([k,l])=>`<button data-act="setThemeTo" data-k="${k}" class="${(themePref()||'dark')===k?'on':''}" aria-pressed="${(themePref()||'dark')===k}"${k==='system'?' title="Match your phone"':''}>${l}</button>`).join('')}</span></div>`},
+     S.me.isOwner?{i:'users',t:'Invites and members',at:'data-go="invites"'}:null,
+     {sep:1},{i:'board',t:'How tack works',at:'data-act="replayIntro"'},{i:'shield',t:'Settings and privacy',at:'data-go="settings"'},{i:'flag',t:'Report or feedback',at:'data-go="help"'},
+     {sep:1},{i:'out',t:'Log out',at:'data-act="logout"',danger:true}],'Profile options','onprof')
+    :kebab('person',[{i:'eyeoff',t:'Restrict or block…',at:`data-sheet="who" data-about="${esc(uid)}"`},{i:'flag',t:'Report',at:`data-sheet="report" data-about="${esc(uid)}"`,danger:true}],'Options for '+shortName(uid),'onprof');
   const tints=[['rgba(79,227,224,.16)','var(--cyan-ink)'],['rgba(255,122,209,.16)','var(--pink-ink)'],['rgba(255,197,61,.16)','var(--amber-ink)'],['rgba(170,226,84,.18)','var(--violet-ink)']];
   return`<div class="pad">${isMe?'':back('board','Back to the board')}
   <div class="stack narrow" style="margin:6px auto 0;gap:18px">
-   <div class="prof ${bn?'hasbanner':''}">${bn?`<div class="pbanner" style="${bannerStyle(bn)}"></div>`:''}${isMe?`<button class="editpen" data-go="edit" aria-label="Edit profile">${ic('edit',17)}</button>`:''}
+   <div class="prof ${bn?'hasbanner':''}">${bn?`<div class="pbanner" style="${bannerStyle(bn)}"></div>`:''}${menu}
      <span class="ring${onlineNow(uid)?' live':''}" style="width:108px;height:108px">${face(uid,94)}</span>
      <span class="pname">${isOrg(uid)?'tack':handleOf(uid)?'@'+esc(handleOf(uid)):esc(shortName(uid))}</span>
      ${!isOrg(uid)&&realNameOf(uid)&&handleOf(uid)?`<span class="realname">${esc(realNameOf(uid))}</span>`:''}
-     ${bio?`<p class="pbio">${esc(bio)}</p>`:''}
-     <div class="chips pchips">${metaOf(uid)?`<span class="chip">${esc(metaOf(uid))}</span>`:''}<span class="chip">${esc(campusName(campusOf(uid)))}</span>
-       ${uid===ownerId()?'<span class="chip vio">Organiser</span>':''}${uid!==S.me.id&&workedWith(uid,D).length?`<span class="chip">Worked together · ${workedWith(uid,D).length} ${workedWith(uid,D).length===1?'job':'jobs'}</span>`:''}${online?'<span class="chip on">Online</span>':''}</div>
+     ${bio?`<p class="pbio">${esc(bio)}</p>`:isMe?`<button class="pbio pbioadd" data-go="edit">${ic('plus',14,2.4)} Add a short bio</button>`:'<p class="pbio pbioempty">No bio yet.</p>'}
    </div>
-   <div class="stats"><div><b>${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div><div><b>${st.avg?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.avg}`:'New'}</b><span>rating</span></div>${isMe?`<div><b class="money">₹${fmt(st.earned)}</b><span>earned</span></div>`:`<div><b>${st.poster.n?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.poster.avg.toFixed(1)}`:'–'}</b><span>as a poster</span></div>`}</div>
-   ${st.doer.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a doer · from ${st.doer.n} ${st.doer.n===1?'rating':'ratings'}</span>${st.doer.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
-   ${isMe?'':reviewList(uid)}
-   ${st.poster.n?`<div class="box stack" style="gap:8px"><span class="formlabel">As a poster · from ${st.poster.n} ${st.poster.n===1?'rating':'ratings'}</span>${st.poster.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:''}
-   ${isMe?`<div class="menu">
-       <button data-go="reviews">${ic('star',18)} Your reviews${(()=>{const l=reviewsOf(S.me.id);return l&&l.length?`<span class="menuval">${l.length}</span>`:''})()}<span class="chev">${ic('chev',16)}</span></button>
-       <button data-act="${pushOn()?'pushOff':'pushOn'}" ${S.busy?'disabled':''}>${ic('bell',18)} Notifications<span class="menuval">${pushOn()?'On':'Off'}</span></button>
-       ${S.me.isOwner?`<button data-go="invites">${ic('users',18)} Invites and members<span class="chev">${ic('chev',16)}</span></button>`:''}
-       <div class="themerow">${ic('moon',18)} Appearance<span class="seg" role="group" aria-label="Appearance">${[['dark','Dark'],['light','Light'],['system','Auto']].map(([k,l])=>`<button data-act="setThemeTo" data-k="${k}" class="${(themePref()||'dark')===k?'on':''}" aria-pressed="${(themePref()||'dark')===k}"${k==='system'?' title="Match your phone"':''}>${l}</button>`).join('')}</span></div>
-       <button data-act="replayIntro">${ic('board',18)} How tack works<span class="chev">${ic('chev',16)}</span></button>
-       <button data-go="settings">${ic('shield',18)} Settings and privacy<span class="chev">${ic('chev',16)}</span></button>
-       <button data-go="help">${ic('flag',18)} Report or feedback<span class="chev">${ic('chev',16)}</span></button>
-       <button data-act="logout">${ic('out',18)} Log out</button></div>
-       <p class="note">Logged in as ${esc(S.me.email)}</p>`
-     :`${workedWith(uid,D).length?`<button class="cta" data-msgwith="${esc(uid)}">${ic('chat',17,2.2,'var(--on-grad)')} Message ${esc(firstName(uid))}</button>`:''}
-       <button class="linkbtn" data-sheet="who" data-about="${esc(uid)}">Restrict, block or report</button>`}
+   ${isMe?`<button class="cta" data-go="edit">${ic('edit',17,2.2,'var(--on-grad)')} Edit profile</button>`
+     :workedWith(uid,D).length?`<button class="cta" data-msgwith="${esc(uid)}">${ic('chat',17,2.2,'var(--on-grad)')} Message ${esc(firstName(uid))}</button>`:''}
+   <div class="stats"><div><b>${st.done}</b><span>${st.done===1?'job':'jobs'} done</span></div>${st.doer.n||(isMe&&st.poster.n)?`<button class="stat" data-sheet="ratings" data-about="${esc(uid)}" aria-label="See ratings"><b>${st.avg?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.avg}`:'New'}</b><span>rating ${ic('chev',10,2.6)}</span></button>`:`<div><b>${st.avg?`<i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.avg}`:'New'}</b><span>rating</span></div>`}${isMe?`<div><b class="money">₹${fmt(st.earned)}</b><span>earned</span></div>`:st.poster.n?`<button class="stat" data-sheet="ratings" data-about="${esc(uid)}" aria-label="See ratings"><b><i class="sstar">${ic('star',15,2,'currentColor','currentColor')}</i>${st.poster.avg.toFixed(1)}</b><span>as a poster ${ic('chev',10,2.6)}</span></button>`:'<div><b>–</b><span>as a poster</span></div>'}</div>
   </div></div><div style="height:24px"></div>`;
 }
 function viewSettings(D){const me=S.me.id,blocked=arr(S.priv.blocked).filter(u=>typeof u==='string'),rs=restricted(),t=S.priv.terms||{};
@@ -1489,6 +1494,10 @@ function sheetHTML(D){
   const s=S.sheet;if(!s)return'';let b='';
   const j=S.openJob?D.jobByKey[S.openJob]:null;
   switch(s.type){
+  case'ratings':{const u=s.about,rt=stats(u,D),me=u===S.me.id,l=reviewsOf(u);
+    const box=(t,x)=>x.n?`<div class="box stack" style="gap:8px"><span class="formlabel">${t} · from ${x.n} ${x.n===1?'rating':'ratings'}</span>${x.per.map(c=>`<div class="critrow"><span>${c.l}</span><span class="critbar"><span style="width:${(c.v/5*100).toFixed(0)}%"></span></span><b>${c.v.toFixed(1)}</b></div>`).join('')}</div>`:'';
+    b=`<h2 id="sheetT">${me?'Your ratings':esc(shortName(u))+'’s ratings'}</h2><div class="stack" style="gap:14px">${box('As a doer',rt.doer)}${box('As a poster',rt.poster)}
+      ${me?(l&&l.length?'<button class="btn2" data-go="reviews">Read your reviews</button>':''):reviewList(u)}</div>`;break}
   case'gig':{const x=D.jobByKey[s.key];if(!x||!x.pick){b='<h2 id="sheetT">This gig is no longer here</h2>';break}const pk=x.pick,pay=payOf(x),sent=sentOf(x),me=S.me.id,done=pk.status==='done';
     const row=(l,v)=>`<div class="gigrow"><span>${l}</span><b>${v}</b></div>`;
     b=`<p class="gigtag${done?' done':''}">${done?'Completed':'In progress'}</p><h2 id="sheetT">${esc(x.text)}</h2>
@@ -1808,7 +1817,7 @@ window.addEventListener('orientationchange',()=>{kbBase.h=0;setTimeout(()=>{kbBa
 function go(v,keepThread){if(v==='job')S.tkSeen=null;if(v==='post'&&S.view!=='post')S.postEnter=true;
   const from=S.view;
   if(v!=='chat'&&!keepThread)closeThread();
-  const apply=()=>{if(v==='post'&&from!=='post'&&(S.draft.editId||S.draft.cid)&&!S.editEnter)S.draft=blankDraft();S.editEnter=false;if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}S.view=v;S.sheet=null;S.err={};if(v==='help'&&from!=='help')S.help={kind:null,job:null,why:'',note:'',sent:null};if(v==='settings'){S.pwOpen=false}if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit'){seedOnb();S.hcheck={h:handleOf(S.me.id),st:'mine'}}if(v==='invites')S.inv.campus='';render();
+  const apply=()=>{if(v==='post'&&from!=='post'&&(S.draft.editId||S.draft.cid)&&!S.editEnter)S.draft=blankDraft();S.editEnter=false;if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}S.view=v;S.sheet=null;S.omenu=null;S.err={};if(v==='help'&&from!=='help')S.help={kind:null,job:null,why:'',note:'',sent:null};if(v==='settings'){S.pwOpen=false}if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit'){seedOnb();S.hcheck={h:handleOf(S.me.id),st:'mine'}}if(v==='invites')S.inv.campus='';render();
     if(v==='board'&&from==='job'&&S.openJob){const p=document.querySelector(`.tile[data-job="${CSS.escape(S.openJob)}"] .price`);if(p)p.style.viewTransitionName='jp'}};
   if(from===v||S.phase!=='app'||!document.startViewTransition||reduceMotion.matches){apply();return}
   const d=(DEPTH[v]??1)-(DEPTH[from]??1),root=document.documentElement;
@@ -1937,6 +1946,7 @@ const ACT={
   async addBranch(){const c=S.cpick;if(!c||c.busy)return;if(c.ncol.trim().length<2){c.err='Add your college name.';render();return}c.busy=true;c.err='';render();
     try{await S.fb.rpc('add_my_campus',{p_college:c.ncol.trim(),p_city:c.ncity.trim()});S.cpick=null;handleUser(S.user)}catch(e){c.busy=false;c.err='Couldn’t make the board. Try again.';render()}},
   introPush(){closeIntro('board');setTimeout(enablePush,350)},
+  omenu(el){const id=el.dataset.id;S.omenu=S.omenu===id?null:id;render();if(S.omenu)requestAnimationFrame(()=>document.querySelector('.opop [role=menuitem]')?.focus({preventScroll:true}));else document.querySelector(`.obtn[data-id="${id}"]`)?.focus({preventScroll:true})},
   replayIntro(){openIntro(S.view)},
   pickTheme(el){if(!themePick)return;themePick.sel=el.dataset.k;applyTheme(themePick.sel);renderThemePick()},
   themeDone(){if(!themePick)return;const {sel,then}=themePick;themePick=null;setTheme(sel);const r=$('themeRoot');
@@ -2157,6 +2167,9 @@ document.addEventListener('click',e=>{
   if(ds.msgwith!==undefined){const j=workedWith(ds.msgwith,D).sort((a,b)=>num(b.takenAt||b.at)-num(a.takenAt||a.at))[0];if(j)openThread({key:jobThreadKey(j.key,j.accepted),other:ds.msgwith,jobKey:j.key});return}
   if(ds.threadWith!==undefined){const j=D.jobByKey[S.openJob];if(j)openThread({key:jobThreadKey(j.key,ds.threadWith),other:ds.threadWith,jobKey:j.key});return}
 });
+// Tapping outside an open ⋯ menu only closes it. Picking an item closes it and runs the item.
+document.addEventListener('click',e=>{if(!S.omenu)return;if(!e.target.closest('.omenu')){S.omenu=null;e.stopPropagation();e.preventDefault();render();return}
+  if(e.target.closest('.opop [role=menuitem]')){S.omenu=null;setTimeout(()=>{if(!S.omenu&&document.querySelector('.opop'))render()},0)}},true);
 let lp=null;
 function openJobMenu(k){S.sheet={type:'jobmenu',key:k};render()}
 // Hold a note for its menu, or hold a person (chats, the free row) to restrict, block or report them.
@@ -2198,12 +2211,15 @@ document.addEventListener('pointerdown',e=>{if(e.target.id==='jhue')$('notewrap'
 document.addEventListener('focusout',e=>{if(e.target.closest?.('#notewrap'))setTimeout(()=>{const w=$('notewrap');if(w&&!noteHeld())w.classList.remove('flat')},0)});
 ['pointerup','pointercancel'].forEach(t=>document.addEventListener(t,()=>$('notewrap')?.classList.remove('straight')));
 window.__tackBack=()=>{
+  if(S.omenu){S.omenu=null;render();return true}
   if($('docRoot')){closeDoc();return true}
   if(S.intro.on){introStep(-1);return true}
   if(S.sheet){closeSheet();return true}
   const b=document.querySelector('#main .back[data-go]');if(b){b.click();return true}
   return false};
 document.addEventListener('keydown',e=>{
+  if(S.omenu&&e.key==='Escape'){const id=S.omenu;S.omenu=null;render();document.querySelector(`.obtn[data-id="${id}"]`)?.focus({preventScroll:true});return}
+  if(S.omenu&&(e.key==='ArrowDown'||e.key==='ArrowUp')){const it=[...document.querySelectorAll('.opop [role=menuitem]')];if(it.length){e.preventDefault();const k=it.indexOf(document.activeElement);it[(k+(e.key==='ArrowDown'?1:-1)+it.length)%it.length].focus()}return}
   if($('docRoot')){if(e.key==='Escape')closeDoc();return}
   if(S.intro.on){if(e.key==='ArrowRight'){e.preventDefault();introStep(1)}else if(e.key==='ArrowLeft'){e.preventDefault();introStep(-1)}else if(e.key==='Escape')closeIntro();return}
   if(e.key==='Escape'&&S.sheet){closeSheet();return}
