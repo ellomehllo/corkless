@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610122247';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610122247';
-import {modHit,MOD_CAT} from './mod.js?v=202610122247';
+import {makeDb} from './db.js?v=202610122249';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610122249';
+import {modHit,MOD_CAT} from './mod.js?v=202610122249';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -633,14 +633,14 @@ function cnoteTile(n,i){const c=COLOR_RE.test(n.color||'')?n.color:'#7FA2FF',k=O
 function viewCBoard(D){const id=S.cid,c=S.coms[id];if(!id||!c||!S.cmine[id])return viewBoard(D);
   const notes=Object.entries(S.cnotes).map(([k,v])=>({...v,id:k})).sort((a,b)=>b.at-a.at),n=Object.keys(S.cmembers).length,owner=comOwner(id);
   const cols=wideMQ.matches?3:2,col=Array.from({length:cols},()=>[]);notes.forEach((x,i)=>col[i%cols].push(cnoteTile(x,i)));
-  return`<div class="pad cboard"><div class="ptop">${back('board',campus())}${kebab('cboard',[{i:'users',t:'Members',v:String(n),at:'data-sheet="cmembers"'},owner?{i:'plus',t:'Invite people',at:'data-sheet="cinvite"'}:null],'Board options')}</div>
+  return`<div class="pad cboard"><div class="ptop">${back('board')}${kebab('cboard',[{i:'users',t:'Members',v:String(n),at:'data-sheet="cmembers"'},owner?{i:'plus',t:'Invite people',at:'data-sheet="cinvite"'}:null],'Board options')}</div>
     <div class="chead"><h1 class="pageh">${esc(c.name)}</h1>${c.about?`<p class="cabout">${esc(c.about)}</p>`:''}
       <div class="cmeta"><span class="muted">${n} ${n===1?'member':'members'}</span></div></div>
     ${notes.length?`<div class="wall">${col.map(x=>`<div class="wcol">${x.join('')}</div>`).join('')}</div>`:`<div class="empty"><b>No notes yet</b><p>Add the first note for ${esc(c.name)}.</p></div>`}
     <button class="cta cadd" data-act="cnoteStart">${ic('plus',17,2.4,'var(--on-grad)')} Add a note</button></div>`}
 function viewCNote(D){const n0=S.cnotes[S.cnote];if(!S.cid||!n0)return viewCBoard(D);const n={...n0,id:S.cnote},c=COLOR_RE.test(n.color||'')?n.color:'#7FA2FF',me=S.me.id,owner=comOwner(S.cid);
   const coms=Object.entries(S.ccoms).map(([k,v])=>({...v,id:k})).filter(x=>x.note===n.id).sort((a,b)=>a.at-b.at);
-  return`<div class="pad cnotepage"><div class="ptop">${back('cboard',comName(S.cid))}${kebab('cnote',[n.by===me||owner?{i:'trash',t:n.by===me?'Delete this note':'Remove this note',at:'data-act="cnoteDel"',danger:true}:null],'Note options')}</div>
+  return`<div class="pad cnotepage"><div class="ptop">${back('cboard')}${kebab('cnote',[n.by===me||owner?{i:'trash',t:n.by===me?'Delete this note':'Remove this note',at:'data-act="cnoteDel"',danger:true}:null],'Note options')}</div>
     <div class="tile ntile cnbig" style="--nc:${c};--d:0s"><span class="pin"></span><p>${esc(n.text)}</p>${[n.where,n.when].filter(Boolean).length?`<span class="where">${ic('place',12,2.2)}<span>${esc([n.where,n.when].filter(Boolean).join(' · '))}</span></span>`:''}${n.more?`<p class="cmore">${esc(n.more)}</p>`:''}
       <span class="by">${face(n.by,26)}<span class="nm">${esc(shortName(n.by))}</span><span class="n">${since(n.at)}</span></span></div>
     ${n.pics?picStrip('c:'+n.id,n.pics):''}
@@ -896,7 +896,7 @@ function gateHTML(){
 function onboardHTML(edit){
   const o=S.onb,me=S.me.id;
   return`<div class="gatebox onb" style="gap:20px">
-   ${edit?`<button class="back" data-act="goBack" data-to="me" style="padding:0">${ic('back',16)} Profile</button>`:'<div class="mark">tack</div>'}
+   ${edit?`<button class="back" data-act="goBack" data-to="me" aria-label="Back" style="padding:0">${ic('back',20)}</button>`:'<div class="mark">tack</div>'}
    <div><h1>${edit?'Edit profile':'Set up your profile'}</h1>
    </div>
    ${edit?`<div class="eprev">
@@ -925,7 +925,7 @@ function onboardHTML(edit){
   </div>`;
 }
 
-function back(to,label){return`<button class="back" data-act="goBack" data-to="${to}">${ic('back',16)} ${esc(NAV.length?navLabel(NAV[NAV.length-1]):label)}</button>`}
+function back(to){return`<button class="back" data-act="goBack" data-to="${to}" aria-label="Back">${ic('back',20)}</button>`}
 // One overflow menu (⋯) per page, top right. The page keeps its main action in view; everything else lives here.
 // Items: {i:icon,t:label,at:'data-… attributes',danger,v:value} · {sep:1} · {html}
 function kebab(id,items,label='More options',cls=''){
@@ -1002,12 +1002,12 @@ function saveImg(){if(!S.shareImg)return;const a=document.createElement('a');a.h
 function revBy(rid,D){const pk=Object.values(S.picks||{}).find(p=>p&&p.review===rid);return pk&&D.members.includes(pk.owner)?pk.owner:null}
 function starsHTML(v,size,anim){const st=ic('star',size,2,'currentColor','currentColor');return`<span class="revstars${anim?' anim':''}" aria-label="${v?v.toFixed(1)+' out of 5':'No stars'}">${[1,2,3,4,5].map(n=>{const c=v>=n-.25?'on':v>=n-.75?'half':'';return`<span class="rs ${c}" style="--i:${n}">${c==='half'?`<span class="hf">${st}</span>`:''}${st}</span>`}).join('')}</span>`}
 function viewReviews(D){const l=reviewsOf(S.me.id);
-  return`<div class="pad">${back('me','Profile')}<div class="stack narrow" style="margin-top:6px;gap:14px"><div class="stack gap8"><h1 class="pageh">Your reviews</h1><p class="note" style="text-align:left;margin:0">From posters you did jobs for. Everyone else sees them without names.</p></div>
+  return`<div class="pad">${back('me')}<div class="stack narrow" style="margin-top:6px;gap:14px"><div class="stack gap8"><h1 class="pageh">Your reviews</h1><p class="note" style="text-align:left;margin:0">From posters you did jobs for. Everyone else sees them without names.</p></div>
     ${!l?'<p class="note" style="text-align:left">Loading\u2026</p>':!l.length?'<div class="empty" style="margin:8px 0"><b>No reviews yet</b><p>When a poster reviews your work, it shows up here.</p></div>'
       :l.map(r=>{const by=revBy(r.id,D);return`<button class="box revcard" data-review="${esc(r.id)}"><span class="revtop">${by?ring(by,30):''}<span class="revwho">${by?`<b>${esc(firstName(by))}</b>`:'A poster'}<span>${new Date(r.at).toLocaleDateString('en-IN',{month:'short',year:'numeric'})}</span></span>${r.stars?starsHTML(r.stars,15):''}</span><p class="revtext">${esc(r.text)}</p>${picStrip('r:'+r.id,r.pics,'flush')}</button>`}).join('')}
   </div></div><div style="height:24px"></div>`}
 function viewReview(D){const l=reviewsOf(S.me.id),r=l&&l.find(x=>x.id===S.openRev),by=r&&revBy(r.id,D);
-  return`<div class="pad">${back('reviews','Your reviews')}<div class="stack narrow" style="margin-top:6px">
+  return`<div class="pad">${back('reviews')}<div class="stack narrow" style="margin-top:6px">
     ${!l?'<p class="note">Loading\u2026</p>':!r?'<div class="empty" style="margin:8px 0"><b>This review was removed</b><p>It no longer shows on your profile.</p></div>'
       :`<div class="revreveal">${by?ring(by,64):''}<h1 class="pageh" style="text-align:center">${by?`<b>${esc(firstName(by))}</b> reviewed you`:'Your review'}</h1>
         ${starsHTML(r.stars,34,true)}${r.stars?`<b class="revnum">${r.stars.toFixed(1)}</b>`:''}
@@ -1068,7 +1068,7 @@ function viewTackNote(j){if(S.shareImg?.key!==j.key&&!S.shareBusy){S.shareBusy=t
   const enter=S.tkSeen!==j.key;S.tkSeen=j.key;
   return`<div class="tackpage${enter?' enter':''}">
    <div class="tkbg" style="--t:-${(Date.now()/1000%60).toFixed(2)}s" aria-hidden="true"><i class="tb1"></i><i class="tb2"></i><i class="tb3"></i></div>
-   <div class="tktop">${back('board','Board')}<div class="jtools">${mine&&st==='open'?`<button class="jtool" data-act="editJob" data-key="${esc(j.key)}" aria-label="Edit">${ic('edit',18)}</button>`:''}<button class="jtool" data-act="openShare" data-key="${esc(j.key)}" aria-label="Share">${ic('share',18)}</button></div></div>
+   <div class="tktop">${back('board')}<div class="jtools">${mine&&st==='open'?`<button class="jtool" data-act="editJob" data-key="${esc(j.key)}" aria-label="Edit">${ic('edit',18)}</button>`:''}<button class="jtool" data-act="openShare" data-key="${esc(j.key)}" aria-label="Share">${ic('share',18)}</button></div></div>
    <div class="tkhero">
      <span class="tkicon"></span>
      <h1 class="tkh">${esc(j.text)}</h1>
@@ -1079,7 +1079,7 @@ function viewTackNote(j){if(S.shareImg?.key!==j.key&&!S.shareBusy){S.shareBusy=t
   </div>`}
 function viewJob(D){
   const j0=D.jobByKey[S.openJob],j=j0&&hiddenFor(j0)&&j0.accepted!==S.me.id&&!myBidOn(j0.key)?null:j0;
-  if(!j)return`<div class="pad">${back('board','Back to the board')}<div class="empty" style="margin:18px 0"><b>This job is gone</b><p>The poster closed it or it was taken off the board.</p></div></div>`;
+  if(!j)return`<div class="pad">${back('board')}<div class="empty" style="margin:18px 0"><b>This job is gone</b><p>The poster closed it or it was taken off the board.</p></div></div>`;
   const me=S.me.id,mine=j.owner===me,st=jobState(j),bids=bidsFor(D,j.key).sort((a,b)=>a.amt-b.amt||a.at-b.at);
   const myBid=myBidOn(j.key);
   if(S.bid.key!==j.key)S.bid={key:j.key,amt:String(myBid?num(myBid.amt):j.price),say:myBid?myBid.say:'',pics:myBid&&num(myBid.pics)?null:[]};
@@ -1177,7 +1177,7 @@ function viewJob(D){
   </section>`;
   if(isOrg(j.owner))return viewTackNote(j);
   return`<div class="pad jobpage${gcls(j)}${isOrg(j.owner)?' tackjob':''}" style="--nc:${noteOf(j)}${gvars(j)}">
-  ${menu}<div class="jhero">${cover}${back('board','Board')}
+  ${menu}<div class="jhero">${cover}${back('board')}
     <div class="jhead"><h1 class="h1">${esc(j.text)}</h1></div></div>
   <div class="jpwrap">${hasPh?`<button class="jhint" data-pic="${esc('j:'+j.key)}" data-i="0">${hint}</button>`:`<span class="jhint">${hint}</span>`}<button class="jposter" data-person="${esc(j.owner)}"><span class="javwrap"><span class="ring${onlineNow(j.owner)?' live':''}" style="width:68px;height:68px">${face(j.owner,58)}</span>${online?'<span class="onl"><i></i>Online</span>':''}</span>
     <span class="pname">${esc(shortName(j.owner))}</span>
@@ -1202,7 +1202,7 @@ function viewPost(){
   const d=S.draft,{c,g}=noteTone(),me=S.me.id,ph=(d.pics||[])[0]||'';
   const group=(t,k,list)=>`<div class="stack gap8"><span class="formlabel" id="g-${k}">${t}</span><div class="chips" role="group" aria-labelledby="g-${k}">${list.map(v=>`<button class="chip ${d[k]===v&&!(k==='where'&&d.whereText.trim())?'on':''}" data-set="${k}" data-val="${esc(v)}" aria-pressed="${d[k]===v&&!(k==='where'&&d.whereText.trim())}">${esc(v)}</button>`).join('')}</div></div>`;
   const cm=!!d.cid;
-  return`<div class="pad postpage${cm?' cpost':''}">${cm?back('cboard',comName(d.cid)):d.editId?back('job','Cancel'):back('board','Close')}
+  return`<div class="pad postpage${cm?' cpost':''}">${cm?back('cboard'):d.editId?back('job'):back('board')}
    <h1 class="pageh" style="margin:6px 0 2px">${cm?'Add a note to '+esc(comName(d.cid)):d.editId?'Edit your job':'Pin a job'}</h1>
    <div class="notewrap${noteHeld()?' flat':''}" id="notewrap"><div class="bignote tile ntile${g?' gnote':''}${postEnterOnce()?' enter':''}" id="bignote" style="--nc:${c}${g?';--nc1:var(--g1);--nc2:var(--g2)':''};--d:0s">
      <span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span>
@@ -1300,7 +1300,7 @@ function viewChat(D){
   const accepted=j&&j.accepted&&[j.owner,j.accepted].includes(me)&&[j.owner,j.accepted].includes(c.other);
   const can=canMessage(c,D);
   return`<div class="pad" style="padding-bottom:10px"><div style="display:flex;align-items:center;gap:10px">
-     <button class="back" data-act="goBack" data-to="chats" aria-label="Back to chats" style="padding:0">${ic('back',20)}</button>
+     <button class="back" data-act="goBack" data-to="chats" aria-label="Back" style="padding:0">${ic('back',20)}</button>
      <button class="rowmain" data-person="${esc(c.other)}" data-hold="${esc(c.other)}">${ring(c.other,42)}<span class="rowtext"><span style="font-size:var(--t-16);font-weight:600;letter-spacing:-.015em">${esc(shortName(c.other))}</span>
        <span style="font-size:var(--t-12);font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${onlineNow(c.other)?'Active now':esc(metaOf(c.other)||campus())}</span></span></button>
      ${kebab('chat',[{i:'users',t:'View profile',at:`data-person="${esc(c.other)}"`},{i:'eyeoff',t:'Restrict or block…',at:`data-sheet="who" data-about="${esc(c.other)}"`},{sep:1},{i:'flag',t:'Report',at:`data-sheet="report" data-about="${esc(c.other)}"`,danger:true}],'Chat options')}</div></div>
@@ -1385,7 +1385,7 @@ function viewPerson(uid,D){
     grid=l.length?`${profileWall(l.map(j=>({j,o:{tag:jobState(j)==='done'?(payOf(j)?.ok?'Done · Paid':'Done'):'Picked you',on:jobState(j)!=='done'}})),D)}<p class="ignote">${ic('shield',12,2.2)} Jobs you were picked for. Only you see this.</p>`
       :'<div class="empty igempty"><b>No tags yet</b><p>When someone picks you for their job, it shows up here.</p><button class="btn2" data-go="board">Find a job</button></div>'}
   return`<div class="pad igprof">
-   <div class="igtop">${isMe?'':`<button class="back igback" data-act="goBack" data-to="board" aria-label="Back to the board">${ic('back',20)}</button>`}<h1 class="igh">${isOrg(uid)?'tack':handleOf(uid)?'@'+esc(handleOf(uid)):esc(shortName(uid))}</h1>${menu}</div>
+   <div class="igtop">${isMe?'':`<button class="back igback" data-act="goBack" data-to="board" aria-label="Back">${ic('back',20)}</button>`}<h1 class="igh">${isOrg(uid)?'tack':handleOf(uid)?'@'+esc(handleOf(uid)):esc(shortName(uid))}</h1>${menu}</div>
    <div class="ighead"><span class="ring${onlineNow(uid)?' live':''}" style="width:88px;height:88px">${face(uid,76)}</span>
      <div class="igstats">${stat(st.done,st.done===1?'job done':'jobs done')}${stat(st.avg?star(st.avg):'New','rating',st.doer.n||(isMe&&st.poster.n))}${isMe?`<div class="igstat"><b class="money">₹${fmt(st.earned)}</b><span>earned</span></div>`:stat(st.poster.n?star(st.poster.avg.toFixed(1)):'–','as a poster',st.poster.n)}</div></div>
    <div class="igbio">${real?`<b>${esc(real)}</b>`:''}${bio?`<p>${esc(bio)}</p>`:isMe?`<button class="pbioadd" data-go="edit">${ic('plus',14,2.4)} Add a short bio</button>`:'<p class="pbioempty">No bio yet.</p>'}</div>
@@ -1398,7 +1398,7 @@ function viewPerson(uid,D){
 function viewSettings(D){const me=S.me.id,blocked=arr(S.priv.blocked).filter(u=>typeof u==='string'),rs=restricted(),t=S.priv.terms||{};
   const row=(t1,t2,attrs,end='')=>`<button class="setrow" ${attrs}><span class="rowtext"><span class="t1">${t1}</span>${t2?`<span class="t2">${t2}</span>`:''}</span>${end||`<span class="chev">${ic('chev',16)}</span>`}</button>`;
   const tog=(on,t1,t2,attrs)=>`<button class="setrow" role="switch" aria-checked="${on}" ${attrs}><span class="rowtext"><span class="t1">${t1}</span><span class="t2">${t2}</span></span><span class="switch ${on?'on':''}" aria-hidden="true"></span></button>`;
-  return`<div class="pad">${back('me','Back')}<div class="stack narrow" style="margin-top:6px;gap:24px">
+  return`<div class="pad">${back('me')}<div class="stack narrow" style="margin-top:6px;gap:24px">
    <h1 class="pageh">Settings</h1>
    <section class="setsec"><h2 class="seth">Account</h2><div class="setcard">
      <div class="setrow static"><span class="rowtext"><span class="t1">Email</span><span class="t2">${esc(S.me.email)}</span></span></div>
@@ -1444,7 +1444,7 @@ const HELP_KINDS=[['past','Report a problem with a past job','Something went wro
   ['feedback','Send feedback or an idea','Tell us what to fix, or what you’d like next.','chat'],['data','Account, privacy or data request','Ask about your data, correct something, or raise a complaint.','shield']];
 const HELP_WHY={past:['No-show','Didn’t pay or paid less','Work not as agreed','Unsafe or harassing','Something else'],board:['Breaks the posting rules','Assignment or exam work','Scam or spam','Unsafe or harassing','Something else']};
 function viewHelp(D){const h=S.help,me=S.me.id;
-  const head=(t,sub,backAct)=>`<div class="pad">${backAct?`<button class="back" data-act="${backAct}">${ic('back',16)} Back</button>`:back('settings','Back')}<div class="stack narrow" style="margin-top:6px;gap:18px"><div class="stack gap8"><h1 class="pageh">${t}</h1>${sub?`<p class="note" style="text-align:left;margin:0">${sub}</p>`:''}</div>`;
+  const head=(t,sub,backAct)=>`<div class="pad">${backAct?`<button class="back" data-act="${backAct}" aria-label="Back">${ic('back',20)}</button>`:back('settings')}<div class="stack narrow" style="margin-top:6px;gap:18px"><div class="stack gap8"><h1 class="pageh">${t}</h1>${sub?`<p class="note" style="text-align:left;margin:0">${sub}</p>`:''}</div>`;
   const tail=`</div></div><div style="height:28px"></div>`;
   if(h.sent)return head(h.sent==='feedback'?'Thank you.':'We’ve got it.','',null)+`<div class="sentcard"><span class="bigpin"></span><p>${h.sent==='feedback'?'Your feedback goes straight to the organiser. Ideas like yours shape what tack does next.':'Your report has been sent to the organiser. You’ll get an acknowledgement within 24 hours, and we aim to resolve it within 15 days. Nobody else can see what you sent.'}</p>
     <button class="cta" data-act="helpDone">Done</button></div>`+tail;
@@ -1493,7 +1493,7 @@ function viewInvites(D){
   if(!S.me.isOwner)return viewBoard(D);
   const list=Object.entries(S.invites).filter(([e])=>e!==S.me.email).map(([e,x])=>({email:e,camp:typeof x?.campus==='string'?x.campus:'',at:num(x?.at),uid:typeof x?.uid==='string'?x.uid:null,by:typeof x?.by==='string'?x.by:null,code:typeof x?.code==='string'})).sort((a,b)=>b.at-a.at);
   const li=S.lastInvite;
-  return`<div class="pad">${back('me','Back')}<div class="stack narrow" style="margin-top:6px;gap:20px">
+  return`<div class="pad">${back('me')}<div class="stack narrow" style="margin-top:6px;gap:20px">
    <div><h1 class="pageh" style="margin-bottom:6px">Invites and members</h1>
    <p style="margin:0;font-size:var(--t-14);line-height:1.55;color:var(--fg2)">Anyone with a college email can sign up and lands on their campus board. Invite everyone else here: add their email and campus, then send them the invite.</p></div>
    <div class="stack gap8"><label class="formlabel" for="invE">Invite by email</label>
@@ -1878,9 +1878,6 @@ window.addEventListener('orientationchange',()=>{kbBase.h=0;setTimeout(()=>{kbBa
 const NAV=[];let CUR=null;
 const snap=()=>({view:S.view,openJob:S.openJob,personOf:S.personOf,cid:S.cid,cnote:S.cnote,openRev:S.openRev,ptab:S.ptab,chat:S.chat?.key?{key:S.chat.key,other:S.chat.other,jobKey:S.chat.jobKey||null}:null});
 const sameNav=(a,b)=>a.view===b.view&&({job:a.openJob===b.openJob,person:a.personOf===b.personOf,chat:a.chat?.other===b.chat?.other,cboard:a.cid===b.cid,cnote:a.cnote===b.cnote,review:a.openRev===b.openRev}[a.view]??true);
-function navLabel(x){const h=u=>u&&handleOf(u)?'@'+handleOf(u):'';
-  return{board:'Board',bids:'Activity',chats:'Chats',saved:'Saved',me:'Profile',job:'Job',cnote:'Note',settings:'Settings',privacy:'Settings',reviews:'Your reviews',review:'Review',help:'Help',invites:'Invites',
-    person:h(x.personOf)||'Profile',chat:h(x.chat?.other)||'Chat',cboard:comName(x.cid)}[x.view]||'Back'}
 function goBack(fb='board'){const x=NAV.pop();if(!x){go(fb);return}
   S.navRestoring=true;S.navScroll={v:x.view,y:x.y||0};
   try{S.openJob=x.openJob;S.personOf=x.personOf;S.openRev=x.openRev;S.ptab=x.ptab||'notes';

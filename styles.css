@@ -85,7 +85,7 @@ input::placeholder,textarea::placeholder{color:var(--dim)}
 .udot{width:8px;height:8px;border-radius:50%;background:var(--grad);box-shadow:0 0 8px var(--accent);display:inline-block}
 .tab .udot{position:absolute;top:3px;left:calc(50% + 7px)}
 
-.back{display:inline-flex;align-items:center;gap:7px;font-size:var(--t-12);font-weight:500;color:var(--muted);padding:10px 0}
+.back{display:inline-flex;align-items:center;gap:7px;min-width:36px;min-height:36px;font-size:var(--t-12);font-weight:500;color:var(--fg2);padding:10px 0}
 .h1{margin:0;font-size:var(--t-23);font-weight:600;line-height:1.26;letter-spacing:-.03em;text-wrap:balance;overflow-wrap:anywhere}
 .pageh{font-family:var(--display);font-weight:700;font-size:var(--t-28);letter-spacing:-.04em;margin:6px 0 14px}
 .big{font-family:var(--display);font-size:var(--t-56);font-weight:700;letter-spacing:-.05em;line-height:.9;color:var(--accent);font-variant-numeric:tabular-nums}
@@ -466,7 +466,7 @@ button.jcover{cursor:zoom-in}
 .jhead{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;pointer-events:none;max-width:34ch}
 .jhead .h1{font-family:var(--display);font-size:var(--t-23);font-weight:700;letter-spacing:-.03em;line-height:1.2;text-shadow:0 2px 18px rgba(0,0,0,.55)}
 .jhint{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:rgba(6,6,8,.5);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);font-size:var(--t-11);font-weight:600;color:var(--soft)}
-.jhero .back{position:absolute;top:12px;left:12px;z-index:2;padding:8px 14px 8px 11px;border-radius:999px;background:rgba(6,6,8,.55);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--fg)}
+.jhero .back{position:absolute;top:12px;left:12px;z-index:2;width:40px;height:40px;padding:0;justify-content:center;border-radius:999px;background:rgba(6,6,8,.55);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--fg)}
 .jposter{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:6px;margin:-78px auto 0;text-align:center;max-width:100%}
 .jposter .ring{border-color:var(--nc)!important;border-width:3px;background:var(--bg);box-shadow:0 0 0 4px var(--bg),0 0 30px color-mix(in srgb,var(--nc) 45%,transparent)}
 .jposter .pname{font-size:var(--t-23)}
@@ -1216,7 +1216,7 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 @keyframes tkfloat2{to{transform:translate(-20%,18%) scale(.92)}}
 @keyframes tkfloat3{to{transform:translate(12%,-14%) scale(1.15)}}
 .tktop{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:2}
-.tktop .back{padding:8px 14px 8px 11px;border-radius:999px;background:rgba(6,6,8,.45);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--fg)}
+.tktop .back{width:40px;height:40px;padding:0;justify-content:center;border-radius:999px;background:rgba(6,6,8,.45);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--fg)}
 .tktop .jtools{position:static;display:flex;gap:8px}
 .tkhero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding:24px 4px 4px}
 .tkicon{width:76px;height:76px;border-radius:22px;background:url(icon-192.png?v=202610050117) center/cover;
