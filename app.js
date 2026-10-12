@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610112142';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610112142';
-import {modHit,MOD_CAT} from './mod.js?v=202610112142';
+import {makeDb} from './db.js?v=202610120755';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610120755';
+import {modHit,MOD_CAT} from './mod.js?v=202610120755';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -153,7 +153,6 @@ function photoOf(uid){const p=uid===S.me?.id&&(S.phase==='onboard'||S.view==='ed
 function ringOf(uid){const r=uid===S.me?.id&&S.onb.ring&&(S.phase==='onboard'||S.view==='edit')?S.onb.ring:pdoc(uid).ring;if(RINGS.includes(r))return r;let h=0;for(const c of String(uid))h=(h*31+c.charCodeAt(0))|0;return RINGS[Math.abs(h)%RINGS.length]}
 function metaOf(uid){const d=pdoc(uid);return [str(d.year,12),str(d.branch,24)].filter(Boolean).join(' ')}
 function face(uid,s){if(isOrg(uid))return tackFace(s);const src=photoOf(uid);return src?`<img class="av" src="${src}" width="${s}" height="${s}" alt="">`:`<span class="av av-empty" style="width:${s}px;height:${s}px;font-size:${Math.round(s*.4)}px">${esc((firstName(uid).replace(/^@/,'')[0]||'?').toUpperCase())}</span>`}
-function liveOf(uid){const n=Date.now();return Object.values(pdoc(uid).jobs||{}).some(j=>j&&j.status==='open'&&num(j.deadline)>n)}
 // Online: the database only shows this to people you've made a deal with. S.skew corrects for the phone's clock.
 const onlineAt=uid=>num(S.onlineDocs?.[uid]?.at),onlineNow=uid=>{const t=onlineAt(uid);return uid!==S.me?.id&&t>0&&t>Date.now()+(S.skew||0)-150000};
 const restricted=()=>arr(S.priv.restricted).filter(u=>typeof u==='string');
@@ -1046,7 +1045,7 @@ function viewBoard(D){
   <div class="wallzone ${S.dropping?'dropin':''}">${filtered&&!list.length&&all.length?`<div class="empty"><b>${S.near&&!S.find.q.trim()?'Nothing near you right now':'No jobs match that'}</b><p>${S.near?'Only jobs pinned with a location can show as near you.':'Try another word, like the place, the time or what you need.'}</p><button class="btn2" data-act="clearFind">Show all jobs</button></div>`:list.length?wallHTML(list,D)+`<div class="boardend"><span class="endpin" aria-hidden="true"></span>${filtered?`<p>${list.length} of ${all.length} jobs shown.</p>`:''}<button class="btn2" data-go="post">Pin a job</button></div>`
     :`<div class="empty"><b>Nothing pinned yet</b><p>Pin the first job: a xerox run, a lift down four floors, an hour of help before a submission.</p><button class="cta" data-go="post">Pin a job</button></div>`}</div></div>`;
 }
-function viewTackNote(j,bidArea){if(S.shareImg?.key!==j.key&&!S.shareBusy){S.shareBusy=true;noteCard(j).then(b=>{S.shareBusy=false;if(b)S.shareImg={key:j.key,blob:b,url:URL.createObjectURL(b)}}).catch(()=>{S.shareBusy=false})}const mine=j.owner===S.me.id,st=jobState(j),jp=j.pics?picsOf('j:'+j.key):null;
+function viewTackNote(j){if(S.shareImg?.key!==j.key&&!S.shareBusy){S.shareBusy=true;noteCard(j).then(b=>{S.shareBusy=false;if(b)S.shareImg={key:j.key,blob:b,url:URL.createObjectURL(b)}}).catch(()=>{S.shareBusy=false})}const mine=j.owner===S.me.id,st=jobState(j),jp=j.pics?picsOf('j:'+j.key):null;
   const paras=str(j.more,600).split(/\n+/).map(x=>x.trim()).filter(Boolean);
   const enter=S.tkSeen!==j.key;S.tkSeen=j.key;
   return`<div class="tackpage${enter?' enter':''}">
@@ -1059,12 +1058,6 @@ function viewTackNote(j,bidArea){if(S.shareImg?.key!==j.key&&!S.shareBusy){S.sha
    ${jp&&jp.length?`<div class="tkpics">${jp.map((src,i)=>`<button class="tkpic" data-pic="${esc('j:'+j.key)}" data-i="${i}" style="--k:${i}"><img src="${src}" alt="Photo ${i+1}"></button>`).join('')}</div>`:''}
    ${paras.length?`<div class="tkcard">${paras.map((p,i)=>`<p style="--k:${i}">${esc(p)}</p>`).join('')}</div>`:''}
    <div class="tkshare"><span class="tklabel">Share</span><div class="slogos">${slogo('ig','Instagram','data-act="tackShare" data-to="ig"')}${slogo('wa','WhatsApp','data-act="tackShare" data-to="wa"')}${slogo('share','More','data-act="tackShare" data-to="sys"')}${slogo('link','Copy link','data-act="tackShare" data-to="copy"')}</div></div>
-   <div class="tkbids">${bidArea||''}</div>
-   <div class="tkcta">
-     <button class="cta" data-go="post">${ic('plus',18,2.4,'var(--on-grad)')} Pin a job</button>
-     <button class="btn2 tkghost" data-sheet="invitefriend">${ic('users',17)} Invite a friend</button>
-     <button class="btn2 tkghost" data-act="tackFeedback">${ic('chat',17)} Give feedback</button>
-   </div>
   </div>`}
 function viewJob(D){
   const j0=D.jobByKey[S.openJob],j=j0&&hiddenFor(j0)&&j0.accepted!==S.me.id&&!myBidOn(j0.key)?null:j0;
@@ -1156,7 +1149,7 @@ function viewJob(D){
     </div>${picStrip('b:'+j.key+'~'+b.by,b.pics,'sub')}`).join(''):''}
    </div>
   </section>`;
-  if(isOrg(j.owner))return viewTackNote(j,mine?bidsSec+foot:foot+(st==='open'?'':bidsSec));
+  if(isOrg(j.owner))return viewTackNote(j);
   return`<div class="pad jobpage${gcls(j)}${isOrg(j.owner)?' tackjob':''}" style="--nc:${noteOf(j)}${gvars(j)}">
   <div class="jhero">${cover}${back('board','Board')}<div class="jtools">${mine&&st==='open'?`<button class="jtool" data-act="editJob" data-key="${esc(j.key)}" aria-label="Edit this job">${ic('edit',18)}</button>`:''}<button class="jtool" data-act="openShare" data-key="${esc(j.key)}" aria-label="Share this job">${ic('share',18)}</button>${mine?'':`<button class="jtool ${isSaved(j.key)?'on':''}" data-act="toggleSave" data-key="${esc(j.key)}" aria-label="${isSaved(j.key)?'Remove from saved':'Save this job'}" aria-pressed="${isSaved(j.key)}">${ic('bookmark',18,2,'currentColor',isSaved(j.key)?'currentColor':'none')}</button>`}</div>
     <div class="jhead"><h1 class="h1">${esc(j.text)}</h1></div></div>
@@ -1248,7 +1241,7 @@ function viewBids(D){
           :`<button class="item notif ${f.at>S.actSeenAt?'new':''}${f.earn?' earned':''}" ${f.rev?`data-review="${esc(f.rev)}"`:f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span></span>${f.earn?`<b class="earn">+₹${fmt(f.earn)}</b>`:''}${miniNote(f.job&&D.jobByKey[f.job])}${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`;
         return feed.length?`<div class="ifeed allfeed">${dateGroups(feed,f=>f.at).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(one).join('')}</section>`).join('')}</div>`:empty('Bids, picks and payments show up here.')})()
       :S.actTab==='jobs'?`${jobsNow.length?`<div class="ifeed"><section class="igroup">${jobsNow.map(j=>row(j,jobLine(j),j.price,me)).join('')}</section></div>`:empty('Nothing pinned right now.')}
-        <button class="linkbtn" data-go="post" style="align-self:flex-start;padding:0">Pin a job</button>`
+`
       :S.actTab==='bids'?(active.length||waiting.length||notPicked.length?`<div class="ifeed">${grp('Active',active)+grp('Waiting',waiting)+grp('Not picked',notPicked)}</div>`:empty('Bids you place on the board show up here.'))
       :hist.length?`<div class="ifeed">${dateGroups(hist,y=>y.at).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(y=>y.mine?row(y.j,jobLine(y.j),y.amt,me):row(y.j,bidLine(y.x||{j:y.j}),y.amt)).join('')}</section>`).join('')}</div>`:empty('Finished and closed jobs and bids show up here.')}`})()}
    </div></div><div style="height:24px"></div>`;
@@ -1325,7 +1318,7 @@ function viewPerson(uid,D){
   return`<div class="pad">${isMe?'':back('board','Back to the board')}
   <div class="stack narrow" style="margin:6px auto 0;gap:18px">
    <div class="prof ${bn?'hasbanner':''}">${bn?`<div class="pbanner" style="${bannerStyle(bn)}"></div>`:''}${isMe?`<button class="editpen" data-go="edit" aria-label="Edit profile">${ic('edit',17)}</button>`:''}
-     <span class="ring${liveOf(uid)?' live':''}" style="width:108px;height:108px">${face(uid,94)}</span>
+     <span class="ring${onlineNow(uid)?' live':''}" style="width:108px;height:108px">${face(uid,94)}</span>
      <span class="pname">${isOrg(uid)?'tack':handleOf(uid)?'@'+esc(handleOf(uid)):esc(shortName(uid))}</span>
      ${!isOrg(uid)&&realNameOf(uid)&&handleOf(uid)?`<span class="realname">${esc(realNameOf(uid))}</span>`:''}
      ${bio?`<p class="pbio">${esc(bio)}</p>`:''}
