@@ -10,7 +10,9 @@ const COLS={
   online:['id','at'],
   people:['id','name','photo','year','branch','does','bio','banner','ring','adult','joined_at','removed','asks','handle','handle_at'],
   names:['id','name'],
-  jobs:['owner','id','text','more','price','kind','when_label','place','at','deadline','status','done_at','taken_at','edited_at','repick_at','offer','pics','geo','color','dropped','drop_why','campus'],
+  jobs:['owner','id','text','more','price','kind','when_label','place','at','deadline','status','done_at','taken_at','edited_at','repick_at','offer','pics','geo','color','dropped','drop_why','campus','friends_only'],
+  follows:['follower','followee','at'],
+  friend_adds:['by','who','at'],
   jobpics:['owner','job','pics','at'],
   pitches:['owner','job','by','amt','say','at','pics','near'],
   bidpics:['owner','job','by','pics','at'],
@@ -64,6 +66,8 @@ const C={
   pitches:{t:'pitches',pk:k=>{const p=split(k,3);return{owner:p[0],job:p[1],by:p[2]}},key:r=>r.owner+'~'+r.job+'~'+r.by,strip:[],jobKey:true},
   bidpics:{t:'bidpics',pk:k=>{const p=split(k,3);return{owner:p[0],job:p[1],by:p[2]}},key:r=>r.owner+'~'+r.job+'~'+r.by,strip:[],jobKey:true},
   offers:{t:'offers',pk:k=>{const p=split(k,3);return{owner:p[0],job:p[1],recipient:p[2]}},key:r=>r.owner+'~'+r.job+'~'+r.recipient,strip:[]},
+  follows:{t:'follows',pk:k=>{const p=split(k,2);return{follower:p[0],followee:p[1]}},key:r=>r.follower+'~'+r.followee,strip:[]},
+  friend_adds:{t:'friend_adds',pk:k=>{const p=split(k,2);return{by:p[0],who:p[1]}},key:r=>r.by+'~'+r.who,strip:[]},
   jobs:{t:'jobs',pk:k=>{const p=split(k,2);return{owner:p[0],id:p[1]}},key:r=>r.owner+'~'+r.id,strip:['owner','id','key']},
 };
 
@@ -75,7 +79,7 @@ function fromRow(col,row){const c=C[col];if(col==='private')return row.data&&typ
   for(const[k,v]of Object.entries(row)){if(v===null||c.strip.includes(k))continue;d[UNREN[k]||camel(k)]=v}
   if(c.jobKey&&typeof d.job==='string'&&d.owner)d.job=d.owner+'~'+d.job;
   return d}
-const NN={people:{adult:false,removed:false},jobs:{more:'',kind:'Errand',status:'open'},pitches:{say:''},picks:{rated_doer:false,rated_poster:false,status:'assigned'},
+const NN={people:{adult:false,removed:false},jobs:{more:'',kind:'Errand',status:'open',friends_only:false},pitches:{say:''},picks:{rated_doer:false,rated_poster:false,status:'assigned'},
   offers:{status:'pending'},online:{at:0},config:{campus:'MIT-WPU',member_invites:true},threads:{open:true,read:{}},invites:{at:0},invcodes:{at:0},jobpics:{at:0},bidpics:{at:0}};
 const fullRow=(col,d)=>{const t=C[col].t,r=toRow(col,d),dflt=NN[t]||{};for(const s of COLS[t])if(!(s in r))r[s]=s in dflt?(s==='at'?ms():dflt[s]):null;return r};
 

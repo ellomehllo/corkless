@@ -1628,3 +1628,7 @@ button.igstat:active b{opacity:.7}
 .ninvbtns .pick,.ninvbtns .ghostbtn{padding:7px 16px}
 .nbanner.ninv{align-items:flex-start}
 .nbanner .nbbody{flex:1;min-width:0;display:flex;flex-direction:column}
+/* friends and followers */
+.igacts .igbtn{min-width:0}
+.relwho{display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left;color:inherit}
+.relwho .cn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
