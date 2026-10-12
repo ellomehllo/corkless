@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610122302';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610122302';
-import {modHit,MOD_CAT} from './mod.js?v=202610122302';
+import {makeDb} from './db.js?v=202610122316';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610122316';
+import {modHit,MOD_CAT} from './mod.js?v=202610122316';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -95,7 +95,7 @@ const S={
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',banner:'',adult:false,rules:false},
   inv:{email:'',campus:'',camp:''}, camp:{q:''}, coms:{}, cmine:{}, cinv:{}, cid:null, cnote:null, cnotes:{}, ccoms:{}, cmembers:{}, cdraft:{name:'',about:'',text:'',more:'',color:'#7FA2FF',handle:'',comment:''}, lastInvite:null, myCampus:null, campuses:{}, viewCampus:(()=>{try{return localStorage.getItem('tack.viewCampus')||''}catch{return''}})(),
   picks:{}, repDocs:{},
-  sheet:null, omenu:null, pnotes:{}, ptab:'notes', following:{}, followers:{}, addsOut:{}, addsIn:{}, ffeed:[], rate:{a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]}, rep:{why:'',note:'',block:false}, erase:{pw:''},
+  sheet:null, omenu:null, pnotes:{}, ptab:'notes', following:{}, followers:{}, ffeed:[], rate:{a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]}, rep:{why:'',note:'',block:false}, erase:{pw:''},
   chat:{key:null}, err:{}
 };
 
@@ -205,16 +205,23 @@ function derive(){
 }
 function myBidOn(jobKey){const p=S.pitchMine[jobKey+'~'+S.me.id];return p&&num(p.amt)>0?{amt:num(p.amt),say:str(p.say,SAY_MAX),at:num(p.at),pics:Math.min(MAX_PICS,num(p.pics))}:null}
 function threadOpen(k){return !!S.threadDocs[k]}
-// Friends add each other (both ways); following is one way. Friends can message anytime and see friends-only jobs.
-const isFollowing=u=>!!S.following[u],followsMe=u=>!!S.followers[u],isFriend=u=>!!(S.addsOut[u]&&S.addsIn[u]);
-const friendState=u=>isFriend(u)?'friends':S.addsOut[u]?'requested':S.addsIn[u]?'incoming':'none';
-const friendIds=()=>Object.keys(S.addsOut).filter(u=>S.addsIn[u]);
+// Following is instant and one way. Following each other makes you friends: friends can message anytime and see each other's
+// friends-only jobs. A job's chat stays open while it's being bid on and during the deal, and for a week after it's done
+// (to sort out payment); after that, the two of you keep talking only if you follow each other.
+const isFollowing=u=>!!S.following[u],followsMe=u=>!!S.followers[u],isFriend=u=>isFollowing(u)&&followsMe(u),canChat=isFriend;
+const CHAT_GRACE=7*864e5;
+function jobChatOpen(k,D){const j=D.jobByKey[parseKey(k)?.jobKey],doer=parseKey(k)?.members[1];if(!j)return false;
+  if(j.status==='open'||(j.status==='assigned'&&!j.accepted))return true;
+  if(j.accepted&&j.accepted===doer)return j.status==='assigned'||(j.status==='done'&&Date.now()-num(j.doneAt||j.pick?.doneAt)<CHAT_GRACE);
+  return false}
+const activeDeal=(u,D)=>workedWith(u,D).find(j=>jobChatOpen(jobThreadKey(j.key,j.accepted),D))||null;
+const friendIds=()=>Object.keys(S.following).filter(isFriend);
 const dmKey=u=>{const[a,b]=[S.me.id,u].sort();return`f~${a}~dm~${b}`};
-function setRel(m,u,v){S[m]={...S[m]};if(v)S[m][u]=v===true?Date.now():v;else delete S[m][u];render()}
+function setRel(m,u,v){S[m]={...S[m]};if(v)S[m][u]=v;else delete S[m][u];render()}
 function loadFeed(){if(!S.me)return;S.fb.rpc('follow_feed').then(l=>{S.ffeed=Array.isArray(l)?l.filter(x=>x&&typeof x.id==='string'&&ID_RE.test(String(x.owner))).map(normPNote):[];if(S.phase==='app')render()},()=>{S.ffeed=[]})}
 function canMessage(t,D){const me=S.me.id;
-  if(!t.jobKey)return!!parseKey(t.key)?.friend&&isFriend(t.other);
-  const j=D.jobByKey[t.jobKey];if(!j)return threadOpen(t.key);return j.owner===me||j.accepted===me||threadOpen(t.key)}
+  if(isFriend(t.other))return true;if(!t.jobKey)return false;
+  const j=D.jobByKey[t.jobKey];if(!j)return false;return(j.owner===me||j.accepted===me||threadOpen(t.key))&&jobChatOpen(t.key,D)}
 function workedWith(uid,D){const me=S.me.id;return D.jobs.filter(j=>(j.status==='assigned'||j.status==='done')&&((j.owner===me&&j.accepted===uid)||(j.owner===uid&&j.accepted===me)))}
 function lastJobFor(uid,D){return D.jobs.filter(j=>j.owner===S.me.id&&j.accepted===uid&&(j.status==='assigned'||j.status==='done')).sort((a,b)=>b.at-a.at)[0]||null}
 const ASKS_ON=false;
@@ -251,8 +258,7 @@ function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str
       else if(b&&jobState(j)==='open'&&j.editedAt>b.at)add(j.editedAt,j.owner,`${nm(j.owner)} ${A('updated')} ${t(j)}. Check it still works for you.`,{job:j.key});
     }
   }
-  for(const[u,at]of Object.entries(S.followers))if(!D.blocked.has(u))add(at,u,`${nm(u)} ${A('started following you')}`,{person:u});
-  for(const[u,at]of Object.entries(S.addsIn))if(!D.blocked.has(u)){if(!S.addsOut[u])add(at,u,`${nm(u)} ${A('wants to be friends')}`,{person:u,freq:u});else if(at>S.addsOut[u])add(at,u,`${nm(u)} ${A('added you back')}. You can message each other anytime now.`,{person:u})}
+  for(const[u,at]of Object.entries(S.followers))if(!D.blocked.has(u))add(at,u,`${nm(u)} ${A('started following you')}`,{person:u,...(isFollowing(u)?{}:{fb:u})});
   for(const x of S.ffeed)if(!D.blocked.has(x.owner))add(x.at,x.owner,`${nm(x.owner)} ${A('pinned')} ${t(x)}`,D.jobByKey[x.key]?{job:x.key}:{person:x.owner});
   for(const[id,iv]of Object.entries(S.cinv||{}))if(S.coms[id])add(num(iv.at),iv.by,`${nm(iv.by)} ${A('invited you')} to <b>${esc(comName(id))}</b>`,{go:'board',cinv:id});
   for(const o of offerList(S.offersIn))if(ok(o.owner))add(num(o.at),o.owner,`${nm(o.owner)} ${A('asked you')}: ${esc(str(o.text,60))}`,{go:'bids'});
@@ -322,7 +328,7 @@ const jobThreadKey=(jobKey,bidder)=>`j~${jobKey}~${bidder}`;
 function parseKey(k){const p=k.split('~');if(p[0]==='j'&&p.length===4)return{members:[p[1],p[3]],jobKey:p[1]+'~'+p[2]};if(p[0]==='d'&&p.length===3)return{members:[p[1],p[2]],jobKey:null};if(p[0]==='f'&&p.length===4&&p[2]==='dm')return{members:[p[1],p[3]],jobKey:null,friend:true};return null}
 function threadsOf(D){
   const me=S.me.id,out={};
-  const add=(k,other,jobKey)=>{if(out[k])return out[k];if(!other||other===me||(!D.members.includes(other)&&!isFriend(other))||D.blocked.has(other))return null;return out[k]={key:k,other,jobKey,last:null}};
+  const add=(k,other,jobKey)=>{if(out[k])return out[k];if(!other||other===me||(!D.members.includes(other)&&!canChat(other))||D.blocked.has(other))return null;return out[k]={key:k,other,jobKey,last:null}};
   for(const[k,t]of Object.entries(S.threadDocs)){const p=parseKey(k);if(!p||!p.members.includes(me))continue;
     const th=add(k,p.members.find(x=>x!==me),p.jobKey);if(th&&t&&num(t.lastAt))th.last={at:num(t.lastAt),text:str(t.lastText,80),from:str(t.lastBy,128)}}
   for(const j of D.jobs)if(j.accepted&&(j.status==='assigned'||j.status==='done')&&(j.owner===me||j.accepted===me))add(jobThreadKey(j.key,j.accepted),j.owner===me?j.accepted:j.owner,j.key);
@@ -484,9 +490,9 @@ function startSubs(){
   S.ready={config:false,people:false,priv:false};S.config={};S.peopleDocs={};S.priv={};S.threadDocs={};S.invites={};S.reports=[];
   const fail=e=>{if(e&&e.code==='permission-denied')lostAccess();else console.warn(e)};
   S.subs.push(onSnapshot(doc(db,'config','app'),s=>{S.config=s.exists()?s.data():{};S.ready.config=true;afterData()},fail));
-  S.following={};S.followers={};S.addsOut={};S.addsIn={};S.ffeed=[];
-  const rel=(col,f,m,k)=>S.subs.push(onSnapshot(query(collection(db,col),where(f,'==',me)),snap=>{const o={};snap.forEach(x=>{const d=x.data();if(ID_RE.test(String(d[k])))o[d[k]]=num(d.at)||1});S[m]=o;if(S.phase==='app')render()},e=>console.warn(e)));
-  rel('follows','follower','following','followee');rel('follows','followee','followers','follower');rel('friend_adds','by','addsOut','who');rel('friend_adds','who','addsIn','by');
+  S.following={};S.followers={};S.ffeed=[];
+  const rel=(f,m,k)=>S.subs.push(onSnapshot(query(collection(db,'follows'),where(f,'==',me)),snap=>{const o={};snap.forEach(x=>{const d=x.data();if(ID_RE.test(String(d[k])))o[d[k]]=num(d.at)||1});S[m]=o;if(S.phase==='app')render()},e=>console.warn(e)));
+  rel('follower','following','followee');rel('followee','followers','follower');
   loadFeed();
   S.subs.push(onSnapshot(collection(db,'people'),snap=>{
     const d={};snap.forEach(x=>{d[x.id]=x.data()});
@@ -1280,7 +1286,7 @@ function viewBids(D){
       ${S.actTab==='all'?(()=>{const feed=[...D.notes.map(n=>({...n,kind:'n'})),...jobsNow.map(j=>({kind:'j',j,at:j.at})),...[...active,...waiting,...notPicked].map(y=>({kind:'b',y,at:y.at||y.j.at}))].sort((a,b)=>b.at-a.at);
         const np=([l,c])=>[String(l).replace(/\s*·\s*₹[\d,]+/g,'').replace(/₹[\d,]+\s*·\s*/g,''),c];
         const one=f=>f.kind==='j'?row(f.j,np(jobLine(f.j)),f.j.price,me):f.kind==='b'?row(f.y.j,np(bidLine(f.y.x||{j:f.y.j})),f.y.amt)
-          :f.cinv||f.freq?`<div class="item notif ninv ${f.at>S.actSeenAt?'new':''}">${ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span>${actBtns(f)}</span>${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</div>`
+          :f.cinv||f.fb?`<div class="item notif ninv ${f.at>S.actSeenAt?'new':''}">${ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span>${actBtns(f)}</span>${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</div>`
           :`<button class="item notif ${f.at>S.actSeenAt?'new':''}${f.earn?' earned':''}" ${f.rev?`data-review="${esc(f.rev)}"`:f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span></span>${f.earn?`<b class="earn">+₹${fmt(f.earn)}</b>`:''}${miniNote(f.job&&D.jobByKey[f.job])}${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`;
         return feed.length?`<div class="ifeed allfeed">${dateGroups(feed,f=>f.at).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(one).join('')}</section>`).join('')}</div>`:empty('Bids, picks and payments show up here.')})()
       :S.actTab==='jobs'?`${jobsNow.length?`<div class="ifeed"><section class="igroup">${jobsNow.map(j=>row(j,jobLine(j),j.price,me)).join('')}</section></div>`:empty('Nothing pinned right now.')}
@@ -1341,7 +1347,8 @@ function viewChat(D){
        return`${head?`<p class="tstamp">${chatStamp(m.at)}</p>`:''}${cards}<div class="mrow ${mine?'mine':'theirs'}${cont?' cont':''}${more?' more':''}${rx.length?' hasrx':''}">${mine?'':`<span class="mav">${lastOfRun?face(m.by,28):''}</span>`}<div class="mcol">${lab}<div class="mline"><div class="${mine?'out':'in'}${m.kind!=='text'?' media '+m.kind:''}" data-mid="${m.id}">${msgBody(m)}${rx.length?`<span class="rx${S.rxPop===m.id?' pop':''}">${[...new Set(rx)].join('')}${rx.length>1?`<b>${rx.length}</b>`:''}</span>`:''}</div>${acts}</div></div></div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`}).join('')+gigsUpTo(Infinity)})()}
    ${S.chatUp?`<div class="out media pending">${S.chatUp==='photo'?'Sending photo…':'Sending voice message…'}</div>`:''}
   </div>
-  ${!can?`<div class="foot"><p class="note">${c.jobKey?`You can message ${esc(firstName(c.other))} once they pick you for this job.`:`Add ${esc(firstName(c.other))} as a friend to message anytime, or chat inside a job you\u2019re doing together.`}</p></div>`:`
+  ${!can?`<div class="foot"><p class="note">${c.jobKey&&D.jobByKey[c.jobKey]&&jobChatOpen(c.key,D)?`You can message ${esc(firstName(c.other))} once they pick you for this job.`
+      :`${c.jobKey?'This job is over, so its chat has closed. ':''}Follow each other to keep talking anytime.`}</p>${c.jobKey&&D.jobByKey[c.jobKey]&&jobChatOpen(c.key,D)||isFollowing(c.other)?'':`<button class="cta" data-act="follow" data-uid="${esc(c.other)}">${followsMe(c.other)?'Follow back':'Follow '+esc(shortName(c.other))}</button>`}</div>`:`
   <div class="foot" style="position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%)">${S.rec?`<div class="composer rec">
     <button class="cbtn" data-act="recCancel" aria-label="Cancel recording">${ic('trash',19)}</button>
     <span class="recbar"><i class="recdot"></i><span id="recT">${recClock()}</span><span class="muted">Recording</span></span>
@@ -1371,20 +1378,20 @@ const stTag=j=>({assigned:'Taken',done:'Done',closed:'Closed',expired:'Ended'}[j
 function profileWall(items,D){const n=wideMQ.matches?3:2,cols=Array.from({length:n},()=>[]);
   items.forEach(({j,o},i)=>cols[i%n].push(tile(j,D,i,o)));
   return`<div class="wallzone pwall"><div class="wall">${cols.map(c=>`<div class="wcol">${c.join('')}</div>`).join('')}</div></div>`}
-// Profile buttons for someone else: Message (friends, or you've worked together), Follow, and Add friend.
-function relBtns(uid,D){if(isOrg(uid))return`<div class="igacts"><button class="igbtn${isFollowing(uid)?'':' pri'}" data-act="follow" data-uid="${esc(uid)}">${isFollowing(uid)?'Following':'Follow'}</button></div>`;
-  const fs=friendState(uid),msg=fs==='friends'||workedWith(uid,D).length>0,fol=isFollowing(uid);
-  const fr=fs==='friends'?`<button class="igbtn" data-sheet="unfriend" data-about="${esc(uid)}">${ic('tick',14,2.6)} Friends</button>`
-    :fs==='requested'?`<button class="igbtn" data-act="friendRemove" data-uid="${esc(uid)}" data-msg="Request cancelled">Requested</button>`
-    :`<button class="igbtn${fs==='incoming'?' pri':''}" data-act="friendAdd" data-uid="${esc(uid)}">${fs==='incoming'?'Add back':'Add friend'}</button>`;
-  return`<div class="igacts">${msg?`<button class="igbtn pri" data-msgwith="${esc(uid)}">${ic('chat',15,2.2)} Message</button>`:''}<button class="igbtn${!msg&&!fol&&fs!=='incoming'?' pri':''}" data-act="follow" data-uid="${esc(uid)}">${fol?'Following':'Follow'}</button>${fr}</div>`}
+// Profile buttons for someone else: Follow / Following / Follow back. Once you follow each other: Message, then Friends.
+// During a job you're doing together, Message shows too.
+function relBtns(uid,D){const msg=!isOrg(uid)&&(isFriend(uid)||!!activeDeal(uid,D)),u=esc(uid),f=isFollowing(uid);
+  const fb=f?`<button class="igbtn" data-act="follow" data-uid="${u}">${isFriend(uid)?ic('tick',14,2.6)+' Friends':'Following'}</button>`
+    :`<button class="igbtn pri" data-act="follow" data-uid="${u}">${followsMe(uid)?'Follow back':'Follow'}</button>`;
+  const mb=msg?`<button class="igbtn${f?' pri':''}" data-msgwith="${u}">${ic('chat',15,2.2)} Message</button>`:'';
+  return`<div class="igacts">${isFriend(uid)?mb+fb:fb+mb}</div>`}
 function viewPerson(uid,D){
   const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,me=S.me.id;
   const bio=str(d.bio,BIO_MAX)||str(d.does,60),real=!isOrg(uid)&&handleOf(uid)?realNameOf(uid):'';
   const menu=isMe?kebab('me',[{html:`<span class="ohead">Logged in as ${esc(S.me.email)}</span>`},
-     {i:'users',t:'Friends',at:'data-sheet="rel" data-about="friends"',v:String(friendIds().length)},
      {i:'users',t:'Followers',at:'data-sheet="rel" data-about="followers"',v:String(Object.keys(S.followers).length)},
      {i:'users',t:'Following',at:'data-sheet="rel" data-about="following"',v:String(Object.keys(S.following).length)},
+     {i:'users',t:'Friends',at:'data-sheet="rel" data-about="friends"',v:String(friendIds().length)},
      {sep:1},
      {i:'star',t:'Your reviews',at:'data-go="reviews"',v:(()=>{const l=reviewsOf(S.me.id);return l&&l.length?String(l.length):''})()},
      {i:'bell',t:'Notifications',at:`data-act="${pushOn()?'pushOff':'pushOn'}"`,v:pushOn()?'On':'Off'},
@@ -1392,8 +1399,7 @@ function viewPerson(uid,D){
      S.me.isOwner?{i:'users',t:'Invites and members',at:'data-go="invites"'}:null,
      {sep:1},{i:'board',t:'How tack works',at:'data-act="replayIntro"'},{i:'shield',t:'Settings and privacy',at:'data-go="settings"'},{i:'flag',t:'Report or feedback',at:'data-go="help"'},
      {sep:1},{i:'out',t:'Log out',at:'data-act="logout"',danger:true}],'Profile options')
-    :kebab('person',[isFriend(uid)?{i:'users',t:'Remove friend',at:`data-sheet="unfriend" data-about="${esc(uid)}"`}:null,
-      followsMe(uid)?{i:'x',t:'Remove follower',at:`data-act="removeFollower" data-uid="${esc(uid)}"`}:null,{sep:1},{i:'eyeoff',t:'Restrict or block…',at:`data-sheet="who" data-about="${esc(uid)}"`},{i:'flag',t:'Report',at:`data-sheet="report" data-about="${esc(uid)}"`,danger:true}],'Options for '+shortName(uid));
+    :kebab('person',[followsMe(uid)?{i:'x',t:'Remove follower',at:`data-act="removeFollower" data-uid="${esc(uid)}"`}:null,{sep:1},{i:'eyeoff',t:'Restrict or block…',at:`data-sheet="who" data-about="${esc(uid)}"`},{i:'flag',t:'Report',at:`data-sheet="report" data-about="${esc(uid)}"`,danger:true}],'Options for '+shortName(uid));
   loadProfileNotes(uid);
   const tab=isMe&&PTABS.includes(S.ptab)?S.ptab:'notes',c=S.pnotes[uid];
   const star=v=>`<i class="sstar">${ic('star',13,2,'currentColor','currentColor')}</i>${v}`;
@@ -1570,16 +1576,17 @@ function sheetHTML(D){
   const s=S.sheet;if(!s)return'';let b='';
   const j=S.openJob?D.jobByKey[S.openJob]:null;
   switch(s.type){
-  case'rel':{const k=['friends','followers','following'].includes(s.about)?s.about:'friends',bl=new Set(arr(S.priv.blocked));
-    const ids=(k==='friends'?friendIds():Object.keys(k==='followers'?S.followers:S.following)).filter(u=>!bl.has(u)).sort((a,b)=>shortName(a).localeCompare(shortName(b)));
-    const act=u=>k==='friends'?`<button class="ghostbtn" data-sheet="unfriend" data-about="${esc(u)}">Remove</button>`:k==='followers'?`<button class="ghostbtn" data-act="removeFollower" data-uid="${esc(u)}">Remove</button>`:`<button class="ghostbtn" data-act="follow" data-uid="${esc(u)}">Unfollow</button>`;
+  case'rel':{const k=['friends','followers','following'].includes(s.about)?s.about:'followers',bl=new Set(arr(S.priv.blocked));
+    const ids=(k==='friends'?friendIds():Object.keys(k==='following'?S.following:S.followers)).filter(u=>!bl.has(u)).sort((a,b)=>shortName(a).localeCompare(shortName(b)));
+    const act=u=>{const x=esc(u);return k==='followers'?(isFollowing(u)?'':`<button class="pick" data-act="follow" data-uid="${x}">Follow back</button>`)+`<button class="ghostbtn" data-act="removeFollower" data-uid="${x}">Remove</button>`
+      :k==='following'?`<button class="ghostbtn" data-act="follow" data-uid="${x}">Following</button>`:''};
     b=`<h2 id="sheetT">${{friends:'Friends',followers:'Followers',following:'Following'}[k]}</h2>
       ${ids.length?`<div class="menu cmlist">${ids.map(u=>`<div class="cmrow"><button class="relwho" data-person="${esc(u)}">${face(u,30)}<span class="cn">${esc(shortName(u))}</span></button>${act(u)}</div>`).join('')}</div>`
-        :`<p class="note">${{friends:'No friends yet. Open someone’s profile and tap Add friend. Once they add you back, you can message each other anytime.',followers:'Nobody follows you yet.',following:'You aren’t following anyone yet. Follow people to hear when they pin a job.'}[k]}</p>`}
+        :`<p class="note">${{friends:'No friends yet. You become friends when you both follow each other.',followers:'Nobody follows you yet.',following:'You aren’t following anyone yet. Follow people to hear when they pin a job.'}[k]}</p>`}
       ${k==='followers'&&ids.length?'<p class="note">Removing a follower doesn’t tell them.</p>':''}`;break}
-  case'unfriend':{const u=s.about;b=`<h2 id="sheetT">Remove ${esc(shortName(u))} as a friend?</h2>
-      <p>You won’t be able to message each other outside a job, or see each other’s friends-only jobs. They aren’t told.</p>
-      <button class="cta destructive" data-act="friendRemove" data-uid="${esc(u)}" data-msg="Removed from friends">Remove friend</button><button class="linkbtn" data-act="closeSheet">Keep</button>`;break}
+  case'unfollow':{const u=s.about,fr=isFriend(u);b=`<h2 id="sheetT">Unfollow ${esc(shortName(u))}?</h2>
+      <p>${fr?'You’ll stop being friends, so you can only message each other inside a job, and you won’t see each other’s friends-only jobs. They aren’t told.':'You won’t hear when they pin a job. They aren’t told.'}</p>
+      <button class="cta destructive" data-act="unfollow" data-uid="${esc(u)}">Unfollow</button><button class="linkbtn" data-act="closeSheet">Cancel</button>`;break}
   case'pnmenu':{const x=pnoteByKey(s.about,D);if(!x){b='<h2 id="sheetT">This note is gone</h2>';break}
     b=`<h2 id="sheetT">${esc(x.text.length>70?x.text.slice(0,70)+'…':x.text)}</h2><div class="menu">${D.jobByKey[x.key]?`<button data-job="${esc(x.key)}">${ic('board',18)} Open note</button>`:''}
       <button data-act="pnHide" data-key="${esc(x.key)}" data-val="${x.hidden?'0':'1'}">${ic('eyeoff',18)} ${x.hidden?'Show on my profile':'Hide from my profile'}</button></div>
@@ -1888,14 +1895,14 @@ function nbCheck(D){const now=Date.now();
   if(!NB.on)nbNext()}
 function nbRoot(){let r=$('nbanners');if(!r){r=document.createElement('div');r.id='nbanners';r.className='nbanners';r.setAttribute('aria-live','polite');document.body.appendChild(r)}return r}
 // A board invite can be answered right on the notice, in Activity or in the banner.
-const actBtns=f=>f.freq?`<span class="ninvbtns"><button class="pick" data-act="friendAdd" data-uid="${esc(f.freq)}">Add back</button><button class="ghostbtn" data-act="friendRemove" data-uid="${esc(f.freq)}" data-msg="Request ignored">Ignore</button></span>`:invBtns(f.cinv);
+const actBtns=f=>f.fb?`<span class="ninvbtns"><button class="pick" data-act="follow" data-uid="${esc(f.fb)}">Follow back</button></span>`:invBtns(f.cinv);
 const invBtns=id=>`<span class="ninvbtns"><button class="pick" data-act="comJoin" data-id="${esc(id)}">Accept</button><button class="ghostbtn" data-act="comDecline" data-id="${esc(id)}">Decline</button></span>`;
 function nbNext(){const n=NB.q.shift();if(!n){NB.on=null;return}NB.on=n;const r=nbRoot(),go2=n.rev?`data-review="${esc(n.rev)}"`:n.job?`data-job="${esc(n.job)}"`:n.person?`data-person="${esc(n.person)}"`:`data-go="${n.go}"`;
-  r.innerHTML=n.cinv||n.freq?`<div class="nbanner ninv" role="status">${ring(n.who,36)}<span class="nbbody"><span class="ntext">${n.html}</span>${actBtns(n)}</span></div>`:`<button class="nbanner" ${go2}>${n.who==='tack'?tackFace(36):ring(n.who,36)}<span class="ntext">${n.html}</span>${n.earn?`<b class="earn">+\u20b9${fmt(n.earn)}</b>`:''}${miniNote(n.job&&derive().jobByKey[n.job])}</button>`;
+  r.innerHTML=n.cinv||n.fb?`<div class="nbanner ninv" role="status">${ring(n.who,36)}<span class="nbbody"><span class="ntext">${n.html}</span>${actBtns(n)}</span></div>`:`<button class="nbanner" ${go2}>${n.who==='tack'?tackFace(36):ring(n.who,36)}<span class="ntext">${n.html}</span>${n.earn?`<b class="earn">+\u20b9${fmt(n.earn)}</b>`:''}${miniNote(n.job&&derive().jobByKey[n.job])}</button>`;
   const el=r.firstChild;let y0=null;
   el.addEventListener('pointerdown',e=>{y0=e.clientY});el.addEventListener('pointermove',e=>{if(y0!=null&&e.clientY-y0<-18){y0=null;nbHide()}});
   el.addEventListener('click',()=>{clearTimeout(NB.t);nbHide(true)});
-  clearTimeout(NB.t);NB.t=setTimeout(()=>nbHide(),n.cinv||n.freq?9000:4500)}
+  clearTimeout(NB.t);NB.t=setTimeout(()=>nbHide(),n.cinv||n.fb?9000:4500)}
 function nbHide(now){const el=$('nbanners')?.firstChild;clearTimeout(NB.t);if(!el){nbNext();return}
   if(now||reduceMotion.matches){el.remove();setTimeout(nbNext,200);return}
   el.classList.add('out');el.addEventListener('animationend',()=>{el.remove();setTimeout(nbNext,250)},{once:true})}
@@ -2061,13 +2068,13 @@ const ACT={
   async addBranch(){const c=S.cpick;if(!c||c.busy)return;if(c.ncol.trim().length<2){c.err='Add your college name.';render();return}c.busy=true;c.err='';render();
     try{await S.fb.rpc('add_my_campus',{p_college:c.ncol.trim(),p_city:c.ncity.trim()});S.cpick=null;handleUser(S.user)}catch(e){c.busy=false;c.err='Couldn’t make the board. Try again.';render()}},
   introPush(){closeIntro('board');setTimeout(enablePush,350)},
-  async follow(el){const u=el.dataset.uid,on=!isFollowing(u);setRel('following',u,on);
-    try{await S.fb.rpc('set_follow',{p:u,p_on:on});toast(on?'Following '+shortName(u)+'. You\u2019ll hear when they pin a job.':'Unfollowed '+shortName(u))}catch(e){console.warn(e);setRel('following',u,!on);toast('Couldn\u2019t do that. Try again.')}},
-  async friendAdd(el){const u=el.dataset.uid;setRel('addsOut',u,true);
-    try{const r=await S.fb.rpc('friend_add',{p:u});toast(r==='friends'?'You and '+shortName(u)+' are friends now':'Friend request sent to '+shortName(u))}catch(e){console.warn(e);setRel('addsOut',u,false);toast('Couldn\u2019t add them. Try again.')}},
-  async friendRemove(el){const u=el.dataset.uid,o=S.addsOut[u],i=S.addsIn[u],msg=el.dataset.msg;S.sheet=null;S.addsOut={...S.addsOut};S.addsIn={...S.addsIn};delete S.addsOut[u];delete S.addsIn[u];render();
-    try{await S.fb.rpc('friend_remove',{p:u});if(msg)toast(msg)}catch(e){console.warn(e);if(o)setRel('addsOut',u,o);if(i)setRel('addsIn',u,i);toast('Couldn\u2019t do that. Try again.')}},
-  async removeFollower(el){const u=el.dataset.uid,o=S.followers[u];setRel('followers',u,false);
+  async follow(el){const u=el.dataset.uid;if(isFollowing(u)){S.sheet={type:'unfollow',about:u};render();return}
+    setRel('following',u,Date.now());
+    try{await S.fb.rpc('follow_user',{p:u});toast(followsMe(u)?'You and '+shortName(u)+' are friends now. You can message each other anytime.':'Following '+shortName(u))}
+    catch(e){console.warn(e);setRel('following',u,null);toast('Couldn\u2019t do that. Try again.')}},
+  async unfollow(el){const u=el.dataset.uid,o=S.following[u];S.sheet=null;setRel('following',u,null);
+    try{await S.fb.rpc('unfollow_user',{p:u});toast('Unfollowed '+shortName(u))}catch(e){console.warn(e);setRel('following',u,o);toast('Couldn\u2019t do that. Try again.')}},
+  async removeFollower(el){const u=el.dataset.uid,o=S.followers[u];S.sheet=null;setRel('followers',u,null);
     try{await S.fb.rpc('remove_follower',{p:u});toast(shortName(u)+' no longer follows you')}catch(e){console.warn(e);setRel('followers',u,o);toast('Couldn\u2019t do that. Try again.')}},
   toggleFriendsOnly(){S.draft.friendsOnly=!S.draft.friendsOnly;render()},
   ptab(el){S.ptab=PTABS.includes(el.dataset.k)?el.dataset.k:'notes';render()},
@@ -2217,7 +2224,7 @@ const ACT={
   toggleOnline(){savePriv({hideOnline:!S.priv.hideOnline});toast(S.priv.hideOnline?'Nobody sees when you’re online now':'People you’ve made a deal with can see when you’re online')},
   restrict(el){const u=el.dataset.uid;savePriv({restricted:[...new Set([...restricted(),u])]});S.sheet=null;toast('Restricted. '+firstName(u)+' isn\u2019t told.')},
   unrestrict(el){const u=el.dataset.uid;savePriv({restricted:restricted().filter(x=>x!==u)});if(S.sheet?.type==='who')S.sheet=null;toast('Unrestricted')},
-  blockWho(el){const u=el.dataset.uid;S.fb.rpc('cut_ties',{p:u}).catch(()=>{});['following','followers','addsOut','addsIn'].forEach(m=>{if(S[m][u]){S[m]={...S[m]};delete S[m][u]}});savePriv({blocked:[...new Set([...arr(S.priv.blocked),u])]});S.sheet=null;toast('Blocked. '+firstName(u)+' isn\u2019t told.');if(['chat','person'].includes(S.view))go('board')},
+  blockWho(el){const u=el.dataset.uid;S.fb.rpc('cut_ties',{p:u}).catch(()=>{});['following','followers'].forEach(m=>{if(S[m][u]){S[m]={...S[m]};delete S[m][u]}});savePriv({blocked:[...new Set([...arr(S.priv.blocked),u])]});S.sheet=null;toast('Blocked. '+firstName(u)+' isn\u2019t told.');if(['chat','person'].includes(S.view))go('board')},
   withdrawOffer(el){const k=el.dataset.key,m={...S.offersOut};delete m[k];S.offersOut=m;render();S.fb.deleteDoc(S.fb.doc(S.db,'offers',k)).catch(writeErr)},
   toggleMemberInvites(el){S.config={...S.config,memberInvites:!!el.checked};render();S.fb.setDoc(S.fb.doc(S.db,'config','app'),S.config).catch(writeErr);toast(el.checked?'Members can invite friends':'Member invites are off')},
   saveCampus(){const c=(S.inv.campus||'').trim();if(!c)return;const {doc,setDoc}=S.fb;
@@ -2295,7 +2302,7 @@ document.addEventListener('click',e=>{
   if(ds.threadJob!==undefined){const j=D.jobByKey[S.openJob];if(j&&canMessage({key:jobThreadKey(j.key,me),other:j.owner,jobKey:j.key},D))openThread({key:jobThreadKey(j.key,me),other:j.owner,jobKey:j.key});return}
   if(ds.gig!==undefined){S.sheet={type:'gig',key:ds.gig};render();return}
   if(ds.gigopen!==undefined){S.sheet=null;S.openJob=ds.gigopen;S.bid={key:null};go('job');return}
-  if(ds.msgwith!==undefined){const u=ds.msgwith,j=workedWith(u,D).sort((a,b)=>num(b.takenAt||b.at)-num(a.takenAt||a.at))[0];if(j)openThread({key:jobThreadKey(j.key,j.accepted),other:u,jobKey:j.key});else if(isFriend(u))openThread({key:dmKey(u),other:u,jobKey:null});return}
+  if(ds.msgwith!==undefined){const u=ds.msgwith,j=activeDeal(u,D);if(isFriend(u))openThread({key:j?jobThreadKey(j.key,j.accepted):dmKey(u),other:u,jobKey:j?.key||null});else if(j)openThread({key:jobThreadKey(j.key,j.accepted),other:u,jobKey:j.key});return}
   if(ds.threadWith!==undefined){const j=D.jobByKey[S.openJob];if(j)openThread({key:jobThreadKey(j.key,ds.threadWith),other:ds.threadWith,jobKey:j.key});return}
 });
 // Tapping outside an open ⋯ menu only closes it. Picking an item closes it and runs the item.

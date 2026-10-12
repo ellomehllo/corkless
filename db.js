@@ -12,7 +12,6 @@ const COLS={
   names:['id','name'],
   jobs:['owner','id','text','more','price','kind','when_label','place','at','deadline','status','done_at','taken_at','edited_at','repick_at','offer','pics','geo','color','dropped','drop_why','campus','friends_only'],
   follows:['follower','followee','at'],
-  friend_adds:['by','who','at'],
   jobpics:['owner','job','pics','at'],
   pitches:['owner','job','by','amt','say','at','pics','near'],
   bidpics:['owner','job','by','pics','at'],
@@ -67,7 +66,6 @@ const C={
   bidpics:{t:'bidpics',pk:k=>{const p=split(k,3);return{owner:p[0],job:p[1],by:p[2]}},key:r=>r.owner+'~'+r.job+'~'+r.by,strip:[],jobKey:true},
   offers:{t:'offers',pk:k=>{const p=split(k,3);return{owner:p[0],job:p[1],recipient:p[2]}},key:r=>r.owner+'~'+r.job+'~'+r.recipient,strip:[]},
   follows:{t:'follows',pk:k=>{const p=split(k,2);return{follower:p[0],followee:p[1]}},key:r=>r.follower+'~'+r.followee,strip:[]},
-  friend_adds:{t:'friend_adds',pk:k=>{const p=split(k,2);return{by:p[0],who:p[1]}},key:r=>r.by+'~'+r.who,strip:[]},
   jobs:{t:'jobs',pk:k=>{const p=split(k,2);return{owner:p[0],id:p[1]}},key:r=>r.owner+'~'+r.id,strip:['owner','id','key']},
 };
 
