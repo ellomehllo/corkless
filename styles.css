@@ -1618,3 +1618,13 @@ button.igstat:active b{opacity:.7}
 :root[data-theme="light"] .flag.ptag:not(.on){background:rgba(18,19,23,.08)}
 @media (min-width:900px){.igtabs,.pwall{margin-left:0;margin-right:0}}
 
+/* username suggestions when inviting to a board */
+.hsugs button{padding:10px 14px}
+.hsugs .rowtext{min-width:0}
+.hsugs .pick{margin-left:auto;flex:none}
+.hsnone{text-align:left;margin:0}
+/* board invites answered from the notice */
+.ninvbtns{display:flex;gap:8px;margin-top:8px}
+.ninvbtns .pick,.ninvbtns .ghostbtn{padding:7px 16px}
+.nbanner.ninv{align-items:flex-start}
+.nbanner .nbbody{flex:1;min-width:0;display:flex;flex-direction:column}

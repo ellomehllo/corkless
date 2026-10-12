@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610122243';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610122243';
-import {modHit,MOD_CAT} from './mod.js?v=202610122243';
+import {makeDb} from './db.js?v=202610122247';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610122247';
+import {modHit,MOD_CAT} from './mod.js?v=202610122247';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -242,7 +242,7 @@ function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str
       else if(b&&jobState(j)==='open'&&j.editedAt>b.at)add(j.editedAt,j.owner,`${nm(j.owner)} ${A('updated')} ${t(j)}. Check it still works for you.`,{job:j.key});
     }
   }
-  for(const[id,iv]of Object.entries(S.cinv||{}))if(S.coms[id])add(num(iv.at),iv.by,`${nm(iv.by)} ${A('invited you')} to <b>${esc(comName(id))}</b>`,{go:'board'});
+  for(const[id,iv]of Object.entries(S.cinv||{}))if(S.coms[id])add(num(iv.at),iv.by,`${nm(iv.by)} ${A('invited you')} to <b>${esc(comName(id))}</b>`,{go:'board',cinv:id});
   for(const o of offerList(S.offersIn))if(ok(o.owner))add(num(o.at),o.owner,`${nm(o.owner)} ${A('asked you')}: ${esc(str(o.text,60))}`,{go:'bids'});
   // Declines are silent: the asker only ever hears about a yes.
   for(const o of offerList(S.offersOut))if(ok(o.to)&&o.status==='accepted')add(num(o.respondedAt),o.to,`${nm(o.to)} ${A('said yes')} to ${esc(str(o.text,60))}`,{go:'bids'});
@@ -612,6 +612,17 @@ function openCom(id){if(S.cid===id){go('cboard');return}closeCom();S.cid=id;cons
     onSnapshot(query(collection(db,'ccomments'),where('community','==',id)),snap=>{const c={};snap.forEach(x=>{c[x.id]=x.data()});S.ccoms=c;r()},e=>console.warn(e)),
     onSnapshot(query(collection(db,'cmembers'),where('community','==',id)),snap=>{const c={};snap.forEach(x=>{const d=x.data();c[d.uid]=d.role});S.cmembers=c;r()},e=>console.warn(e))];
   go('cboard')}
+// Username suggestions when inviting to a board: people you can already see (your campus, board mates, people you've worked with).
+// Matching usernames first, then people you've worked with, then whoever's online. Members and people you've blocked are left out.
+function ciSugs(){const q=S.cdraft.handle.trim().replace(/^@/,'').toLowerCase(),me=S.me.id,D=derive(),bl=new Set(arr(S.priv.blocked)),mem=S.cmembers||{},l=[];
+  for(const u of Object.keys(S.peopleDocs)){if(u===me||!ID_RE.test(u)||!isMember(u)||isOrg(u)||bl.has(u)||mem[u])continue;const h=handleOf(u);if(!h)continue;
+    const nm=(realNameOf(u)||'').toLowerCase();let sc=0;
+    if(q){if(h.startsWith(q))sc=3;else if(h.includes(q))sc=2;else if(nm.split(/\s+/).some(w=>w&&w.startsWith(q)))sc=1;else continue}
+    l.push({u,h,sc,w:workedWith(u,D).length>0,on:onlineNow(u)})}
+  return l.sort((a,b)=>b.sc-a.sc||b.w-a.w||b.on-a.on||a.h.localeCompare(b.h)).slice(0,6)}
+function ciSugsHTML(){const l=ciSugs(),q=S.cdraft.handle.trim();
+  if(!l.length)return q?'<p class="note hsnone">No one you know matches. If you know their exact username, you can still send the invite.</p>':'';
+  return`${q?'':'<span class="formlabel">Suggested</span>'}<div class="menu hsugs">${l.map(x=>`<button data-act="comInviteH" data-h="${esc(x.h)}" aria-label="Invite @${esc(x.h)}">${ring(x.u,34)}<span class="rowtext"><span class="t1">@${esc(x.h)}</span><span class="t2">${esc(x.w?'Worked together':realNameOf(x.u)||campusName(campusOf(x.u)))}</span></span><span class="pick">Invite</span></button>`).join('')}</div>`}
 const comName=id=>str(S.coms[id]?.name,40)||'Board';
 const comOwner=id=>S.cmine[id]==='owner';
 function comChips(){const mine=Object.keys(S.cmine).filter(id=>S.coms[id]).sort((a,b)=>comName(a).localeCompare(comName(b))),inv=Object.keys(S.cinv).filter(id=>S.coms[id]);
@@ -1252,6 +1263,7 @@ function viewBids(D){
       ${S.actTab==='all'?(()=>{const feed=[...D.notes.map(n=>({...n,kind:'n'})),...jobsNow.map(j=>({kind:'j',j,at:j.at})),...[...active,...waiting,...notPicked].map(y=>({kind:'b',y,at:y.at||y.j.at}))].sort((a,b)=>b.at-a.at);
         const np=([l,c])=>[String(l).replace(/\s*·\s*₹[\d,]+/g,'').replace(/₹[\d,]+\s*·\s*/g,''),c];
         const one=f=>f.kind==='j'?row(f.j,np(jobLine(f.j)),f.j.price,me):f.kind==='b'?row(f.y.j,np(bidLine(f.y.x||{j:f.y.j})),f.y.amt)
+          :f.cinv?`<div class="item notif ninv ${f.at>S.actSeenAt?'new':''}">${ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span>${invBtns(f.cinv)}</span>${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</div>`
           :`<button class="item notif ${f.at>S.actSeenAt?'new':''}${f.earn?' earned':''}" ${f.rev?`data-review="${esc(f.rev)}"`:f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span></span>${f.earn?`<b class="earn">+₹${fmt(f.earn)}</b>`:''}${miniNote(f.job&&D.jobByKey[f.job])}${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`;
         return feed.length?`<div class="ifeed allfeed">${dateGroups(feed,f=>f.at).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(one).join('')}</section>`).join('')}</div>`:empty('Bids, picks and payments show up here.')})()
       :S.actTab==='jobs'?`${jobsNow.length?`<div class="ifeed"><section class="igroup">${jobsNow.map(j=>row(j,jobLine(j),j.price,me)).join('')}</section></div>`:empty('Nothing pinned right now.')}
@@ -1640,6 +1652,7 @@ function sheetHTML(D){
     ${S.err.cnew?`<p class="err">${esc(S.err.cnew)}</p>`:''}<button class="cta" data-act="comCreate">Create board</button>`;break;
   case'cinvite':b=`<h2 id="sheetT">Invite to ${esc(comName(S.cid))}</h2><p>Invite people by their tack username.</p>
     <label class="field hfield" for="ciIn"><span class="hat">@</span><input id="ciIn" maxlength="21" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="username" value="${esc(S.cdraft.handle)}" data-bind="cdraft.handle"></label>
+    <div id="ciSugs" class="stack gap8">${ciSugsHTML()}</div>
     ${S.err.cinv?`<p class="err">${esc(S.err.cinv)}</p>`:''}<button class="cta" data-act="comInvite">Send invite</button>`;break;
   case'cjoin':{const c=S.coms[s.about],iv=S.cinv[s.about];b=`<h2 id="sheetT">${esc(c?.name||'Board')}</h2>${c?.about?`<p>${esc(c.about)}</p>`:''}<p>${esc(shortName(iv?.by))} invited you to this board.</p>
     <button class="cta" data-act="comJoin" data-id="${esc(s.about)}">Join board</button><button class="btn2" data-act="comDecline" data-id="${esc(s.about)}">Decline</button>`;break}
@@ -1835,12 +1848,14 @@ function nbCheck(D){const now=Date.now();
   for(const n of D.notes){const k=nbKey(n);if(NB.seen.has(k))continue;NB.seen.add(k);if(n.at>=NB.since-5e3&&n.at<=now+6e4&&S.view!=='bids')NB.q.push(n)}
   if(!NB.on)nbNext()}
 function nbRoot(){let r=$('nbanners');if(!r){r=document.createElement('div');r.id='nbanners';r.className='nbanners';r.setAttribute('aria-live','polite');document.body.appendChild(r)}return r}
+// A board invite can be answered right on the notice, in Activity or in the banner.
+const invBtns=id=>`<span class="ninvbtns"><button class="pick" data-act="comJoin" data-id="${esc(id)}">Accept</button><button class="ghostbtn" data-act="comDecline" data-id="${esc(id)}">Decline</button></span>`;
 function nbNext(){const n=NB.q.shift();if(!n){NB.on=null;return}NB.on=n;const r=nbRoot(),go2=n.rev?`data-review="${esc(n.rev)}"`:n.job?`data-job="${esc(n.job)}"`:n.person?`data-person="${esc(n.person)}"`:`data-go="${n.go}"`;
-  r.innerHTML=`<button class="nbanner" ${go2}>${n.who==='tack'?tackFace(36):ring(n.who,36)}<span class="ntext">${n.html}</span>${n.earn?`<b class="earn">+\u20b9${fmt(n.earn)}</b>`:''}${miniNote(n.job&&derive().jobByKey[n.job])}</button>`;
+  r.innerHTML=n.cinv?`<div class="nbanner ninv" role="status">${ring(n.who,36)}<span class="nbbody"><span class="ntext">${n.html}</span>${invBtns(n.cinv)}</span></div>`:`<button class="nbanner" ${go2}>${n.who==='tack'?tackFace(36):ring(n.who,36)}<span class="ntext">${n.html}</span>${n.earn?`<b class="earn">+\u20b9${fmt(n.earn)}</b>`:''}${miniNote(n.job&&derive().jobByKey[n.job])}</button>`;
   const el=r.firstChild;let y0=null;
   el.addEventListener('pointerdown',e=>{y0=e.clientY});el.addEventListener('pointermove',e=>{if(y0!=null&&e.clientY-y0<-18){y0=null;nbHide()}});
   el.addEventListener('click',()=>{clearTimeout(NB.t);nbHide(true)});
-  clearTimeout(NB.t);NB.t=setTimeout(()=>nbHide(),4500)}
+  clearTimeout(NB.t);NB.t=setTimeout(()=>nbHide(),n.cinv?9000:4500)}
 function nbHide(now){const el=$('nbanners')?.firstChild;clearTimeout(NB.t);if(!el){nbNext();return}
   if(now||reduceMotion.matches){el.remove();setTimeout(nbNext,200);return}
   el.classList.add('out');el.addEventListener('animationend',()=>{el.remove();setTimeout(nbNext,250)},{once:true})}
@@ -1978,6 +1993,7 @@ const ACT={
   async comCreate(){const d=S.cdraft,n=d.name.trim();if(n.length<2){S.err={cnew:'Give the board a name.'};render();return}if(modBlock('job',n,d.about))return;
     try{const id=await S.fb.rpc('create_community',{p_name:n,p_about:d.about.trim()||null});S.cdraft.name='';S.cdraft.about='';S.sheet=null;S.err={};S.coms={...S.coms,[id]:{name:n,about:d.about.trim(),owner:S.me.id}};S.cmine={...S.cmine,[id]:'owner'};openCom(id);toast('Board created. Invite people from the board.')}
     catch(e){console.warn(e);S.err={cnew:/10 boards/.test(e.message)?'You can start up to 10 boards.':'Couldn\u2019t create the board. Try again.'};render()}},
+  comInviteH(el){S.cdraft.handle=el.dataset.h||'';ACT.comInvite()},
   async comInvite(){const h=S.cdraft.handle.trim().replace(/^@/,'').toLowerCase();if(!h){S.err={cinv:'Type a username.'};render();return}
     try{const r=await S.fb.rpc('invite_to_community',{p_id:S.cid,p_handle:h});if(r==='invited'){S.cdraft.handle='';S.err={};S.sheet=null;toast('Invited @'+h)}else{S.err={cinv:r==='member'?'@'+h+' is already a member.':'No one on '+campus()+' has that username.'};render()}}
     catch(e){console.warn(e);S.err={cinv:'Couldn\u2019t send the invite.'};render()}},
@@ -2265,7 +2281,7 @@ document.addEventListener('submit',e=>{
   if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset,newpw:setNewPw,otp:doVerifyOtp})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
-document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='msg'){$('composer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='ccomIn'){$('ccomposer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='q'||e.target.id==='campQ')render();else if(e.target.id==='fCol'||e.target.id==='cpQ')paintCol();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jhue'&&S.draft.white){S.draft.white=false;$('jwhite')?.classList.remove('on')}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
+document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ciIn'){const c=$('ciSugs');if(c)c.innerHTML=ciSugsHTML();return}if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='msg'){$('composer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='ccomIn'){$('ccomposer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='q'||e.target.id==='campQ')render();else if(e.target.id==='fCol'||e.target.id==='cpQ')paintCol();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jhue'&&S.draft.white){S.draft.white=false;$('jwhite')?.classList.remove('on')}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
 document.addEventListener('change',async e=>{
   bind(e);syncNeed();
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}
