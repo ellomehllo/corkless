@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610122316';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610122316';
-import {modHit,MOD_CAT} from './mod.js?v=202610122316';
+import {makeDb} from './db.js?v=202610122323';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610122323';
+import {modHit,MOD_CAT} from './mod.js?v=202610122323';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -209,7 +209,12 @@ function threadOpen(k){return !!S.threadDocs[k]}
 // friends-only jobs. A job's chat stays open while it's being bid on and during the deal, and for a week after it's done
 // (to sort out payment); after that, the two of you keep talking only if you follow each other.
 const isFollowing=u=>!!S.following[u],followsMe=u=>!!S.followers[u],isFriend=u=>isFollowing(u)&&followsMe(u),canChat=isFriend;
-const CHAT_GRACE=7*864e5;
+const CHAT_GRACE=7*864e5,DM_REQ_MAX=3;
+// Anyone can message anyone they can see. Until you follow each other, the first messages arrive as a message request:
+// up to 3 messages, and the other person accepts or declines. Friends skip the request.
+function dmState(k,u){if(isFriend(u))return'open';const d=S.threadDocs[k];if(!d)return'requesting';if(!d.req)return'open';if(d.req!==S.me.id)return'incoming';
+  const n=(S.chat.parts?.[k]||[]).filter(m=>m.by===S.me.id).length;return n<DM_REQ_MAX?'requesting':'capped'}
+const reqIn=(k,u)=>!!parseKey(k)?.friend&&dmState(k,u)==='incoming';
 function jobChatOpen(k,D){const j=D.jobByKey[parseKey(k)?.jobKey],doer=parseKey(k)?.members[1];if(!j)return false;
   if(j.status==='open'||(j.status==='assigned'&&!j.accepted))return true;
   if(j.accepted&&j.accepted===doer)return j.status==='assigned'||(j.status==='done'&&Date.now()-num(j.doneAt||j.pick?.doneAt)<CHAT_GRACE);
@@ -220,7 +225,7 @@ const dmKey=u=>{const[a,b]=[S.me.id,u].sort();return`f~${a}~dm~${b}`};
 function setRel(m,u,v){S[m]={...S[m]};if(v)S[m][u]=v;else delete S[m][u];render()}
 function loadFeed(){if(!S.me)return;S.fb.rpc('follow_feed').then(l=>{S.ffeed=Array.isArray(l)?l.filter(x=>x&&typeof x.id==='string'&&ID_RE.test(String(x.owner))).map(normPNote):[];if(S.phase==='app')render()},()=>{S.ffeed=[]})}
 function canMessage(t,D){const me=S.me.id;
-  if(isFriend(t.other))return true;if(!t.jobKey)return false;
+  if(isFriend(t.other))return true;if(!t.jobKey){if(!parseKey(t.key)?.friend)return false;const st=dmState(t.key,t.other);return st==='open'||st==='requesting'}
   const j=D.jobByKey[t.jobKey];if(!j)return false;return(j.owner===me||j.accepted===me||threadOpen(t.key))&&jobChatOpen(t.key,D)}
 function workedWith(uid,D){const me=S.me.id;return D.jobs.filter(j=>(j.status==='assigned'||j.status==='done')&&((j.owner===me&&j.accepted===uid)||(j.owner===uid&&j.accepted===me)))}
 function lastJobFor(uid,D){return D.jobs.filter(j=>j.owner===S.me.id&&j.accepted===uid&&(j.status==='assigned'||j.status==='done')).sort((a,b)=>b.at-a.at)[0]||null}
@@ -259,6 +264,7 @@ function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str
     }
   }
   for(const[u,at]of Object.entries(S.followers))if(!D.blocked.has(u))add(at,u,`${nm(u)} ${A('started following you')}`,{person:u,...(isFollowing(u)?{}:{fb:u})});
+  for(const t of D.threads)if(reqIn(t.key,t.other))add(num(S.threadDocs[t.key]?.at)||t.last?.at||0,t.other,`${nm(t.other)} ${A('sent you a message request')}`,{mreq:t.key,person:t.other});
   for(const x of S.ffeed)if(!D.blocked.has(x.owner))add(x.at,x.owner,`${nm(x.owner)} ${A('pinned')} ${t(x)}`,D.jobByKey[x.key]?{job:x.key}:{person:x.owner});
   for(const[id,iv]of Object.entries(S.cinv||{}))if(S.coms[id])add(num(iv.at),iv.by,`${nm(iv.by)} ${A('invited you')} to <b>${esc(comName(id))}</b>`,{go:'board',cinv:id});
   for(const o of offerList(S.offersIn))if(ok(o.owner))add(num(o.at),o.owner,`${nm(o.owner)} ${A('asked you')}: ${esc(str(o.text,60))}`,{go:'bids'});
@@ -328,7 +334,7 @@ const jobThreadKey=(jobKey,bidder)=>`j~${jobKey}~${bidder}`;
 function parseKey(k){const p=k.split('~');if(p[0]==='j'&&p.length===4)return{members:[p[1],p[3]],jobKey:p[1]+'~'+p[2]};if(p[0]==='d'&&p.length===3)return{members:[p[1],p[2]],jobKey:null};if(p[0]==='f'&&p.length===4&&p[2]==='dm')return{members:[p[1],p[3]],jobKey:null,friend:true};return null}
 function threadsOf(D){
   const me=S.me.id,out={};
-  const add=(k,other,jobKey)=>{if(out[k])return out[k];if(!other||other===me||(!D.members.includes(other)&&!canChat(other))||D.blocked.has(other))return null;return out[k]={key:k,other,jobKey,last:null}};
+  const add=(k,other,jobKey)=>{if(out[k])return out[k];if(!other||other===me||(!D.members.includes(other)&&!canChat(other)&&!parseKey(k)?.friend)||D.blocked.has(other))return null;return out[k]={key:k,other,jobKey,last:null}};
   for(const[k,t]of Object.entries(S.threadDocs)){const p=parseKey(k);if(!p||!p.members.includes(me))continue;
     const th=add(k,p.members.find(x=>x!==me),p.jobKey);if(th&&t&&num(t.lastAt))th.last={at:num(t.lastAt),text:str(t.lastText,80),from:str(t.lastBy,128)}}
   for(const j of D.jobs)if(j.accepted&&(j.status==='assigned'||j.status==='done')&&(j.owner===me||j.accepted===me))add(jobThreadKey(j.key,j.accepted),j.owner===me?j.accepted:j.owner,j.key);
@@ -741,7 +747,7 @@ function markSeen(){
   const c=S.chat;if(!c.key||S.view!=='chat')return;const me=S.me.id,patch={};
   for(const k of c.keys||[c.key]){const last=Math.max(0,...(c.parts?.[k]||[]).filter(m=>m.by!==me).map(m=>m.at));if(!last)continue;
     if(last>num((S.priv.seen||{})[k]))patch[k]=last;
-    if(pref('receipts')&&threadOpen(k)&&last>num(((S.threadDocs[k]||{}).read||{})[me]))S.fb.rpc('thread_read',{p_thread:k,p_at:last}).catch(()=>{})}
+    if(pref('receipts')&&threadOpen(k)&&!reqIn(k,c.other)&&last>num(((S.threadDocs[k]||{}).read||{})[me]))S.fb.rpc('thread_read',{p_thread:k,p_at:last}).catch(()=>{})}
   if(Object.keys(patch).length)savePriv({seen:patch});
 }
 function sendMsg(){
@@ -1286,7 +1292,7 @@ function viewBids(D){
       ${S.actTab==='all'?(()=>{const feed=[...D.notes.map(n=>({...n,kind:'n'})),...jobsNow.map(j=>({kind:'j',j,at:j.at})),...[...active,...waiting,...notPicked].map(y=>({kind:'b',y,at:y.at||y.j.at}))].sort((a,b)=>b.at-a.at);
         const np=([l,c])=>[String(l).replace(/\s*·\s*₹[\d,]+/g,'').replace(/₹[\d,]+\s*·\s*/g,''),c];
         const one=f=>f.kind==='j'?row(f.j,np(jobLine(f.j)),f.j.price,me):f.kind==='b'?row(f.y.j,np(bidLine(f.y.x||{j:f.y.j})),f.y.amt)
-          :f.cinv||f.fb?`<div class="item notif ninv ${f.at>S.actSeenAt?'new':''}">${ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span>${actBtns(f)}</span>${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</div>`
+          :f.cinv||f.fb||f.mreq?`<div class="item notif ninv ${f.at>S.actSeenAt?'new':''}">${ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span>${actBtns(f)}</span>${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</div>`
           :`<button class="item notif ${f.at>S.actSeenAt?'new':''}${f.earn?' earned':''}" ${f.rev?`data-review="${esc(f.rev)}"`:f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span></span>${f.earn?`<b class="earn">+₹${fmt(f.earn)}</b>`:''}${miniNote(f.job&&D.jobByKey[f.job])}${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`;
         return feed.length?`<div class="ifeed allfeed">${dateGroups(feed,f=>f.at).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(one).join('')}</section>`).join('')}</div>`:empty('Bids, picks and payments show up here.')})()
       :S.actTab==='jobs'?`${jobsNow.length?`<div class="ifeed"><section class="igroup">${jobsNow.map(j=>row(j,jobLine(j),j.price,me)).join('')}</section></div>`:empty('Nothing pinned right now.')}
@@ -1309,12 +1315,15 @@ function inviteCard(D,big){
 function dateGroups(list,at){const d0=new Date().setHours(0,0,0,0),grp=t=>!t?'Earlier':t>=d0?'Today':t>=d0-864e5?'Yesterday':t>=d0-6*864e5?'Last 7 days':t>=d0-29*864e5?'Last 30 days':'Earlier',out=[];
   for(const x of list){const g=grp(at(x));if(!out.length||out[out.length-1][0]!==g)out.push([g,[]]);out[out.length-1][1].push(x)}return out}
 function viewChats(D){
+  const isReq=t=>(t.keys||[t.key]).every(k=>reqIn(k,t.other)),reqs=D.convos.filter(isReq),rest=D.convos.filter(t=>!isReq(t));
+  const reqRow=t=>`<button class="item" data-thread="${esc(t.key)}" data-hold="${esc(t.other)}">${ring(t.other,46)}<span class="itext"><span class="t1">${esc(shortName(t.other))}</span><span class="t2">${esc(t.sub)}</span></span><span class="iend"><span class="tag">Request</span></span></button>`;
   return`<div class="pad narrow"><h1 class="pageh">Chats</h1>
-  ${D.convos.length?`<div class="ifeed">${dateGroups(D.convos,t=>t.last?.at||t.job?.at||0).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(t=>`<button class="item" data-thread="${esc(t.key)}" data-hold="${esc(t.other)}">${ring(t.other,46)}
+  ${reqs.length?`<div class="ifeed"><section class="igroup"><h2 class="ihead">Message requests</h2>${reqs.map(reqRow).join('')}</section></div>`:''}
+  ${rest.length?`<div class="ifeed">${dateGroups(rest,t=>t.last?.at||t.job?.at||0).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(t=>`<button class="item" data-thread="${esc(t.key)}" data-hold="${esc(t.other)}">${ring(t.other,46)}
     <span class="itext"><span class="t1">${esc(shortName(t.other))}</span><span class="t2" style="${t.unread?'color:var(--fg);font-weight:500':''}">${esc(t.sub)}</span></span>
     <span class="iend"><span class="time">${t.last?ago(t.last.at):''}</span>${t.unread?'<span class="udot" aria-label="Unread"></span>':''}</span></button>`).join('')}</section>`).join('')}</div>`
-   :inviteCard(D,true)}
-  ${D.convos.length?`<div style="margin-top:18px">${inviteCard(D,false)}</div>`:''}
+   :reqs.length?'':inviteCard(D,true)}
+  ${rest.length?`<div style="margin-top:18px">${inviteCard(D,false)}</div>`:''}
   </div><div style="height:24px"></div>`;
 }
 function viewChat(D){
@@ -1347,8 +1356,13 @@ function viewChat(D){
        return`${head?`<p class="tstamp">${chatStamp(m.at)}</p>`:''}${cards}<div class="mrow ${mine?'mine':'theirs'}${cont?' cont':''}${more?' more':''}${rx.length?' hasrx':''}">${mine?'':`<span class="mav">${lastOfRun?face(m.by,28):''}</span>`}<div class="mcol">${lab}<div class="mline"><div class="${mine?'out':'in'}${m.kind!=='text'?' media '+m.kind:''}" data-mid="${m.id}">${msgBody(m)}${rx.length?`<span class="rx${S.rxPop===m.id?' pop':''}">${[...new Set(rx)].join('')}${rx.length>1?`<b>${rx.length}</b>`:''}</span>`:''}</div>${acts}</div></div></div>${seen&&m===lastOut?'<p class="seen">Seen</p>':''}`}).join('')+gigsUpTo(Infinity)})()}
    ${S.chatUp?`<div class="out media pending">${S.chatUp==='photo'?'Sending photo…':'Sending voice message…'}</div>`:''}
   </div>
-  ${!can?`<div class="foot"><p class="note">${c.jobKey&&D.jobByKey[c.jobKey]&&jobChatOpen(c.key,D)?`You can message ${esc(firstName(c.other))} once they pick you for this job.`
-      :`${c.jobKey?'This job is over, so its chat has closed. ':''}Follow each other to keep talking anytime.`}</p>${c.jobKey&&D.jobByKey[c.jobKey]&&jobChatOpen(c.key,D)||isFollowing(c.other)?'':`<button class="cta" data-act="follow" data-uid="${esc(c.other)}">${followsMe(c.other)?'Follow back':'Follow '+esc(shortName(c.other))}</button>`}</div>`:`
+  ${(()=>{const st=parseKey(c.key)?.friend?dmState(c.key,c.other):null,fn=esc(firstName(c.other)),u=esc(c.other);
+    return st==='incoming'?`<div class="foot"><div class="mreq"><b>${fn} wants to message you</b><span>They won\u2019t know you\u2019ve read this until you accept.</span>
+        <div class="ninvbtns"><button class="pick" data-act="answerMsgReq" data-key="${esc(c.key)}" data-ok="1">Accept</button><button class="ghostbtn" data-act="answerMsgReq" data-key="${esc(c.key)}" data-ok="0">Decline</button></div></div></div>`
+      :st==='capped'?`<div class="foot"><p class="note">Message request sent. You can send more once ${fn} accepts, or once you follow each other.</p></div>`
+      :st==='requesting'?`<p class="note mreqnote">${ic('shield',12,2.2)} This goes to ${fn} as a message request. They\u2019ll see it once they accept.</p>`:''})()}
+  ${(()=>{const st=parseKey(c.key)?.friend?dmState(c.key,c.other):null;return st==='incoming'||st==='capped'})()?'':!can?`<div class="foot"><p class="note">${c.jobKey&&D.jobByKey[c.jobKey]&&jobChatOpen(c.key,D)?`You can message ${esc(firstName(c.other))} once they pick you for this job.`
+      :`${c.jobKey?'This job is over, so its chat has closed. ':''}Follow each other to keep talking anytime, or send a message request.`}</p>${c.jobKey&&D.jobByKey[c.jobKey]&&jobChatOpen(c.key,D)?'':`<div class="ninvbtns">${isFollowing(c.other)?'':`<button class="pick" data-act="follow" data-uid="${esc(c.other)}">${followsMe(c.other)?'Follow back':'Follow'}</button>`}<button class="ghostbtn" data-msgwith="${esc(c.other)}">Message request</button></div>`}</div>`:`
   <div class="foot" style="position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%)">${S.rec?`<div class="composer rec">
     <button class="cbtn" data-act="recCancel" aria-label="Cancel recording">${ic('trash',19)}</button>
     <span class="recbar"><i class="recdot"></i><span id="recT">${recClock()}</span><span class="muted">Recording</span></span>
@@ -1378,9 +1392,9 @@ const stTag=j=>({assigned:'Taken',done:'Done',closed:'Closed',expired:'Ended'}[j
 function profileWall(items,D){const n=wideMQ.matches?3:2,cols=Array.from({length:n},()=>[]);
   items.forEach(({j,o},i)=>cols[i%n].push(tile(j,D,i,o)));
   return`<div class="wallzone pwall"><div class="wall">${cols.map(c=>`<div class="wcol">${c.join('')}</div>`).join('')}</div></div>`}
-// Profile buttons for someone else: Follow / Following / Follow back. Once you follow each other: Message, then Friends.
-// During a job you're doing together, Message shows too.
-function relBtns(uid,D){const msg=!isOrg(uid)&&(isFriend(uid)||!!activeDeal(uid,D)),u=esc(uid),f=isFollowing(uid);
+// Profile buttons for someone else: Follow / Following / Follow back, and Message. Once you follow each other: Message, then Friends.
+// Message opens your job chat while a deal is on; otherwise your direct chat, which is a message request until you're friends.
+function relBtns(uid,D){const msg=!isOrg(uid),u=esc(uid),f=isFollowing(uid);
   const fb=f?`<button class="igbtn" data-act="follow" data-uid="${u}">${isFriend(uid)?ic('tick',14,2.6)+' Friends':'Following'}</button>`
     :`<button class="igbtn pri" data-act="follow" data-uid="${u}">${followsMe(uid)?'Follow back':'Follow'}</button>`;
   const mb=msg?`<button class="igbtn${f?' pri':''}" data-msgwith="${u}">${ic('chat',15,2.2)} Message</button>`:'';
@@ -1895,14 +1909,14 @@ function nbCheck(D){const now=Date.now();
   if(!NB.on)nbNext()}
 function nbRoot(){let r=$('nbanners');if(!r){r=document.createElement('div');r.id='nbanners';r.className='nbanners';r.setAttribute('aria-live','polite');document.body.appendChild(r)}return r}
 // A board invite can be answered right on the notice, in Activity or in the banner.
-const actBtns=f=>f.fb?`<span class="ninvbtns"><button class="pick" data-act="follow" data-uid="${esc(f.fb)}">Follow back</button></span>`:invBtns(f.cinv);
+const actBtns=f=>f.mreq?`<span class="ninvbtns"><button class="pick" data-thread="${esc(f.mreq)}">Read</button><button class="ghostbtn" data-act="answerMsgReq" data-key="${esc(f.mreq)}" data-ok="0">Decline</button></span>`:f.fb?`<span class="ninvbtns"><button class="pick" data-act="follow" data-uid="${esc(f.fb)}">Follow back</button></span>`:invBtns(f.cinv);
 const invBtns=id=>`<span class="ninvbtns"><button class="pick" data-act="comJoin" data-id="${esc(id)}">Accept</button><button class="ghostbtn" data-act="comDecline" data-id="${esc(id)}">Decline</button></span>`;
 function nbNext(){const n=NB.q.shift();if(!n){NB.on=null;return}NB.on=n;const r=nbRoot(),go2=n.rev?`data-review="${esc(n.rev)}"`:n.job?`data-job="${esc(n.job)}"`:n.person?`data-person="${esc(n.person)}"`:`data-go="${n.go}"`;
-  r.innerHTML=n.cinv||n.fb?`<div class="nbanner ninv" role="status">${ring(n.who,36)}<span class="nbbody"><span class="ntext">${n.html}</span>${actBtns(n)}</span></div>`:`<button class="nbanner" ${go2}>${n.who==='tack'?tackFace(36):ring(n.who,36)}<span class="ntext">${n.html}</span>${n.earn?`<b class="earn">+\u20b9${fmt(n.earn)}</b>`:''}${miniNote(n.job&&derive().jobByKey[n.job])}</button>`;
+  r.innerHTML=n.cinv||n.fb||n.mreq?`<div class="nbanner ninv" role="status">${ring(n.who,36)}<span class="nbbody"><span class="ntext">${n.html}</span>${actBtns(n)}</span></div>`:`<button class="nbanner" ${go2}>${n.who==='tack'?tackFace(36):ring(n.who,36)}<span class="ntext">${n.html}</span>${n.earn?`<b class="earn">+\u20b9${fmt(n.earn)}</b>`:''}${miniNote(n.job&&derive().jobByKey[n.job])}</button>`;
   const el=r.firstChild;let y0=null;
   el.addEventListener('pointerdown',e=>{y0=e.clientY});el.addEventListener('pointermove',e=>{if(y0!=null&&e.clientY-y0<-18){y0=null;nbHide()}});
   el.addEventListener('click',()=>{clearTimeout(NB.t);nbHide(true)});
-  clearTimeout(NB.t);NB.t=setTimeout(()=>nbHide(),n.cinv||n.fb?9000:4500)}
+  clearTimeout(NB.t);NB.t=setTimeout(()=>nbHide(),n.cinv||n.fb||n.mreq?9000:4500)}
 function nbHide(now){const el=$('nbanners')?.firstChild;clearTimeout(NB.t);if(!el){nbNext();return}
   if(now||reduceMotion.matches){el.remove();setTimeout(nbNext,200);return}
   el.classList.add('out');el.addEventListener('animationend',()=>{el.remove();setTimeout(nbNext,250)},{once:true})}
@@ -2072,6 +2086,9 @@ const ACT={
     setRel('following',u,Date.now());
     try{await S.fb.rpc('follow_user',{p:u});toast(followsMe(u)?'You and '+shortName(u)+' are friends now. You can message each other anytime.':'Following '+shortName(u))}
     catch(e){console.warn(e);setRel('following',u,null);toast('Couldn\u2019t do that. Try again.')}},
+  async answerMsgReq(el){const k=el.dataset.key,ok=el.dataset.ok==='1',d=S.threadDocs[k];
+    if(ok&&d){S.threadDocs={...S.threadDocs,[k]:{...d,req:null}}}if(!ok){const t={...S.threadDocs};delete t[k];S.threadDocs=t;if(S.chat.keys?.includes(k)){closeThread();go('chats')}}render();
+    try{await S.fb.rpc('answer_msg_request',{p_thread:k,p_ok:ok});toast(ok?'Accepted. You can chat now.':'Request declined')}catch(e){console.warn(e);if(d)S.threadDocs={...S.threadDocs,[k]:d};render();toast('Couldn\u2019t do that. Try again.')}},
   async unfollow(el){const u=el.dataset.uid,o=S.following[u];S.sheet=null;setRel('following',u,null);
     try{await S.fb.rpc('unfollow_user',{p:u});toast('Unfollowed '+shortName(u))}catch(e){console.warn(e);setRel('following',u,o);toast('Couldn\u2019t do that. Try again.')}},
   async removeFollower(el){const u=el.dataset.uid,o=S.followers[u];S.sheet=null;setRel('followers',u,null);
@@ -2302,7 +2319,7 @@ document.addEventListener('click',e=>{
   if(ds.threadJob!==undefined){const j=D.jobByKey[S.openJob];if(j&&canMessage({key:jobThreadKey(j.key,me),other:j.owner,jobKey:j.key},D))openThread({key:jobThreadKey(j.key,me),other:j.owner,jobKey:j.key});return}
   if(ds.gig!==undefined){S.sheet={type:'gig',key:ds.gig};render();return}
   if(ds.gigopen!==undefined){S.sheet=null;S.openJob=ds.gigopen;S.bid={key:null};go('job');return}
-  if(ds.msgwith!==undefined){const u=ds.msgwith,j=activeDeal(u,D);if(isFriend(u))openThread({key:j?jobThreadKey(j.key,j.accepted):dmKey(u),other:u,jobKey:j?.key||null});else if(j)openThread({key:jobThreadKey(j.key,j.accepted),other:u,jobKey:j.key});return}
+  if(ds.msgwith!==undefined){const u=ds.msgwith,j=activeDeal(u,D);openThread(j?{key:jobThreadKey(j.key,j.accepted),other:u,jobKey:j.key}:{key:dmKey(u),other:u,jobKey:null});return}
   if(ds.threadWith!==undefined){const j=D.jobByKey[S.openJob];if(j)openThread({key:jobThreadKey(j.key,ds.threadWith),other:ds.threadWith,jobKey:j.key});return}
 });
 // Tapping outside an open ⋯ menu only closes it. Picking an item closes it and runs the item.

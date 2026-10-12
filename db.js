@@ -28,7 +28,7 @@ const COLS={
   cnotes:['id','community','by','text','more','color','at','pics','when_label','place'],
   cnotepics:['id','community','pics'],
   ccomments:['id','note','community','by','t','at'],
-  threads:['id','members','job','open','last_text','last_at','last_by','read'],
+  threads:['id','members','job','open','last_text','last_at','last_by','read','req'],
   msgs:['id','thread','by','t','at','kind','media','dur','reply_to','reactions'],
   reports:['by','about','why','note','kind','job','at'],
   flags:['by','area','cat','at'],
