@@ -1604,20 +1604,17 @@ button.igstat:active b{opacity:.7}
 .igtabs{display:flex;margin:22px -16px 0;border-top:1px solid var(--line)}
 .igtab{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:-1px;padding:12px 0;border-top:1.5px solid transparent;font-size:var(--fs-c);font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .igtab.on{color:var(--fg);border-top-color:var(--fg)}
-.iggrid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin:2px -16px 0}
-.pgcell{position:relative;min-width:0}
-.pgtile{position:relative;width:100%;aspect-ratio:4/5;display:flex;flex-direction:column;gap:4px;padding:18px 10px 10px;text-align:left;overflow:hidden;color:var(--fg);
-  background:linear-gradient(165deg,color-mix(in oklab,var(--nc) 32%,var(--surface)),color-mix(in oklab,var(--nc) 12%,var(--bg)))}
-.pgpin{position:absolute;top:7px;left:50%;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:var(--nc);box-shadow:0 0 8px var(--nc)}
-.pgprice{font-family:var(--display);font-size:var(--fs-b);font-weight:700;letter-spacing:-.02em}
-.pgtext{font-size:var(--fs-c);line-height:1.3;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
-.pgtag{position:absolute;left:7px;bottom:7px;max-width:calc(100% - 14px);padding:3px 7px;border-radius:999px;background:rgba(0,0,0,.42);color:#fff;font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pgtag.on{background:var(--grad);color:var(--on-grad)}
-.pghid{position:absolute;right:7px;bottom:7px;display:inline-flex;align-items:center;gap:3px;padding:3px 6px;border-radius:999px;background:rgba(0,0,0,.5);color:#fff;font-size:10px;font-weight:600}
-.pgcell.hid .pgtile{opacity:.55}
-.pgdots{position:absolute;top:3px;right:3px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(0,0,0,.32);color:#fff}
 .ignote{display:flex;align-items:center;justify-content:center;gap:6px;margin:12px 0 0;font-size:var(--fs-c);color:var(--muted);text-align:center}
 .igempty{margin-top:26px}
 .igempty .cta,.igempty .btn2{width:auto;margin:10px auto 0;padding:11px 22px}
-:root[data-theme="light"] .pgtile{background:linear-gradient(165deg,color-mix(in oklab,var(--nc) 26%,#fff),color-mix(in oklab,var(--nc) 10%,#fff))}
-@media (min-width:900px){.iggrid,.igtabs{margin-left:0;margin-right:0}.iggrid{gap:6px}.pgtile{border-radius:8px}}
+/* personal board on the profile: the campus board's dotted wall */
+.pwall{margin:0 -16px;min-height:62vh}
+.pwall .wall{padding-top:18px}
+.pwrap{position:relative}
+.pwrap.hid .tile{opacity:.5}
+.pgdots{position:absolute;top:8px;right:8px;z-index:3;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(6,6,8,.45);color:#fff;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.flag.ptag{display:inline-flex;align-items:center;gap:4px;margin-right:6px;background:rgba(6,6,8,.32);color:var(--fg)}
+.flag.ptag.on{background:var(--grad);color:var(--on-grad)}
+:root[data-theme="light"] .flag.ptag:not(.on){background:rgba(18,19,23,.08)}
+@media (min-width:900px){.igtabs,.pwall{margin-left:0;margin-right:0}}
+

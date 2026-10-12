@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610122229';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610122229';
-import {modHit,MOD_CAT} from './mod.js?v=202610122229';
+import {makeDb} from './db.js?v=202610122237';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610122237';
+import {modHit,MOD_CAT} from './mod.js?v=202610122237';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -884,7 +884,7 @@ function gateHTML(){
 function onboardHTML(edit){
   const o=S.onb,me=S.me.id;
   return`<div class="gatebox onb" style="gap:20px">
-   ${edit?`<button class="back" data-go="me" style="padding:0">${ic('back',16)} Profile</button>`:'<div class="mark">tack</div>'}
+   ${edit?`<button class="back" data-act="goBack" data-to="me" style="padding:0">${ic('back',16)} Profile</button>`:'<div class="mark">tack</div>'}
    <div><h1>${edit?'Edit profile':'Set up your profile'}</h1>
    </div>
    ${edit?`<div class="eprev">
@@ -913,7 +913,7 @@ function onboardHTML(edit){
   </div>`;
 }
 
-function back(to,label){return`<button class="back" data-go="${to}">${ic('back',16)} ${label}</button>`}
+function back(to,label){return`<button class="back" data-act="goBack" data-to="${to}">${ic('back',16)} ${esc(NAV.length?navLabel(NAV[NAV.length-1]):label)}</button>`}
 // One overflow menu (⋯) per page, top right. The page keeps its main action in view; everything else lives here.
 // Items: {i:icon,t:label,at:'data-… attributes',danger,v:value} · {sep:1} · {html}
 function kebab(id,items,label='More options',cls=''){
@@ -1014,19 +1014,20 @@ function hexHue(x){const r=parseInt(x.slice(1,3),16)/255,g=parseInt(x.slice(3,5)
 const gradNote=j=>false;
 const gcls=j=>gradNote(j)?' gnote':'',gvars=j=>gradNote(j)?';--nc1:var(--g1);--nc2:var(--g2)':'';
 function noteOf(j){if(!j)return DEFAULT_NOTE;if(COLOR_RE.test(j.color||''))return j.color;if(!j.key)return DEFAULT_NOTE;let h=2166136261;for(let i=0;i<j.key.length;i++){h^=j.key.charCodeAt(i);h=Math.imul(h,16777619)}return hueHex((h>>>0)%360)}
-function tile(j,D,i=0){
-  const c=noteOf(j),n=bidsFor(D,j.key).length,left=j.deadline-Date.now();
+function tile(j,D,i=0,o={}){
+  const c=noteOf(j),n=bidsFor(D,j.key).length,left=j.deadline-Date.now(),soon=jobState(j)==='open'&&left<36e5;
   const ph=j.pics?(picsOf('j:'+j.key)||[])[0]:'',d=-((Date.now()/1000+i*2.3)%32).toFixed(2);
   const tk=isOrg(j.owner);
-  return`<button class="tile ntile${gcls(j)}${tk?' tacknote':''} r${i%3} ${S.fresh===j.key?'fresh':''}" data-job="${esc(j.key)}" style="--nc:${c};--i:${i};--d:${d}s${gvars(j)}">
+  const t=`<button class="tile ntile${gcls(j)}${tk?' tacknote':''} r${i%3} ${S.fresh===j.key?'fresh':''}" ${o.remote?`data-sheet="pnote" data-about="${esc(j.key)}"`:`data-job="${esc(j.key)}"`} style="--nc:${c};--i:${i};--d:${d}s${gvars(j)}">
     <span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span>
-    <span class="pin"></span>${S.me?.isOwner&&held(j.owner)?'<span class="heldtag">Held</span>':j.pics?`<span class="tpics">${ic('camera',12,2.2)} ${j.pics} ${j.pics===1?'photo':'photos'}</span>`:''}
+    <span class="pin"></span>${S.me?.isOwner&&held(j.owner)?'<span class="heldtag">Held</span>':j.pics&&!o.own?`<span class="tpics">${ic('camera',12,2.2)} ${j.pics} ${j.pics===1?'photo':'photos'}</span>`:''}
     ${tk?'':`<span class="price">₹${fmt(j.price)}</span>`}
-    ${left<36e5?`<span class="flag">${Math.max(1,Math.round(left/6e4))} min left</span>`:''}${nearMe(j)?nearTag():''}
+    ${soon?`<span class="flag">${Math.max(1,Math.round(left/6e4))} min left</span>`:''}${o.tag?`<span class="flag ptag${o.on?' on':''}">${esc(o.tag)}</span>`:''}${j.hidden?`<span class="flag ptag">${ic('eyeoff',11,2.4)} Hidden</span>`:''}${nearMe(j)?nearTag():''}
     <p>${esc(j.text)}</p>
-    ${j.where||j.when?`<span class="where">${ic('place',12,2.2)}<span>${esc([j.where,left<36e5?'':j.when].filter(Boolean).join(' · '))}</span></span>`:''}
+    ${j.where||j.when?`<span class="where">${ic('place',12,2.2)}<span>${esc([j.where,soon?'':j.when].filter(Boolean).join(' · '))}</span></span>`:''}
     <span class="by">${face(j.owner,22)}<span class="nm">${esc(firstName(j.owner))}</span><span class="n">${j.owner===S.me.id?`${n} ${n===1?'bid':'bids'}`:since(j.at)}</span></span>
   </button>`;
+  return o.own?`<div class="pwrap${j.hidden?' hid':''}">${t}<button class="pgdots" data-sheet="pnmenu" data-about="${esc(j.key)}" aria-label="Options for this note">${ic('dots',16,2.8)}</button></div>`:t;
 }
 const wideMQ=matchMedia('(min-width:900px)');
 function wallHTML(list,D){const n=wideMQ.matches?3:2,cols=Array.from({length:n},()=>[]);
@@ -1286,7 +1287,7 @@ function viewChat(D){
   const accepted=j&&j.accepted&&[j.owner,j.accepted].includes(me)&&[j.owner,j.accepted].includes(c.other);
   const can=canMessage(c,D);
   return`<div class="pad" style="padding-bottom:10px"><div style="display:flex;align-items:center;gap:10px">
-     <button class="back" data-go="chats" aria-label="Back to chats" style="padding:0">${ic('back',20)}</button>
+     <button class="back" data-act="goBack" data-to="chats" aria-label="Back to chats" style="padding:0">${ic('back',20)}</button>
      <button class="rowmain" data-person="${esc(c.other)}" data-hold="${esc(c.other)}">${ring(c.other,42)}<span class="rowtext"><span style="font-size:var(--t-16);font-weight:600;letter-spacing:-.015em">${esc(shortName(c.other))}</span>
        <span style="font-size:var(--t-12);font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${onlineNow(c.other)?'Active now':esc(metaOf(c.other)||campus())}</span></span></button>
      ${kebab('chat',[{i:'users',t:'View profile',at:`data-person="${esc(c.other)}"`},{i:'eyeoff',t:'Restrict or block…',at:`data-sheet="who" data-about="${esc(c.other)}"`},{sep:1},{i:'flag',t:'Report',at:`data-sheet="report" data-about="${esc(c.other)}"`,danger:true}],'Chat options')}</div></div>
@@ -1334,12 +1335,11 @@ function profileNotes(uid,D){const c=S.pnotes[uid],base=c?.ok?c.list:[],seen=new
   const extra=D.jobs.filter(j=>j.owner===uid&&j.status!=='removed'&&!seen.has(j.key));
   return[...base.map(x=>D.jobByKey[x.key]?{...D.jobByKey[x.key],hidden:x.hidden}:x),...extra].filter(x=>uid===S.me.id||!x.hidden).sort((a,b)=>b.at-a.at)}
 function pnoteByKey(k,D){for(const c of Object.values(S.pnotes))for(const x of c?.list||[])if(x.key===k)return D.jobByKey[k]?{...D.jobByKey[k],hidden:x.hidden}:x;return D.jobByKey[k]||null}
-function pgTile(j,D,own,badge){const st=jobState(j),live=!!D.jobByKey[j.key];
-  const tag=badge||({assigned:'Taken',done:'Done',closed:'Closed',expired:'Ended'}[st]||'');
-  return`<div class="pgcell${j.hidden?' hid':''}"><button class="pgtile" style="--nc:${noteOf(j)}" ${live?`data-job="${esc(j.key)}"`:`data-sheet="pnote" data-about="${esc(j.key)}"`} aria-label="${esc(j.text)}">
-    <span class="pgpin" aria-hidden="true"></span>${isOrg(j.owner)?'':`<b class="pgprice">₹${fmt(j.price)}</b>`}<span class="pgtext">${esc(j.text)}</span>
-    ${tag?`<span class="pgtag${badge&&st==='open'?' on':''}">${esc(tag)}</span>`:''}${j.hidden?`<span class="pghid">${ic('eyeoff',11,2.4)} Hidden</span>`:''}</button>
-    ${own?`<button class="pgdots" data-sheet="pnmenu" data-about="${esc(j.key)}" aria-label="Options for this note">${ic('dots',16,2.8)}</button>`:''}</div>`}
+const stTag=j=>({assigned:'Taken',done:'Done',closed:'Closed',expired:'Ended'}[jobState(j)]||'');
+// Your personal board: every note you've pinned, on the same dotted board and wall as the campus board.
+function profileWall(items,D){const n=wideMQ.matches?3:2,cols=Array.from({length:n},()=>[]);
+  items.forEach(({j,o},i)=>cols[i%n].push(tile(j,D,i,o)));
+  return`<div class="wallzone pwall"><div class="wall">${cols.map(c=>`<div class="wcol">${c.join('')}</div>`).join('')}</div></div>`}
 function viewPerson(uid,D){
   const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,me=S.me.id;
   const bio=str(d.bio,BIO_MAX)||str(d.does,60),real=!isOrg(uid)&&handleOf(uid)?realNameOf(uid):'';
@@ -1358,14 +1358,14 @@ function viewPerson(uid,D){
   const tabBtn=(k,i,l)=>`<button class="igtab${tab===k?' on':''}" role="tab" aria-selected="${tab===k}" data-act="ptab" data-k="${k}">${ic(i,17)} ${l}</button>`;
   let grid='';
   if(tab==='notes'){const list=profileNotes(uid,D),hid=list.filter(x=>x.hidden).length;
-    grid=list.length?`<div class="iggrid">${list.map(j=>pgTile(j,D,isMe&&!isOrg(uid))).join('')}</div>${hid?`<p class="ignote">${ic('eyeoff',12,2.2)} Hidden notes are only visible to you.</p>`:''}`
+    grid=list.length?`${profileWall(list.map(j=>({j,o:{remote:!D.jobByKey[j.key],own:isMe&&!isOrg(uid),tag:stTag(j)}})),D)}${hid?`<p class="ignote">${ic('eyeoff',12,2.2)} Hidden notes are only visible to you.</p>`:''}`
       :!c||c.busy&&!c.ok?'<p class="ignote">Loading notes…</p>'
       :`<div class="empty igempty"><b>No notes yet</b>${isMe?'<p>Jobs you pin show up here.</p><button class="cta" data-go="post">Pin a job</button>':''}</div>`}
   else{const l=Object.values(S.pitchMine).filter(p=>p&&num(p.amt)>0&&D.jobByKey[p.job]&&D.jobByKey[p.job].owner!==me).map(p=>({j:D.jobByKey[p.job],amt:num(p.amt),at:num(p.at)})).sort((a,b)=>b.at-a.at);
-    grid=l.length?`<div class="iggrid">${l.map(({j,amt})=>pgTile(j,D,false,j.accepted===me?'Picked you':j.accepted?'Someone else':jobState(j)==='open'?`Your bid ₹${fmt(amt)}`:'Closed')).join('')}</div><p class="ignote">${ic('shield',12,2.2)} Only you see your bids.</p>`
+    grid=l.length?`${profileWall(l.map(({j,amt})=>({j,o:{tag:j.accepted===me?'Picked you':j.accepted?'Someone else':jobState(j)==='open'?`Your bid ₹${fmt(amt)}`:'Closed',on:j.accepted===me||jobState(j)==='open'&&!j.accepted}})),D)}<p class="ignote">${ic('shield',12,2.2)} Only you see your bids.</p>`
       :'<div class="empty igempty"><b>No bids yet</b><p>Bids you place show up here. Only you see them.</p><button class="btn2" data-go="board">Find a job</button></div>'}
   return`<div class="pad igprof">
-   <div class="igtop">${isMe?'':`<button class="back igback" data-go="board" aria-label="Back to the board">${ic('back',20)}</button>`}<h1 class="igh">${isOrg(uid)?'tack':handleOf(uid)?'@'+esc(handleOf(uid)):esc(shortName(uid))}</h1>${menu}</div>
+   <div class="igtop">${isMe?'':`<button class="back igback" data-act="goBack" data-to="board" aria-label="Back to the board">${ic('back',20)}</button>`}<h1 class="igh">${isOrg(uid)?'tack':handleOf(uid)?'@'+esc(handleOf(uid)):esc(shortName(uid))}</h1>${menu}</div>
    <div class="ighead"><span class="ring${onlineNow(uid)?' live':''}" style="width:88px;height:88px">${face(uid,76)}</span>
      <div class="igstats">${stat(st.done,st.done===1?'job done':'jobs done')}${stat(st.avg?star(st.avg):'New','rating',st.doer.n||(isMe&&st.poster.n))}${isMe?`<div class="igstat"><b class="money">₹${fmt(st.earned)}</b><span>earned</span></div>`:stat(st.poster.n?star(st.poster.avg.toFixed(1)):'–','as a poster',st.poster.n)}</div></div>
    <div class="igbio">${real?`<b>${esc(real)}</b>`:''}${bio?`<p>${esc(bio)}</p>`:isMe?`<button class="pbioadd" data-go="edit">${ic('plus',14,2.4)} Add a short bio</button>`:'<p class="pbioempty">No bio yet.</p>'}</div>
@@ -1799,7 +1799,8 @@ function render(){
     const keep=lastView===S.view?main.scrollTop:((DEPTH[S.view]??1)===0?scrollMem[S.view]||0:0);
     main.dataset.view=S.view;main.innerHTML=((DEPTH[S.view]??1)===0?bannerHTML():'')+(VIEWS[S.view]||viewBoard)(D);main.scrollTop=keep;
     if(lastView!==S.view&&S.view==='chat')requestAnimationFrame(()=>{main.scrollTop=main.scrollHeight});
-    lastView=S.view;nbCheck(D);
+    if(S.navScroll&&S.navScroll.v===S.view){main.scrollTop=S.navScroll.y;S.navScroll=null}
+    lastView=S.view;CUR=snap();nbCheck(D);
     $('rail').innerHTML=railHTML(D);
     const navOn=v=>S.view===v||(v==='board'&&['job','person'].includes(S.view))||(v==='chats'&&S.view==='chat')||(v==='me'&&['privacy','edit','settings','help'].includes(S.view))||(v==='invites'&&S.view==='invites');
     $('sidebar').innerHTML=`<div style="padding:0 6px"><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${S.me.isOwner?`<button class="campbtn" data-sheet="campus">${esc(campus())}${ic('chev',12,2.4)}</button>`:esc(campus())} · ${boardJobs(D).length} pinned</span></div></div>
@@ -1849,14 +1850,32 @@ function kbCheck(){const vv=window.visualViewport,h=window.innerHeight,vh=vv?vv.
 window.visualViewport?.addEventListener('resize',kbCheck);window.addEventListener('resize',kbCheck);
 document.addEventListener('focusin',()=>setTimeout(kbCheck,300));document.addEventListener('focusout',()=>setTimeout(kbCheck,200));
 window.addEventListener('orientationchange',()=>{kbBase.h=0;setTimeout(()=>{kbBase.h=window.innerHeight;kbCheck()},400)});
-function go(v,keepThread){if(v==='job')S.tkSeen=null;if(v==='post'&&S.view!=='post')S.postEnter=true;
+// Back follows the way you came. Every screen you leave is remembered with what it showed and how far you'd scrolled;
+// the tabs (Board, Activity, Chats, Saved, Profile) start a fresh trail. Forms you've submitted aren't stepped back into.
+const NAV=[];let CUR=null;
+const snap=()=>({view:S.view,openJob:S.openJob,personOf:S.personOf,cid:S.cid,cnote:S.cnote,openRev:S.openRev,ptab:S.ptab,chat:S.chat?.key?{key:S.chat.key,other:S.chat.other,jobKey:S.chat.jobKey||null}:null});
+const sameNav=(a,b)=>a.view===b.view&&({job:a.openJob===b.openJob,person:a.personOf===b.personOf,chat:a.chat?.other===b.chat?.other,cboard:a.cid===b.cid,cnote:a.cnote===b.cnote,review:a.openRev===b.openRev}[a.view]??true);
+function navLabel(x){const h=u=>u&&handleOf(u)?'@'+handleOf(u):'';
+  return{board:'Board',bids:'Activity',chats:'Chats',saved:'Saved',me:'Profile',job:'Job',cnote:'Note',settings:'Settings',privacy:'Settings',reviews:'Your reviews',review:'Review',help:'Help',invites:'Invites',
+    person:h(x.personOf)||'Profile',chat:h(x.chat?.other)||'Chat',cboard:comName(x.cid)}[x.view]||'Back'}
+function goBack(fb='board'){const x=NAV.pop();if(!x){go(fb);return}
+  S.navRestoring=true;S.navScroll={v:x.view,y:x.y||0};
+  try{S.openJob=x.openJob;S.personOf=x.personOf;S.openRev=x.openRev;S.ptab=x.ptab||'notes';
+    if(x.view==='chat'&&x.chat)openThread(x.chat);
+    else if((x.view==='cboard'||x.view==='cnote')&&x.cid&&S.cid!==x.cid){S.cnote=x.cnote;openCom(x.cid);if(x.view==='cnote')go('cnote')}
+    else{if(x.view==='cnote')S.cnote=x.cnote;go(x.view)}}
+  finally{S.navRestoring=false}}
+function go(v,keepThread){const restoring=!!S.navRestoring;
+  if(!restoring&&S.phase==='app'){if((DEPTH[v]??1)===0)NAV.length=0;
+    else if(CUR&&!['post','edit'].includes(CUR.view)&&!sameNav(CUR,{...snap(),view:v})){NAV.push({...CUR,y:$('main')?.scrollTop||0});if(NAV.length>40)NAV.shift()}}
+  if(v==='job')S.tkSeen=null;if(v==='post'&&S.view!=='post')S.postEnter=true;
   const from=S.view;
   if(v!=='chat'&&!keepThread)closeThread();
-  const apply=()=>{if(v==='post'&&from!=='post'&&(S.draft.editId||S.draft.cid)&&!S.editEnter)S.draft=blankDraft();S.editEnter=false;if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}if((v==='person'||v==='me')&&from!==v)S.ptab='notes';S.view=v;S.sheet=null;S.omenu=null;S.err={};if(v==='help'&&from!=='help')S.help={kind:null,job:null,why:'',note:'',sent:null};if(v==='settings'){S.pwOpen=false}if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit'){seedOnb();S.hcheck={h:handleOf(S.me.id),st:'mine'}}if(v==='invites')S.inv.campus='';render();
+  const apply=()=>{if(v==='post'&&from!=='post'&&(S.draft.editId||S.draft.cid)&&!S.editEnter)S.draft=blankDraft();S.editEnter=false;if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}if((v==='person'||v==='me')&&from!==v&&!restoring)S.ptab='notes';S.view=v;S.sheet=null;S.omenu=null;S.err={};if(v==='help'&&from!=='help')S.help={kind:null,job:null,why:'',note:'',sent:null};if(v==='settings'){S.pwOpen=false}if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit'){seedOnb();S.hcheck={h:handleOf(S.me.id),st:'mine'}}if(v==='invites')S.inv.campus='';render();
     if(v==='board'&&from==='job'&&S.openJob){const p=document.querySelector(`.tile[data-job="${CSS.escape(S.openJob)}"] .price`);if(p)p.style.viewTransitionName='jp'}};
   if(from===v||S.phase!=='app'||!document.startViewTransition||reduceMotion.matches){apply();return}
   const d=(DEPTH[v]??1)-(DEPTH[from]??1),root=document.documentElement;
-  root.dataset.nav=d>0?'fwd':d<0?'back':'tab';
+  root.dataset.nav=restoring?'back':d>0?'fwd':d<0?'back':'tab';
   const t=document.startViewTransition(apply);
   t.ready.catch(()=>{});t.updateCallbackDone.catch(()=>{});
   t.finished.catch(()=>{}).finally(()=>{document.querySelectorAll('.tile .price').forEach(e=>{e.style.viewTransitionName=''});delete root.dataset.nav});
@@ -1987,6 +2006,7 @@ const ACT={
     x.hidden=h;render();
     try{if(!await S.fb.rpc('set_profile_hidden',{p_job:k.split('~')[1],p_hidden:h}))throw new Error('not updated');toast(h?'Hidden from your profile':'Back on your profile')}
     catch(e){console.warn(e);x.hidden=!h;render();toast('Couldn\u2019t change that. Try again.')}},
+  goBack(el){goBack(el?.dataset?.to||'board')},
   omenu(el){const id=el.dataset.id;S.omenu=S.omenu===id?null:id;render();if(S.omenu)requestAnimationFrame(()=>document.querySelector('.opop [role=menuitem]')?.focus({preventScroll:true}));else document.querySelector(`.obtn[data-id="${id}"]`)?.focus({preventScroll:true})},
   replayIntro(){openIntro(S.view)},
   pickTheme(el){if(!themePick)return;themePick.sel=el.dataset.k;applyTheme(themePick.sel);renderThemePick()},
@@ -2256,7 +2276,8 @@ window.__tackBack=()=>{
   if($('docRoot')){closeDoc();return true}
   if(S.intro.on){introStep(-1);return true}
   if(S.sheet){closeSheet();return true}
-  const b=document.querySelector('#main .back[data-go]');if(b){b.click();return true}
+  const b=document.querySelector('#main .back');if(b){b.click();return true}
+  if(NAV.length){goBack();return true}
   return false};
 document.addEventListener('keydown',e=>{
   if(S.omenu&&e.key==='Escape'){const id=S.omenu;S.omenu=null;render();document.querySelector(`.obtn[data-id="${id}"]`)?.focus({preventScroll:true});return}
