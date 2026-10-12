@@ -1602,7 +1602,7 @@ button.igstat:active b{opacity:.7}
 .igbtn{flex:1;height:38px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:10px;background:var(--surface2);color:var(--fg);font-size:var(--fs-b);font-weight:600}
 .igbtn.pri{background:var(--grad);color:var(--on-grad)}
 .igtabs{display:flex;margin:22px -16px 0;border-top:1px solid var(--line)}
-.igtab{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:-1px;padding:12px 0;border-top:1.5px solid transparent;font-size:var(--fs-c);font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.igtab{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:-1px;padding:11px 0 10px;border-top:1.5px solid transparent;font-size:var(--fs-c);font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .igtab.on{color:var(--fg);border-top-color:var(--fg)}
 .ignote{display:flex;align-items:center;justify-content:center;gap:6px;margin:12px 0 0;font-size:var(--fs-c);color:var(--muted);text-align:center}
 .igempty{margin-top:26px}

@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610122237';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610122237';
-import {modHit,MOD_CAT} from './mod.js?v=202610122237';
+import {makeDb} from './db.js?v=202610122243';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610122243';
+import {modHit,MOD_CAT} from './mod.js?v=202610122243';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -67,7 +67,8 @@ const I={
  ban:'<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
  moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/>',
  smile:'<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/>',
- dots:'<path d="M12 5h.01M12 12h.01M12 19h.01" stroke-width="3"/>',
+ tagged:'<rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="12" cy="10" r="3"/><path d="M6.5 20.5a6 6 0 0 1 11 0"/>',
+  dots:'<path d="M12 5h.01M12 12h.01M12 19h.01" stroke-width="3"/>',
  image:'<rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="1.8"/><path d="m21 15-4.5-4.5L6 21"/>',
  reply:'<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
  copy:'<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>'
@@ -1335,6 +1336,7 @@ function profileNotes(uid,D){const c=S.pnotes[uid],base=c?.ok?c.list:[],seen=new
   const extra=D.jobs.filter(j=>j.owner===uid&&j.status!=='removed'&&!seen.has(j.key));
   return[...base.map(x=>D.jobByKey[x.key]?{...D.jobByKey[x.key],hidden:x.hidden}:x),...extra].filter(x=>uid===S.me.id||!x.hidden).sort((a,b)=>b.at-a.at)}
 function pnoteByKey(k,D){for(const c of Object.values(S.pnotes))for(const x of c?.list||[])if(x.key===k)return D.jobByKey[k]?{...D.jobByKey[k],hidden:x.hidden}:x;return D.jobByKey[k]||null}
+const PTAB_ICONS=[['notes','board','Notes'],['bids','bids','Bids'],['saved','bookmark','Saved'],['tagged','tagged','Tagged']],PTABS=PTAB_ICONS.map(x=>x[0]);
 const stTag=j=>({assigned:'Taken',done:'Done',closed:'Closed',expired:'Ended'}[jobState(j)]||'');
 // Your personal board: every note you've pinned, on the same dotted board and wall as the campus board.
 function profileWall(items,D){const n=wideMQ.matches?3:2,cols=Array.from({length:n},()=>[]);
@@ -1352,18 +1354,24 @@ function viewPerson(uid,D){
      {sep:1},{i:'out',t:'Log out',at:'data-act="logout"',danger:true}],'Profile options')
     :kebab('person',[{i:'eyeoff',t:'Restrict or block…',at:`data-sheet="who" data-about="${esc(uid)}"`},{i:'flag',t:'Report',at:`data-sheet="report" data-about="${esc(uid)}"`,danger:true}],'Options for '+shortName(uid));
   loadProfileNotes(uid);
-  const tab=isMe&&S.ptab==='bids'?'bids':'notes',c=S.pnotes[uid];
+  const tab=isMe&&PTABS.includes(S.ptab)?S.ptab:'notes',c=S.pnotes[uid];
   const star=v=>`<i class="sstar">${ic('star',13,2,'currentColor','currentColor')}</i>${v}`;
   const stat=(v,l,tap)=>tap?`<button class="igstat" data-sheet="ratings" data-about="${esc(uid)}" aria-label="See ratings"><b>${v}</b><span>${l}</span></button>`:`<div class="igstat"><b>${v}</b><span>${l}</span></div>`;
-  const tabBtn=(k,i,l)=>`<button class="igtab${tab===k?' on':''}" role="tab" aria-selected="${tab===k}" data-act="ptab" data-k="${k}">${ic(i,17)} ${l}</button>`;
+  const tabBtn=([k,i,l])=>`<button class="igtab${tab===k?' on':''}" role="tab" aria-selected="${tab===k}" aria-label="${l}" title="${l}" data-act="ptab" data-k="${k}">${ic(i,22)}</button>`;
   let grid='';
   if(tab==='notes'){const list=profileNotes(uid,D),hid=list.filter(x=>x.hidden).length;
     grid=list.length?`${profileWall(list.map(j=>({j,o:{remote:!D.jobByKey[j.key],own:isMe&&!isOrg(uid),tag:stTag(j)}})),D)}${hid?`<p class="ignote">${ic('eyeoff',12,2.2)} Hidden notes are only visible to you.</p>`:''}`
       :!c||c.busy&&!c.ok?'<p class="ignote">Loading notes…</p>'
       :`<div class="empty igempty"><b>No notes yet</b>${isMe?'<p>Jobs you pin show up here.</p><button class="cta" data-go="post">Pin a job</button>':''}</div>`}
-  else{const l=Object.values(S.pitchMine).filter(p=>p&&num(p.amt)>0&&D.jobByKey[p.job]&&D.jobByKey[p.job].owner!==me).map(p=>({j:D.jobByKey[p.job],amt:num(p.amt),at:num(p.at)})).sort((a,b)=>b.at-a.at);
+  else if(tab==='bids'){const l=Object.values(S.pitchMine).filter(p=>p&&num(p.amt)>0&&D.jobByKey[p.job]&&D.jobByKey[p.job].owner!==me).map(p=>({j:D.jobByKey[p.job],amt:num(p.amt),at:num(p.at)})).sort((a,b)=>b.at-a.at);
     grid=l.length?`${profileWall(l.map(({j,amt})=>({j,o:{tag:j.accepted===me?'Picked you':j.accepted?'Someone else':jobState(j)==='open'?`Your bid ₹${fmt(amt)}`:'Closed',on:j.accepted===me||jobState(j)==='open'&&!j.accepted}})),D)}<p class="ignote">${ic('shield',12,2.2)} Only you see your bids.</p>`
       :'<div class="empty igempty"><b>No bids yet</b><p>Bids you place show up here. Only you see them.</p><button class="btn2" data-go="board">Find a job</button></div>'}
+  else if(tab==='saved'){const keys=Array.isArray(S.priv.saved)?S.priv.saved:[],l=keys.map(k=>D.jobByKey[k]).filter(j=>j&&j.status!=='removed');
+    grid=l.length?`${profileWall(l.map(j=>({j,o:{tag:stTag(j)}})),D)}<p class="ignote">${ic('shield',12,2.2)} Only you see what you've saved.</p>`
+      :'<div class="empty igempty"><b>Nothing saved yet</b><p>Tap the bookmark on a job, or hold a note on the board, to keep it here.</p><button class="btn2" data-go="board">Browse the board</button></div>'}
+  else{const l=D.jobs.filter(j=>j.accepted===me&&j.owner!==me&&j.status!=='removed').sort((a,b)=>num(b.pick?.at||b.at)-num(a.pick?.at||a.at));
+    grid=l.length?`${profileWall(l.map(j=>({j,o:{tag:jobState(j)==='done'?(payOf(j)?.ok?'Done · Paid':'Done'):'Picked you',on:jobState(j)!=='done'}})),D)}<p class="ignote">${ic('shield',12,2.2)} Jobs you were picked for. Only you see this.</p>`
+      :'<div class="empty igempty"><b>No tags yet</b><p>When someone picks you for their job, it shows up here.</p><button class="btn2" data-go="board">Find a job</button></div>'}
   return`<div class="pad igprof">
    <div class="igtop">${isMe?'':`<button class="back igback" data-act="goBack" data-to="board" aria-label="Back to the board">${ic('back',20)}</button>`}<h1 class="igh">${isOrg(uid)?'tack':handleOf(uid)?'@'+esc(handleOf(uid)):esc(shortName(uid))}</h1>${menu}</div>
    <div class="ighead"><span class="ring${onlineNow(uid)?' live':''}" style="width:88px;height:88px">${face(uid,76)}</span>
@@ -1371,7 +1379,7 @@ function viewPerson(uid,D){
    <div class="igbio">${real?`<b>${esc(real)}</b>`:''}${bio?`<p>${esc(bio)}</p>`:isMe?`<button class="pbioadd" data-go="edit">${ic('plus',14,2.4)} Add a short bio</button>`:'<p class="pbioempty">No bio yet.</p>'}</div>
    ${isMe?`<div class="igacts"><button class="igbtn pri" data-go="edit">${ic('edit',15,2.2)} Edit profile</button></div>`
      :workedWith(uid,D).length?`<div class="igacts"><button class="igbtn pri" data-msgwith="${esc(uid)}">${ic('chat',15,2.2)} Message</button></div>`:''}
-   <div class="igtabs" role="tablist">${tabBtn('notes','board','Notes')}${isMe?tabBtn('bids','bids','Bids'):''}</div>
+   <div class="igtabs" role="tablist">${(isMe?PTAB_ICONS:PTAB_ICONS.slice(0,1)).map(tabBtn).join('')}</div>
    ${grid}
   </div><div style="height:24px"></div>`;
 }
@@ -2000,7 +2008,7 @@ const ACT={
   async addBranch(){const c=S.cpick;if(!c||c.busy)return;if(c.ncol.trim().length<2){c.err='Add your college name.';render();return}c.busy=true;c.err='';render();
     try{await S.fb.rpc('add_my_campus',{p_college:c.ncol.trim(),p_city:c.ncity.trim()});S.cpick=null;handleUser(S.user)}catch(e){c.busy=false;c.err='Couldn’t make the board. Try again.';render()}},
   introPush(){closeIntro('board');setTimeout(enablePush,350)},
-  ptab(el){S.ptab=el.dataset.k==='bids'?'bids':'notes';render()},
+  ptab(el){S.ptab=PTABS.includes(el.dataset.k)?el.dataset.k:'notes';render()},
   async pnHide(el){const k=el.dataset.key,h=el.dataset.val==='1',c=S.pnotes[S.me.id],x=c?.list?.find(y=>y.key===k);S.sheet=null;
     if(!c?.ok||!x){render();toast('Couldn\u2019t change that right now. Try again in a minute.');return}
     x.hidden=h;render();
