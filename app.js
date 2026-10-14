@@ -1,8 +1,8 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
 import {makeDb} from './db.js?v=202610122323';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610122323';
-import {modHit,MOD_CAT} from './mod.js?v=202610122323';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610142017';
+import {modHit,MOD_CAT} from './mod.js?v=202610142017';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
 const SB = window.__TACK_SB || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
@@ -1386,22 +1386,38 @@ function profileNotes(uid,D){const c=S.pnotes[uid],base=c?.ok?c.list:[],seen=new
   const extra=D.jobs.filter(j=>j.owner===uid&&j.status!=='removed'&&!seen.has(j.key));
   return[...base.map(x=>D.jobByKey[x.key]?{...D.jobByKey[x.key],hidden:x.hidden}:x),...extra].filter(x=>uid===S.me.id||!x.hidden).sort((a,b)=>b.at-a.at)}
 function pnoteByKey(k,D){for(const c of Object.values(S.pnotes))for(const x of c?.list||[])if(x.key===k)return D.jobByKey[k]?{...D.jobByKey[k],hidden:x.hidden}:x;return D.jobByKey[k]||null}
-const PTAB_ICONS=[['notes','note','Notes'],['bids','bid','Bids'],['saved','bookmark','Saved'],['tagged','tagged','Tagged']],PTABS=PTAB_ICONS.map(x=>x[0]);
-const stTag=j=>({assigned:'Taken',done:'Done',closed:'Closed',expired:'Ended'}[jobState(j)]||'');
-// Your personal board: every note you've pinned, on the same dotted board and wall as the campus board.
-function profileWall(items,D){const n=wideMQ.matches?3:2,cols=Array.from({length:n},()=>[]);
-  items.forEach(({j,o},i)=>cols[i%n].push(tile(j,D,i,o)));
-  return`<div class="wallzone pwall"><div class="wall">${cols.map(c=>`<div class="wcol">${c.join('')}</div>`).join('')}</div></div>`}
-// Profile buttons for someone else: Follow / Following / Follow back, and Message. Once you follow each other: Message, then Friends.
-// Message opens your job chat while a deal is on; otherwise your direct chat, which is a message request until you're friends.
-function relBtns(uid,D){const msg=!isOrg(uid),u=esc(uid),f=isFollowing(uid);
-  const fb=f?`<button class="igbtn" data-act="follow" data-uid="${u}">${isFriend(uid)?ic('tick',14,2.6)+' Friends':'Following'}</button>`
-    :`<button class="igbtn pri" data-act="follow" data-uid="${u}">${followsMe(uid)?'Follow back':'Follow'}</button>`;
-  const mb=msg?`<button class="igbtn${f?' pri':''}" data-msgwith="${u}">${ic('chat',15,2.2)} Message</button>`:'';
-  return`<div class="igacts">${isFriend(uid)?mb+fb:fb+mb}</div>`}
+const PTAB_ICONS=[['notes','note','Board'],['bids','bid','Bids'],['saved','bookmark','Saved']],PTABS=PTAB_ICONS.map(x=>x[0]);
+const stTag=j=>({assigned:'Picked',done:'Done',closed:'Closed',expired:'Closed'}[jobState(j)]||'');
+const shortDay=t=>t?new Date(t).toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'';
+// A personal board note: price, the job, one status line. Same calm notes as the campus board, without the extras.
+function ptile(j,i,o){const st=jobState(j),dim=['closed','expired','removed'].includes(st)&&!o.on,k=esc(j.key);
+  const t=`<button class="tile ntile ptile${gcls(j)}${dim?' dim':''}" ${o.remote?`data-sheet="pnote" data-about="${k}"`:`data-job="${k}"`} style="--nc:${noteOf(j)};--i:${i};--d:0s${gvars(j)}">
+    <span class="pin"></span>${isOrg(j.owner)?'':`<span class="price">₹${fmt(j.price)}</span>`}<p>${esc(j.text)}</p>
+    <span class="pst${o.on?' on':''}">${esc(o.tag)}${j.hidden?' · hidden':''}</span></button>`;
+  return o.own?`<div class="pwrap${j.hidden?' hid':''}">${t}<button class="pgdots" data-sheet="pnmenu" data-about="${k}" aria-label="Options for this job">${ic('dots',16,2.8)}</button></div>`:t}
+function profileWall(items){const n=wideMQ.matches?3:2,cols=Array.from({length:n},()=>[]);
+  items.forEach(({j,o},i)=>cols[i%n].push(ptile(j,i,o)));
+  return`<div class="pboard"><div class="wall">${cols.map(c=>`<div class="wcol">${c.join('')}</div>`).join('')}</div></div>`}
+// Profile buttons for someone else: Message leads, follow sits beside it.
+function relBtns(uid,D){const u=esc(uid),f=isFollowing(uid),fl=isFriend(uid)?'Friends':f?'Following':followsMe(uid)?'Follow back':'Follow';
+  return`<div class="pacts">${isOrg(uid)?'':`<button class="cta" data-msgwith="${u}">Message</button>`}<button class="btn2" data-act="follow" data-uid="${u}">${fl}</button></div>`}
+// The personal board: jobs they posted and jobs they did. Who did a job is private, so on someone else's profile
+// it only shows jobs they did for you.
+function boardItems(uid,D){const me=S.me.id,isMe=uid===me,out=[];
+  for(const j of profileNotes(uid,D)){const st=jobState(j),n=isMe&&!j.remote?bidsFor(D,j.key).length:0,when=shortDay(j.doneAt||j.at);
+    out.push({at:j.doneAt||j.at,j,o:{remote:!D.jobByKey[j.key],own:isMe&&!isOrg(uid),on:st==='open',
+      tag:st==='open'?(isMe?`Open · ${n} ${n===1?'bid':'bids'}`:'Open now'):st==='assigned'?(isMe?`Posted · picked @${handleOf(j.accepted)||'someone'}`:'Posted · picked'):st==='done'?`Posted · ${when}`:`Closed · ${when}`}})}
+  const did=D.jobs.filter(j=>j.status!=='removed'&&j.accepted===uid&&j.owner!==uid&&(isMe||j.owner===me));
+  for(const j of did){const done=jobState(j)==='done',when=shortDay(j.doneAt||num(j.pick?.at)||j.at);
+    out.push({at:j.doneAt||num(j.pick?.at)||j.at,j,o:{on:!done,tag:isMe?(done?`Did it · ${when}`:`Doing it for @${handleOf(j.owner)||firstName(j.owner)}`):(done?`Did it for you · ${when}`:'Doing it for you')}})}
+  return out.sort((a,b)=>b.at-a.at)}
+function profileNudge(uid){const d=pdoc(uid);
+  const n=!str(d.bio,BIO_MAX)?['Add a line about you','Posters pick people who say what they’re good at.']:!photoOf(uid)?['Add a profile photo','A real face helps people say yes.']:!(d.year&&d.branch)?['Add your year and branch','So classmates know who you are.']:null;
+  return n?`<button class="pnudge" data-go="edit"><span class="rowtext"><span class="t1">${n[0]}</span><span class="t2">${n[1]}</span></span><span class="chev">${ic('chev',16)}</span></button>`:''}
+// Profiles keep one focal point: the person, one line of trust, one action, then their personal board.
 function viewPerson(uid,D){
-  const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,me=S.me.id;
-  const bio=str(d.bio,BIO_MAX)||str(d.does,60),real=!isOrg(uid)&&handleOf(uid)?realNameOf(uid):'';
+  const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,me=S.me.id,org=isOrg(uid);
+  const bio=str(d.bio,BIO_MAX)||str(d.does,60),real=!org&&handleOf(uid)?realNameOf(uid):'';
   const menu=isMe?kebab('me',[{html:`<span class="ohead">Logged in as ${esc(S.me.email)}</span>`},
      {i:'users',t:'Followers',at:'data-sheet="rel" data-about="followers"',v:String(Object.keys(S.followers).length)},
      {i:'users',t:'Following',at:'data-sheet="rel" data-about="following"',v:String(Object.keys(S.following).length)},
@@ -1416,32 +1432,40 @@ function viewPerson(uid,D){
     :kebab('person',[followsMe(uid)?{i:'x',t:'Remove follower',at:`data-act="removeFollower" data-uid="${esc(uid)}"`}:null,{sep:1},{i:'eyeoff',t:'Restrict or block…',at:`data-sheet="who" data-about="${esc(uid)}"`},{i:'flag',t:'Report',at:`data-sheet="report" data-about="${esc(uid)}"`,danger:true}],'Options for '+shortName(uid));
   loadProfileNotes(uid);
   const tab=isMe&&PTABS.includes(S.ptab)?S.ptab:'notes',c=S.pnotes[uid];
-  const star=v=>`<i class="sstar">${ic('star',13,2,'currentColor','currentColor')}</i>${v}`;
-  const stat=(v,l,tap)=>tap?`<button class="igstat" data-sheet="ratings" data-about="${esc(uid)}" aria-label="See ratings"><b>${v}</b><span>${l}</span></button>`:`<div class="igstat"><b>${v}</b><span>${l}</span></div>`;
-  const tabBtn=([k,i,l])=>`<button class="igtab${tab===k?' on':''}" role="tab" aria-selected="${tab===k}" aria-label="${l}" title="${l}" data-act="ptab" data-k="${k}">${ic(i,22)}</button>`;
-  let grid='';
-  if(tab==='notes'){const list=profileNotes(uid,D),hid=list.filter(x=>x.hidden).length;
-    grid=list.length?`${profileWall(list.map(j=>({j,o:{remote:!D.jobByKey[j.key],own:isMe&&!isOrg(uid),tag:stTag(j)}})),D)}${hid?`<p class="ignote">${ic('eyeoff',12,2.2)} Hidden notes are only visible to you.</p>`:''}`
-      :!c||c.busy&&!c.ok?'<p class="ignote">Loading notes…</p>'
-      :`<div class="empty igempty"><b>No notes yet</b>${isMe?'<p>Jobs you pin show up here.</p><button class="cta" data-go="post">Pin a job</button>':''}</div>`}
+  const name=org?'tack':handleOf(uid)?'@'+handleOf(uid):shortName(uid);
+  const meta=org?'':[str(d.year,12),str(d.branch,24),campusName(campusOf(uid))].filter(Boolean).join(' · ');
+  const r=st.doer.n?{v:st.avg,n:st.doer.n,x:''}:st.poster.n?{v:st.poster.avg.toFixed(1),n:st.poster.n,x:' as a poster'}:null;
+  const bits=[r?`<span class="pstar">${ic('star',14,2,'currentColor','currentColor')}</span><b>${r.v}</b><span>(${r.n})${r.x}</span>`:'<span>New on tack</span>',
+    st.done?`<span>${st.done} ${st.done===1?'job':'jobs'} done</span>`:'',isMe&&st.earned?`<b class="money">₹${fmt(st.earned)}</b><span>earned</span>`:''].filter(Boolean);
+  const trust=bits.join('<i class="psep" aria-hidden="true"></i>');
+  const revs=!isMe&&!org?reviewsOf(uid):null,rv=revs&&revs[0];
+  let body='';
+  if(tab==='notes'){const items=boardItems(uid,D),hid=items.filter(x=>x.j.hidden).length;
+    body=items.length?`${isMe?'':`<div class="psh"><h2>Board</h2><span>${items.length} ${items.length===1?'job':'jobs'}</span></div>`}${profileWall(items)}${hid?`<p class="ignote">${ic('eyeoff',12,2.2)} Hidden jobs are only visible to you.</p>`:''}`
+      :!c||c.busy&&!c.ok?'<p class="ignote">Loading…</p>'
+      :isMe?`<div class="empty igempty"><b>Your board is empty</b><p>Jobs you pin and jobs you do show up here.</p><button class="cta" data-go="post">Pin a job</button></div>`:''}
   else if(tab==='bids'){const l=Object.values(S.pitchMine).filter(p=>p&&num(p.amt)>0&&D.jobByKey[p.job]&&D.jobByKey[p.job].owner!==me).map(p=>({j:D.jobByKey[p.job],amt:num(p.amt),at:num(p.at)})).sort((a,b)=>b.at-a.at);
-    grid=l.length?`${profileWall(l.map(({j,amt})=>({j,o:{tag:j.accepted===me?'Picked you':j.accepted?'Someone else':jobState(j)==='open'?`Your bid ₹${fmt(amt)}`:'Closed',on:j.accepted===me||jobState(j)==='open'&&!j.accepted}})),D)}<p class="ignote">${ic('shield',12,2.2)} Only you see your bids.</p>`
+    body=l.length?`${profileWall(l.map(({j,amt})=>({j,o:{tag:j.accepted===me?'Picked you':j.accepted?'Someone else got it':jobState(j)==='open'?`Your bid ₹${fmt(amt)}`:'Closed',on:j.accepted===me||jobState(j)==='open'&&!j.accepted}})))}<p class="ignote">${ic('shield',12,2.2)} Only you see your bids.</p>`
       :'<div class="empty igempty"><b>No bids yet</b><p>Bids you place show up here. Only you see them.</p><button class="btn2" data-go="board">Find a job</button></div>'}
-  else if(tab==='saved'){const keys=Array.isArray(S.priv.saved)?S.priv.saved:[],l=keys.map(k=>D.jobByKey[k]).filter(j=>j&&j.status!=='removed');
-    grid=l.length?`${profileWall(l.map(j=>({j,o:{tag:stTag(j)}})),D)}<p class="ignote">${ic('shield',12,2.2)} Only you see what you've saved.</p>`
+  else{const keys=Array.isArray(S.priv.saved)?S.priv.saved:[],l=keys.map(k=>D.jobByKey[k]).filter(j=>j&&j.status!=='removed');
+    body=l.length?`${profileWall(l.map(j=>({j,o:{tag:stTag(j)||'Open',on:jobState(j)==='open'}})))}<p class="ignote">${ic('shield',12,2.2)} Only you see what you've saved.</p>`
       :'<div class="empty igempty"><b>Nothing saved yet</b><p>Tap the bookmark on a job, or hold a note on the board, to keep it here.</p><button class="btn2" data-go="board">Browse the board</button></div>'}
-  else{const l=D.jobs.filter(j=>j.accepted===me&&j.owner!==me&&j.status!=='removed').sort((a,b)=>num(b.pick?.at||b.at)-num(a.pick?.at||a.at));
-    grid=l.length?`${profileWall(l.map(j=>({j,o:{tag:jobState(j)==='done'?(payOf(j)?.ok?'Done · Paid':'Done'):'Picked you',on:jobState(j)!=='done'}})),D)}<p class="ignote">${ic('shield',12,2.2)} Jobs you were picked for. Only you see this.</p>`
-      :'<div class="empty igempty"><b>No tags yet</b><p>When someone picks you for their job, it shows up here.</p><button class="btn2" data-go="board">Find a job</button></div>'}
-  return`<div class="pad igprof">
-   <div class="igtop">${isMe?'':`<button class="back igback" data-act="goBack" data-to="board" aria-label="Back">${ic('back',20)}</button>`}<h1 class="igh">${isOrg(uid)?'tack':handleOf(uid)?'@'+esc(handleOf(uid)):esc(shortName(uid))}</h1>${menu}</div>
-   <div class="ighead"><span class="ring${onlineNow(uid)?' live':''}" style="width:88px;height:88px">${face(uid,76)}</span>
-     <div class="igstats">${stat(st.done,st.done===1?'job done':'jobs done')}${stat(st.avg?star(st.avg):'New','rating',st.doer.n||(isMe&&st.poster.n))}${isMe?`<div class="igstat"><b class="money">₹${fmt(st.earned)}</b><span>earned</span></div>`:stat(st.poster.n?star(st.poster.avg.toFixed(1)):'–','as a poster',st.poster.n)}</div></div>
-   <div class="igbio">${real?`<b>${esc(real)}</b>`:''}${bio?`<p>${esc(bio)}</p>`:isMe?`<button class="pbioadd" data-go="edit">${ic('plus',14,2.4)} Add a short bio</button>`:'<p class="pbioempty">No bio yet.</p>'}</div>
-   ${isMe?`<div class="igacts"><button class="igbtn pri" data-go="edit">${ic('edit',15,2.2)} Edit profile</button></div>`
-     :relBtns(uid,D)}
-   <div class="igtabs" role="tablist">${(isMe?PTAB_ICONS:PTAB_ICONS.slice(0,1)).map(tabBtn).join('')}</div>
-   ${grid}
+  return`<div class="pad pv3">
+   <div class="pnav">${isMe?'<span></span>':`<button class="back" data-act="goBack" data-to="board" aria-label="Back">${ic('back',20)}</button>`}${menu}</div>
+   <div class="phero">
+     <span class="ring${onlineNow(uid)?' live':''}" style="width:96px;height:96px">${face(uid,86)}</span>
+     <h1 class="pname">${esc(name)}</h1>
+     ${real?`<p class="preal">${esc(real)}</p>`:''}
+     ${meta?`<p class="pmeta">${esc(meta)}</p>`:''}
+     ${r?`<button class="ptrust" data-sheet="ratings" data-about="${esc(uid)}" aria-label="See ratings">${trust}</button>`:`<p class="ptrust">${trust}</p>`}
+     ${bio?`<p class="pbio">${esc(bio)}</p>`:''}
+     ${isMe?`<div class="pacts"><button class="btn2" data-go="edit">Edit profile</button><button class="btn2" data-act="shareMe">Share</button></div>`:relBtns(uid,D)}
+   </div>
+   ${isMe?profileNudge(uid):''}
+   ${rv?`<section class="psec"><div class="psh"><h2>Reviews</h2>${revs.length>1?`<button class="linkbtn" data-sheet="ratings" data-about="${esc(uid)}">See all ${revs.length}</button>`:''}</div>
+     <p class="pquote">${esc(rv.text)}</p><p class="pqby">${rv.stars?`<span class="pstars">${'★'.repeat(Math.round(rv.stars))}</span>`:''}A poster · ${new Date(rv.at).toLocaleDateString('en-IN',{month:'long'})}</p></section>`:''}
+   ${isMe?`<div class="ptabs" role="tablist">${PTAB_ICONS.map(([k,,l])=>`<button class="${tab===k?'on':''}" role="tab" aria-selected="${tab===k}" data-act="ptab" data-k="${k}">${l}</button>`).join('')}</div>`:'<div class="psec"></div>'}
+   ${body}
   </div><div style="height:24px"></div>`;
 }
 function viewSettings(D){const me=S.me.id,blocked=arr(S.priv.blocked).filter(u=>typeof u==='string'),rs=restricted(),t=S.priv.terms||{};
@@ -2095,6 +2119,8 @@ const ACT={
     try{await S.fb.rpc('remove_follower',{p:u});toast(shortName(u)+' no longer follows you')}catch(e){console.warn(e);setRel('followers',u,o);toast('Couldn\u2019t do that. Try again.')}},
   toggleFriendsOnly(){S.draft.friendsOnly=!S.draft.friendsOnly;render()},
   ptab(el){S.ptab=PTABS.includes(el.dataset.k)?el.dataset.k:'notes';render()},
+  shareMe(){const h=handleOf(S.me.id),t=`Find me on tack, the ${campus()} board for quick jobs: @${h}\n${SITE}`;
+    if(navigator.share)navigator.share({text:t}).catch(()=>{});else navigator.clipboard?.writeText(t).then(()=>toast('Copied. Paste it anywhere.'),()=>toast('Couldn\u2019t copy that.'))},
   async pnHide(el){const k=el.dataset.key,h=el.dataset.val==='1',c=S.pnotes[S.me.id],x=c?.list?.find(y=>y.key===k);S.sheet=null;
     if(!c?.ok||!x){render();toast('Couldn\u2019t change that right now. Try again in a minute.');return}
     x.hidden=h;render();
