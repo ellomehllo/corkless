@@ -199,19 +199,19 @@ function derive(){
   const D={members,jobs,jobByKey,bidsByJob,blocked};
   D.threads=threadsOf(D);D.convos=convosOf(D.threads);D.unread=D.convos.filter(t=>t.unread).length;
   D.notes=notesOf(D);D.newNotes=S.view==='bids'?0:D.notes.filter(n=>n.at>num(S.priv.actSeen)&&n.at<=Date.now()+6e4).length;
-  D.toConfirm=jobs.filter(j=>j.accepted===me&&j.status==='done'&&!payOf(j)?.ok).length;
+  D.toConfirm=jobs.filter(j=>j.accepted===me&&j.status==='done'&&(PAY_ON?!payOf(j)?.ok:!j.pick?.ratedPoster)).length;
   D.offersWaiting=offerList(S.offersIn).filter(o=>o.status==='pending'&&D.members.includes(o.owner)&&!D.blocked.has(o.owner)).length;
   return D;
 }
 function myBidOn(jobKey){const p=S.pitchMine[jobKey+'~'+S.me.id];return p&&num(p.amt)>0?{amt:num(p.amt),say:str(p.say,SAY_MAX),at:num(p.at),pics:Math.min(MAX_PICS,num(p.pics))}:null}
 function threadOpen(k){return !!S.threadDocs[k]}
-// Following is instant and one way. Following each other makes you friends: friends can message anytime and see each other's
-// friends-only jobs. A job's chat stays open while it's being bid on and during the deal, and for a week after it's done
-// (to sort out payment); after that, the two of you keep talking only if you follow each other.
-const isFollowing=u=>!!S.following[u],followsMe=u=>!!S.followers[u],isFriend=u=>isFollowing(u)&&followsMe(u),canChat=isFriend;
+// Following is switched off: no followers, no friends, no friends-only jobs. A job's chat stays open while it's being bid on,
+// during the deal and for a week after it's done; after that, either person can send a message request.
+const FOLLOW_ON=false;
+const isFollowing=u=>FOLLOW_ON&&!!S.following[u],followsMe=u=>FOLLOW_ON&&!!S.followers[u],isFriend=u=>isFollowing(u)&&followsMe(u),canChat=isFriend;
 const CHAT_GRACE=7*864e5,DM_REQ_MAX=3;
-// Anyone can message anyone they can see. Until you follow each other, the first messages arrive as a message request:
-// up to 3 messages, and the other person accepts or declines. Friends skip the request.
+// Anyone can message anyone they can see. The first messages arrive as a message request: up to 3 messages,
+// and the other person accepts or declines.
 function dmState(k,u){if(isFriend(u))return'open';const d=S.threadDocs[k];if(!d)return'requesting';if(!d.req)return'open';if(d.req!==S.me.id)return'incoming';
   const n=(S.chat.parts?.[k]||[]).filter(m=>m.by===S.me.id).length;return n<DM_REQ_MAX?'requesting':'capped'}
 const reqIn=(k,u)=>!!parseKey(k)?.friend&&dmState(k,u)==='incoming';
@@ -248,24 +248,24 @@ function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str
   for(const j of D.jobs){
     if(j.owner===me){
       for(const b of bidsFor(D,j.key))if(b.by!==me&&ok(b.by))add(b.at,b.by,`${nm(b.by)} ${A('bid on')} ${t(j)}`,{job:j.key});
-      const pk=j.pick;if(pk&&ok(pk.doer)){const pay=payOf(j);
+      const pk=j.pick;if(PAY_ON&&pk&&ok(pk.doer)){const pay=payOf(j);
         if(pay)add(pay.at,pk.doer,pay.ok?`${nm(pk.doer)} ${A('confirmed your payment')} for ${t(j)}`:`${nm(pk.doer)} says your payment for ${t(j)} ${A('hasn\u2019t arrived yet')}`,{job:j.key})}
       const st=jobState(j);
       if(st==='expired')add(j.deadline,'tack',`${A('Time ran out')} on ${t(j)}. Pin it again if you still need it.`,{job:j.key});
       if(st==='removed')add(j.at,'tack',`${t(j)} was ${A('taken off the board')} by ${esc(organiser())}.`,{job:j.key});
     }else if(j.accepted===me&&j.pick){const pk=j.pick,pay=payOf(j);
       add(num(pk.at),j.owner,`${nm(j.owner)} ${A('picked you')} for ${t(j)}`,{job:j.key});
-      if(pk.status==='done')add(num(pk.doneAt),j.owner,`${nm(j.owner)} ${A('marked')} ${t(j)} ${A('as done')}. Got paid?`,{job:j.key});
-      if(pay&&pay.ok)add(pay.at,'tack',`${A('Congrats, you finished')} ${t(j)}`,{job:j.key,earn:j.agreed||j.price});
+      if(pk.status==='done')add(num(pk.doneAt),j.owner,`${nm(j.owner)} ${A('marked')} ${t(j)} ${A('as done')}. ${PAY_ON?'Got paid?':'Rate them?'}`,{job:j.key});
+      if(PAY_ON?pay&&pay.ok:pk.status==='done')add(PAY_ON?pay.at:num(pk.doneAt)+1,'tack',`${A('Congrats, you finished')} ${t(j)}`,{job:j.key,...(PAY_ON?{earn:j.agreed||j.price}:{})});
       if(typeof pk.review==='string')add(num(pk.doneAt)+2,j.owner,`${nm(j.owner)} ${A('left you a review')}. Tap to see it.`,{rev:pk.review});
     }else if(ok(j.owner)){const b=myBidOn(j.key);
       if(b&&lostBid(j))add(lostAt(j,b.at),j.owner,`${nm(j.owner)} ${A('picked someone else')} for ${t(j)}`,{job:j.key});
       else if(b&&jobState(j)==='open'&&j.editedAt>b.at)add(j.editedAt,j.owner,`${nm(j.owner)} ${A('updated')} ${t(j)}. Check it still works for you.`,{job:j.key});
     }
   }
-  for(const[u,at]of Object.entries(S.followers))if(!D.blocked.has(u))add(at,u,`${nm(u)} ${A('started following you')}`,{person:u,...(isFollowing(u)?{}:{fb:u})});
+  if(FOLLOW_ON)for(const[u,at]of Object.entries(S.followers))if(!D.blocked.has(u))add(at,u,`${nm(u)} ${A('started following you')}`,{person:u,...(isFollowing(u)?{}:{fb:u})});
   for(const t of D.threads)if(reqIn(t.key,t.other))add(num(S.threadDocs[t.key]?.at)||t.last?.at||0,t.other,`${nm(t.other)} ${A('sent you a message request')}`,{mreq:t.key,person:t.other});
-  for(const x of S.ffeed)if(!D.blocked.has(x.owner))add(x.at,x.owner,`${nm(x.owner)} ${A('pinned')} ${t(x)}`,D.jobByKey[x.key]?{job:x.key}:{person:x.owner});
+  if(FOLLOW_ON)for(const x of S.ffeed)if(!D.blocked.has(x.owner))add(x.at,x.owner,`${nm(x.owner)} ${A('pinned')} ${t(x)}`,D.jobByKey[x.key]?{job:x.key}:{person:x.owner});
   for(const[id,iv]of Object.entries(S.cinv||{}))if(S.coms[id])add(num(iv.at),iv.by,`${nm(iv.by)} ${A('invited you')} to <b>${esc(comName(id))}</b>`,{go:'board',cinv:id});
   for(const o of offerList(S.offersIn))if(ok(o.owner))add(num(o.at),o.owner,`${nm(o.owner)} ${A('asked you')}: ${esc(str(o.text,60))}`,{go:'bids'});
   // Declines are silent: the asker only ever hears about a yes.
@@ -301,20 +301,23 @@ const pref=(k,d=true)=>{const v=(S.priv.prefs||{})[k];return typeof v==='boolean
 const needTerms=()=>S.phase==='app'&&!!S.ready?.priv&&!S.joining&&(S.priv.terms||{}).v!==TERMS_V;
 function onlinePeople(D){return D.members.filter(u=>onlineNow(u)&&!D.blocked.has(u)).sort((a,b)=>onlineAt(b)-onlineAt(a))}
 function payOf(j){const x=j.pick&&j.pick.paid;return x&&typeof x==='object'&&typeof x.ok==='boolean'?{ok:x.ok,at:num(x.at)}:null}
+// Payments in tack (UPI sharing, "I've paid", "Did they pay you?") are on hold. Members pay each other directly,
+// in cash or UPI, outside tack. Flip PAY_ON back to bring the guided payment flow back.
+const PAY_ON=false;
 const PAY_GRACE=864e5;
 const UPI_RE=/^[a-zA-Z0-9._-]{2,64}@[a-zA-Z][a-zA-Z0-9.-]{1,48}$/;
 const upiOf=j=>{const u=j.pick&&j.pick.upi;return typeof u==='string'&&UPI_RE.test(u)?u:''};
 const sentOf=j=>{const x=j.pick&&j.pick.sent;return x&&typeof x==='object'&&num(x.at)>0?{at:num(x.at),ref:typeof x.ref==='string'?x.ref.slice(0,40):''}:null};
 const upiLink=j=>`upi://pay?pa=${encodeURIComponent(upiOf(j))}&pn=${encodeURIComponent(shortName(j.accepted))}&am=${num(j.agreed)}&cu=INR&tn=${encodeURIComponent('tack: '+j.text.slice(0,40))}`;
 function payLine(uid){const r=repOf(uid,'p');if(!r.n)return'';const v=r.per.find(c=>c.k==='payment')?.v||0;return v?` · Pays on time ★${v.toFixed(1)}`:''}
-function posterPay(j){const dn=esc(firstName(j.accepted)),u=upiOf(j),sent=sentOf(j),pay=payOf(j),done=jobState(j)==='done',over=done&&!pay?.ok&&!sent&&Date.now()-(j.doneAt||0)>PAY_GRACE;
+function posterPay(j){if(!PAY_ON)return'';const dn=esc(firstName(j.accepted)),u=upiOf(j),sent=sentOf(j),pay=payOf(j),done=jobState(j)==='done',over=done&&!pay?.ok&&!sent&&Date.now()-(j.doneAt||0)>PAY_GRACE;
   if(pay?.ok)return'';
   const btn=u?`<button class="${done?'cta':'btn2'}" data-sheet="paysafe">${ic('shield',16)} Pay ₹${fmt(j.agreed)} with UPI</button>`:'';
   return`<div class="paycard${over?' over':''}">
     <div class="payhead">${ic('shield',18)}<span class="rowtext"><span class="t1">${over?`Payment overdue. ${dn} is still waiting for ₹${fmt(j.agreed)}`:sent?`You marked ₹${fmt(j.agreed)} as sent ${since(sent.at)}`:done?`Pay ${dn} ₹${fmt(j.agreed)}`:'Pay safely, after the work is done'}</span>
       <span class="t2">${sent?`${sent.ref&&sent.ref!=='cash'?'UPI ref '+esc(sent.ref)+'. ':sent.ref==='cash'?'Paid in cash. ':''}Waiting for ${dn} to confirm it reached them.`:u?`${dn} shared their UPI ID for this job. Pay inside tack so there’s a record.`:`${dn} hasn’t shared a UPI ID yet. Ask them in chat, or pay in cash.`}</span></span></div>
     ${sent?'':btn}${sent||!done?'':`<button class="linkbtn" data-act="markSent" data-val="cash">I paid in cash</button>`}</div>`}
-function doerPay(j){const pn=esc(firstName(j.owner)),u=upiOf(j);
+function doerPay(j){if(!PAY_ON)return'';const pn=esc(firstName(j.owner)),u=upiOf(j);
   if(payOf(j)?.ok)return'';
   if(u&&!S.upiEdit)return`<div class="paycard"><div class="payhead">${ic('shield',18)}<span class="rowtext"><span class="t1">${pn} can pay you in tack</span><span class="t2">Your UPI ID <b>${esc(u)}</b> is shared with ${pn} for this job only.</span></span></div><button class="linkbtn" data-act="editUpi">Change</button></div>`;
   return`<div class="paycard"><div class="payhead">${ic('shield',18)}<span class="rowtext"><span class="t1">Get paid safely</span><span class="t2">Share your UPI ID so ${pn} can pay you the exact amount inside tack. Only ${pn} sees it, for this job.</span></span></div>
@@ -325,7 +328,7 @@ function repOf(uid,side){const r=S.repDocs[uid],x=r&&r[side]&&typeof r[side]==='
   const per=CRIT[side].map(([k,l])=>({k,l,v:n?num(x[k])/n:0}));return{n,per,avg:n?(per.reduce((a,c)=>a+c.v,0)/per.length):0}}
 function stats(uid,D){
   const d=repOf(uid,'d'),p=repOf(uid,'p');let earned=0;
-  if(uid===S.me.id)for(const j of D.jobs)if(j.accepted===uid&&payOf(j)?.ok)earned+=j.agreed||j.price;
+  if(PAY_ON&&uid===S.me.id)for(const j of D.jobs)if(j.accepted===uid&&payOf(j)?.ok)earned+=j.agreed||j.price;
   return{done:d.n,avg:d.n?d.avg.toFixed(1):null,doer:d,poster:p,earned};
 }
 function rateLine(uid,D){const s=stats(uid,D);return s.avg?` · ★${s.avg} from ${s.done} ${s.done===1?'job':'jobs'}`:''}
@@ -407,13 +410,18 @@ function saveMine(mut){
 const PUSH_KEY='tack.push';
 const isIOS=()=>/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
-const pushReady=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+// Inside the iOS app tack runs in a web view, where web push can't work. Until native push is added,
+// the iOS app shows no notification settings or prompts at all.
+const IOS_APP=(()=>{try{const C=window.Capacitor;return!!(C&&C.isNativePlatform&&C.isNativePlatform()&&C.getPlatform&&C.getPlatform()==='ios')}catch{return false}})();
+// Shown in Settings when set. Leave empty to point people to Report or feedback only.
+const SUPPORT_EMAIL='';
+const pushReady=()=>!IOS_APP&&'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
 function pushOn(){try{return pushReady()&&Notification.permission==='granted'&&!!localStorage.getItem(PUSH_KEY)}catch{return false}}
 async function pushToken(){const reg=await navigator.serviceWorker.register('sw.js');await navigator.serviceWorker.ready;
   const m=await import(FB+'firebase-messaging.js');S.msg=S.msg||m.getMessaging(await fcmApp());return{m,token:await m.getToken(S.msg,{serviceWorkerRegistration:reg})}}
 function dropPushField(t){const {doc,updateDoc,FieldPath,deleteField}=S.fb;return updateDoc(doc(S.db,'private',S.me.id),new FieldPath('push',t),deleteField()).catch(e=>console.warn(e))}
 async function enablePush(){
-  if(!pushReady()){if(isIOS()&&!standalone()){S.sheet={type:'iosPush'};render()}else toast('This browser can\u2019t show notifications.');return}
+  if(!pushReady()){if(IOS_APP)return;if(isIOS()&&!standalone()){S.sheet={type:'iosPush'};render()}else toast('This browser can\u2019t show notifications.');return}
   let perm=Notification.permission;if(perm==='default')perm=await Notification.requestPermission();
   if(perm!=='granted'){toast('Notifications are blocked. Allow them for tack in your browser settings.');return}
   S.busy=true;render();
@@ -498,8 +506,7 @@ function startSubs(){
   S.subs.push(onSnapshot(doc(db,'config','app'),s=>{S.config=s.exists()?s.data():{};S.ready.config=true;afterData()},fail));
   S.following={};S.followers={};S.ffeed=[];
   const rel=(f,m,k)=>S.subs.push(onSnapshot(query(collection(db,'follows'),where(f,'==',me)),snap=>{const o={};snap.forEach(x=>{const d=x.data();if(ID_RE.test(String(d[k])))o[d[k]]=num(d.at)||1});S[m]=o;if(S.phase==='app')render()},e=>console.warn(e)));
-  rel('follower','following','followee');rel('followee','followers','follower');
-  loadFeed();
+  if(FOLLOW_ON){rel('follower','following','followee');rel('followee','followers','follower');loadFeed()}
   S.subs.push(onSnapshot(collection(db,'people'),snap=>{
     const d={};snap.forEach(x=>{d[x.id]=x.data()});
     S.peopleDocs=d;if(!S.pendingMine)S.myDoc=d[me]?clone(d[me]):null;S.ready.people=true;afterData();
@@ -1062,7 +1069,7 @@ function tile(j,D,i=0,o={}){
     <span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span>
     <span class="pin"></span>${S.me?.isOwner&&held(j.owner)?'<span class="heldtag">Held</span>':j.pics&&!o.own?`<span class="tpics">${ic('camera',12,2.2)} ${j.pics} ${j.pics===1?'photo':'photos'}</span>`:''}
     ${tk?'':`<span class="price">₹${fmt(j.price)}</span>`}
-    ${soon?`<span class="flag">${Math.max(1,Math.round(left/6e4))} min left</span>`:''}${o.tag?`<span class="flag ptag${o.on?' on':''}">${esc(o.tag)}</span>`:''}${j.friendsOnly?`<span class="flag ptag">${ic('users',11,2.4)} Friends</span>`:''}${j.hidden?`<span class="flag ptag">${ic('eyeoff',11,2.4)} Hidden</span>`:''}${nearMe(j)?nearTag():''}
+    ${soon?`<span class="flag">${Math.max(1,Math.round(left/6e4))} min left</span>`:''}${o.tag?`<span class="flag ptag${o.on?' on':''}">${esc(o.tag)}</span>`:''}${FOLLOW_ON&&j.friendsOnly?`<span class="flag ptag">${ic('users',11,2.4)} Friends</span>`:''}${j.hidden?`<span class="flag ptag">${ic('eyeoff',11,2.4)} Hidden</span>`:''}${nearMe(j)?nearTag():''}
     <p>${esc(j.text)}</p>
     ${j.where||j.when?`<span class="where">${ic('place',12,2.2)}<span>${esc([j.where,soon?'':j.when].filter(Boolean).join(' · '))}</span></span>`:''}
     <span class="by">${face(j.owner,22)}<span class="nm">${esc(firstName(j.owner))}</span><span class="n">${j.owner===S.me.id?`${n} ${n===1?'bid':'bids'}`:since(j.at)}</span></span>
@@ -1124,10 +1131,10 @@ function viewJob(D){
     else if(st==='assigned')foot=`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} You picked ${esc(firstName(j.accepted))} for ₹${fmt(j.agreed)}</div>
       <button class="cta" data-sheet="done">Mark as done</button>${posterPay(j)}<button class="btn2" data-thread-with="${esc(j.accepted)}">Message ${esc(firstName(j.accepted))}</button>
 </div>`;
-    else if(st==='done'){const pay=payOf(j),dn=esc(firstName(j.accepted));
+    else if(st==='done'){const pay=PAY_ON?payOf(j):null,dn=esc(firstName(j.accepted));
       foot=`<div class="foot">${pay?.ok?`<div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${dn} confirmed they got ₹${fmt(j.agreed)}</div>`
         :pay?`<div class="banner warnbanner">${dn} hasn’t got your payment yet</div>`:''}${posterPay(j)}
-        ${j.pick?.ratedDoer?`<p class="note">You rated ${dn}${(S.priv.gave||{})[j.key]?' ★'+num(S.priv.gave[j.key]).toFixed(1):''}.</p>`:`<button class="btn2" data-sheet="done">Rate ${dn}</button>`}
+        ${j.pick?.ratedDoer?`<p class="note">You rated ${dn}${(S.priv.gave||{})[j.key]?' ★'+num(S.priv.gave[j.key]).toFixed(1):''}.</p>`:`<button class="cta" data-sheet="done">Rate ${dn}</button>`}
         ${j.pick?.review?`<p class="note">Your review is on ${dn}'s profile, without your name.</p>`
           :j.pick?.ratedDoer?`<button class="btn2" data-sheet="review">Write a public review of ${dn}</button>`:''}
         ${j.pick?.noteToPoster?`<div class="box stack" style="gap:4px"><span class="formlabel">${dn}'s private note to you</span><span class="t2" style="color:var(--fg)">${esc(str(j.pick.noteToPoster,200))}</span></div>`:''}</div>`}
@@ -1156,6 +1163,11 @@ function viewJob(D){
       <button class="cta" data-act="bid" data-need="bid">${myBid?'Update bid':'Place bid'}</button>
       ${myBid?'<button class="linkbtn" data-act="cancelBidEdit">Cancel</button>':''}
       </div>`;
+    else if(j.accepted===me&&st==='done'&&!PAY_ON){const pn=esc(firstName(j.owner));
+      foot=`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} ${pn} marked this job done</div>
+          ${j.pick?.ratedPoster?`<p class="note">You rated ${pn}${(S.priv.gave||{})[j.key]?' ★'+num(S.priv.gave[j.key]).toFixed(1):''}.</p>`:`<button class="cta" data-sheet="ratePoster">Rate ${pn}</button>`}
+          ${j.pick?.noteToDoer?`<div class="box stack" style="gap:4px"><span class="formlabel">${pn}'s private note to you</span><span class="t2" style="color:var(--fg)">${esc(str(j.pick.noteToDoer,200))}</span></div>`:''}
+          <p class="note">Sort out payment with ${pn} directly, in cash or UPI. tack doesn\u2019t handle money.</p></div>`}
     else if(j.accepted===me&&st==='done'){const pay=payOf(j),pn=esc(firstName(j.owner)),late=!pay?.ok&&Date.now()-(j.doneAt||pay?.at||Date.now())>PAY_GRACE;
       foot=pay?.ok?`<div class="foot"><div class="banner">${ic('tick',13,3.4,'var(--accent)')} Paid · you confirmed ₹${fmt(j.agreed)} ${since(pay.at)}</div>
           ${j.pick?.ratedPoster?`<p class="note">You rated ${pn}${(S.priv.gave||{})[j.key]?' ★'+num(S.priv.gave[j.key]).toFixed(1):''}.</p>`:`<button class="cta" data-sheet="ratePoster">Rate ${pn}</button>`}
@@ -1176,7 +1188,7 @@ function viewJob(D){
     mine&&st==='open'?{i:'edit',t:'Edit job',at:`data-act="editJob" data-key="${esc(j.key)}"`}:null,
     mine&&st==='assigned'&&j.accepted&&!repicking(j)&&!(sentOf(j)||payOf(j))?{i:'users',t:'Pick someone else',at:'data-sheet="repick"'}:null,
     !mine&&st==='open'&&myBid?{i:'x',t:'Withdraw my bid',at:'data-act="withdraw"'}:null,
-    j.accepted===me&&st==='done'&&payOf(j)?.ok?{i:'x',t:'I marked paid by mistake',at:'data-act="paid" data-val="no"'}:null,
+    PAY_ON&&j.accepted===me&&st==='done'&&payOf(j)?.ok?{i:'x',t:'I marked paid by mistake',at:'data-act="paid" data-val="no"'}:null,
     mine&&st==='done'&&j.pick?.review?{i:'trash',t:'Delete my review',at:`data-sheet="delReview" data-rid="${esc(j.pick.review)}" data-about="${esc(j.accepted)}"`}:null,
     {sep:1},
     mine&&st==='open'?{i:'x',t:'Close this job',at:'data-sheet="close"',danger:true}:null,
@@ -1212,7 +1224,7 @@ function viewJob(D){
     <span class="jmeta">${mine?`posted ${since(j.at)}${j.editedAt?' · edited':''}`:`${esc(metaOf(j.owner)||campus())}${esc(posterLine(j.owner))} · posted ${since(j.at)}${j.editedAt?' · edited':''}${esc(payLine(j.owner))}`}</span></button></div>
   <div class="jcard stack">
     ${isOrg(j.owner)?'':`<span class="big" style="view-transition-name:jp">₹${fmt(j.price)}</span>`}
-    <div class="chips">${[j.when,online?'':j.where].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${nearMe(j)?nearTag():''}${j.friendsOnly?'<span class="chip">Friends only</span>':''}${stTag}</div>
+    <div class="chips">${[j.when,online?'':j.where].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}${nearMe(j)?nearTag():''}${FOLLOW_ON&&j.friendsOnly?'<span class="chip">Friends only</span>':''}${stTag}</div>
     ${j.more?`<p class="jmore">${esc(j.more)}</p>`:''}
   </div>
   ${mine?bidsSec+foot:foot+(st==='open'?'':bidsSec)}
@@ -1245,7 +1257,7 @@ function viewPost(){
    <div class="stack postsec"><h2 class="h2">Tags</h2>
      ${group('By when','when',WHENS)}${group('Where','where',WHERES)}
      <input id="jw" class="inp" maxlength="40" placeholder="Or type a place: Seminar hall, B-wing 4th floor…" value="${esc(d.whereText)}" data-bind="draft.whereText" aria-label="Other place">
-     ${cm?'':`<button class="locbtn" data-act="toggleFriendsOnly" aria-pressed="${!!d.friendsOnly}">${ic(d.friendsOnly?'tick':'users',16,2.4)}<span class="rowtext"><span class="t1">${d.friendsOnly?'Only your friends can see this':'Show only to friends'}</span><span class="t2">${d.friendsOnly?(friendIds().length?'Your friends on this board see it and can bid. Nobody else does.':'You don’t have friends on tack yet, so nobody else will see it until you do.'):'Keep this job off everyone else’s board.'}</span></span></button>`}
+     ${cm||(!FOLLOW_ON&&!d.friendsOnly)?'':`<button class="locbtn" data-act="toggleFriendsOnly" aria-pressed="${!!d.friendsOnly}">${ic(d.friendsOnly?'tick':'users',16,2.4)}<span class="rowtext"><span class="t1">${d.friendsOnly?'Only your friends can see this':'Show only to friends'}</span><span class="t2">${d.friendsOnly?(friendIds().length?'Your friends on this board see it and can bid. Nobody else does.':'You don’t have friends on tack yet, so nobody else will see it until you do.'):'Keep this job off everyone else’s board.'}</span></span></button>`}
      ${cm?'':`<button class="locbtn" data-act="toggleJobLoc" aria-pressed="${!!d.useLoc}">${ic(d.useLoc?'tick':'place',16,2.4)}<span class="rowtext"><span class="t1">${d.useLoc?'Tagged with where you are now':'Tag this job with where you are'}</span><span class="t2">${d.useLoc?'Members nearby see a Near you tag. Turn off if the job is somewhere else.':'Helps people close by find it. Rounded to about 100 m, never shown on a map.'}</span></span></button>`}
    </div>
    <div class="stack postsec"><h2 class="h2">${cm?'Details':'Job description'}</h2>
@@ -1262,8 +1274,8 @@ function viewBids(D){
   const myJobs=D.jobs.filter(j=>j.owner===me&&j.status!=='removed').sort((a,b)=>{const o=x=>({open:0,assigned:1}[jobState(x)]??2);return o(a)-o(b)||b.at-a.at});
   const myBids=Object.values(S.pitchMine).filter(p=>p&&num(p.amt)>0).map(p=>({k:p.job,b:{amt:num(p.amt),at:num(p.at)},j:D.jobByKey[p.job]})).filter(x=>x.j&&x.j.owner!==me).sort((a,b)=>num(b.b.at)-num(a.b.at));
   const jobLine=j=>{const st=jobState(j),n=bidsFor(D,j.key).length;
-    return st==='open'?[`${n} ${n===1?'bid':'bids'} in`,'']:st==='assigned'?[`Picked ${shortName(j.accepted)} · ₹${fmt(j.agreed)}`,'ok']:st==='done'?(payOf(j)?.ok?[j.pick?.ratedDoer?'Done · Paid ✓':'Done · Paid ✓ · rate them','ok']:[`Done · ${payOf(j)?'they haven\u2019t got your payment':'waiting for them to confirm payment'}`,payOf(j)?'warn':'']):st==='expired'?['Time ran out','warn']:['Closed','']};
-  const bidLine=({j})=>{const st=jobState(j);return j.accepted===me?(st==='done'?(payOf(j)?.ok?['Done · Paid ✓','ok']:['Done · confirm you got paid','warn']):[`Accepted · ₹${fmt(j.agreed)}`,'ok']):droppedMe(j)?[`${firstName(j.owner)} picked someone else`,'lost']:repicking(j)?[`Waiting for ${firstName(j.owner)} to pick again`,'']:lostBid(j)?['Someone else got picked · keep trying','lost']:st==='open'?[`Waiting for ${firstName(j.owner)} to pick`,'']:st==='expired'?['Time ran out','']:['Closed','']};
+    return st==='open'?[`${n} ${n===1?'bid':'bids'} in`,'']:st==='assigned'?[`Picked ${shortName(j.accepted)} · ₹${fmt(j.agreed)}`,'ok']:st==='done'?(!PAY_ON?[j.pick?.ratedDoer?'Done':'Done · rate them','ok']:payOf(j)?.ok?[j.pick?.ratedDoer?'Done · Paid ✓':'Done · Paid ✓ · rate them','ok']:[`Done · ${payOf(j)?'they haven\u2019t got your payment':'waiting for them to confirm payment'}`,payOf(j)?'warn':'']):st==='expired'?['Time ran out','warn']:['Closed','']};
+  const bidLine=({j})=>{const st=jobState(j);return j.accepted===me?(st==='done'?(!PAY_ON?[j.pick?.ratedPoster?'Done':'Done · rate them','ok']:payOf(j)?.ok?['Done · Paid ✓','ok']:['Done · confirm you got paid','warn']):[`Accepted · ₹${fmt(j.agreed)}`,'ok']):droppedMe(j)?[`${firstName(j.owner)} picked someone else`,'lost']:repicking(j)?[`Waiting for ${firstName(j.owner)} to pick again`,'']:lostBid(j)?['Someone else got picked · keep trying','lost']:st==='open'?[`Waiting for ${firstName(j.owner)} to pick`,'']:st==='expired'?['Time ran out','']:['Closed','']};
   const row=(j,[line,cls],amt,who)=>`<button class="item" data-job="${esc(j.key)}">${ring(who||j.owner,38)}<span class="itext"><span class="t1" style="font-weight:500;color:var(--fg)">${esc(j.text)}</span>
     <span style="font-size:var(--t-11);font-weight:600;color:${cls==='ok'?'var(--accent)':cls==='warn'?'var(--coral-ink)':cls==='lost'?'var(--amber-ink)':'var(--muted)'}">${esc(line)}</span></span><span class="amt" style="font-size:var(--t-16);color:var(--fg)">₹${fmt(amt)}</span></button>`;
   const oin=offerList(S.offersIn).filter(o=>D.members.includes(o.owner)&&!D.blocked.has(o.owner)&&o.status!=='declined').sort((a,b)=>num(b.at)-num(a.at));
@@ -1279,9 +1291,9 @@ function viewBids(D){
     ${oin.length?`<div class="sect"><h2 class="h2">Offers for you</h2></div><div class="stack gap8">${oin.map(offerCard).join('')}</div>`:''}
     ${oout.length?`<div class="sect"><h2 class="h2">Offers you sent</h2></div><div class="stack gap8">${oout.map(o=>`<div class="row">${ring(o.to,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.to))} · ₹${fmt(o.price)}</span><span class="t2">${askStale(o)?'No answer':'Waiting for them to answer'} · ${esc(o.text)}</span></span>
       <button class="btn2" style="width:auto;padding:8px 12px;font-size:var(--t-12)" data-act="withdrawOffer" data-key="${esc(o.key)}">${askStale(o)?'Dismiss':'Withdraw'}</button></div>`).join('')}</div>`:''}
-    ${(()=>{const pastJob=j=>{const st=jobState(j);return st==='closed'||st==='expired'||st==='removed'||(st==='done'&&payOf(j)?.ok&&j.pick?.ratedDoer)};
+    ${(()=>{const pastJob=j=>{const st=jobState(j);return st==='closed'||st==='expired'||st==='removed'||(st==='done'&&(!PAY_ON||payOf(j)?.ok)&&j.pick?.ratedDoer)};
       const all=[...doing.map(j=>({j,amt:j.agreed||j.price,at:num(j.pick?.at)||j.at})),...myBids.map(x=>({j:x.j,amt:num(x.b.amt),at:x.b.at,x}))];
-      const pastBid=({j})=>j.accepted===me?(jobState(j)==='done'&&payOf(j)?.ok&&j.pick?.ratedPoster):(jobState(j)!=='open'&&!(repicking(j)&&!droppedMe(j)))||!!j.accepted;
+      const pastBid=({j})=>j.accepted===me?(jobState(j)==='done'&&(!PAY_ON||payOf(j)?.ok)&&j.pick?.ratedPoster):(jobState(j)!=='open'&&!(repicking(j)&&!droppedMe(j)))||!!j.accepted;
       const jobsNow=myJobs.filter(j=>!pastJob(j)),active=all.filter(y=>y.j.accepted===me&&!pastBid(y)),waiting=all.filter(y=>y.j.accepted!==me&&!pastBid(y));
       const notPicked=all.filter(y=>y.x&&lostBid(y.j)&&lostAt(y.j,y.at)>Date.now()-14*864e5).sort((a,b)=>lostAt(b.j,b.at)-lostAt(a.j,a.at));
       const hist=[...D.jobs.filter(j=>j.owner===me&&pastJob(j)).map(j=>({j,mine:true,amt:j.agreed||j.price,at:Math.max(j.doneAt||0,j.at)})),...all.filter(pastBid).map(y=>({...y,at:Math.max(y.j.doneAt||0,y.at||0,y.j.at)}))].sort((a,b)=>b.at-a.at);
@@ -1359,10 +1371,10 @@ function viewChat(D){
   ${(()=>{const st=parseKey(c.key)?.friend?dmState(c.key,c.other):null,fn=esc(firstName(c.other)),u=esc(c.other);
     return st==='incoming'?`<div class="foot"><div class="mreq"><b>${fn} wants to message you</b><span>They won\u2019t know you\u2019ve read this until you accept.</span>
         <div class="ninvbtns"><button class="pick" data-act="answerMsgReq" data-key="${esc(c.key)}" data-ok="1">Accept</button><button class="ghostbtn" data-act="answerMsgReq" data-key="${esc(c.key)}" data-ok="0">Decline</button></div></div></div>`
-      :st==='capped'?`<div class="foot"><p class="note">Message request sent. You can send more once ${fn} accepts, or once you follow each other.</p></div>`
+      :st==='capped'?`<div class="foot"><p class="note">Message request sent. You can send more once ${fn} accepts.</p></div>`
       :st==='requesting'?`<p class="note mreqnote">${ic('shield',12,2.2)} This goes to ${fn} as a message request. They\u2019ll see it once they accept.</p>`:''})()}
   ${(()=>{const st=parseKey(c.key)?.friend?dmState(c.key,c.other):null;return st==='incoming'||st==='capped'})()?'':!can?`<div class="foot"><p class="note">${c.jobKey&&D.jobByKey[c.jobKey]&&jobChatOpen(c.key,D)?`You can message ${esc(firstName(c.other))} once they pick you for this job.`
-      :`${c.jobKey?'This job is over, so its chat has closed. ':''}Follow each other to keep talking anytime, or send a message request.`}</p>${c.jobKey&&D.jobByKey[c.jobKey]&&jobChatOpen(c.key,D)?'':`<div class="ninvbtns">${isFollowing(c.other)?'':`<button class="pick" data-act="follow" data-uid="${esc(c.other)}">${followsMe(c.other)?'Follow back':'Follow'}</button>`}<button class="ghostbtn" data-msgwith="${esc(c.other)}">Message request</button></div>`}</div>`:`
+      :`${c.jobKey?'This job is over, so its chat has closed. ':''}Send a message request to keep talking.`}</p>${c.jobKey&&D.jobByKey[c.jobKey]&&jobChatOpen(c.key,D)?'':`<div class="ninvbtns"><button class="pick" data-msgwith="${esc(c.other)}">Message request</button></div>`}</div>`:`
   <div class="foot" style="position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%)">${S.rec?`<div class="composer rec">
     <button class="cbtn" data-act="recCancel" aria-label="Cancel recording">${ic('trash',19)}</button>
     <span class="recbar"><i class="recdot"></i><span id="recT">${recClock()}</span><span class="muted">Recording</span></span>
@@ -1399,7 +1411,8 @@ function profileWall(items){const n=wideMQ.matches?3:2,cols=Array.from({length:n
   items.forEach(({j,o},i)=>cols[i%n].push(ptile(j,i,o)));
   return`<div class="pboard"><div class="wall">${cols.map(c=>`<div class="wcol">${c.join('')}</div>`).join('')}</div></div>`}
 // Profile buttons for someone else: Message leads, follow sits beside it.
-function relBtns(uid,D){const u=esc(uid),f=isFollowing(uid),fl=isFriend(uid)?'Friends':f?'Following':followsMe(uid)?'Follow back':'Follow';
+function relBtns(uid,D){const u=esc(uid);if(!FOLLOW_ON)return isOrg(uid)?'':`<div class="pacts"><button class="cta" data-msgwith="${u}">Message</button></div>`;
+  const f=isFollowing(uid),fl=isFriend(uid)?'Friends':f?'Following':followsMe(uid)?'Follow back':'Follow';
   return`<div class="pacts">${isOrg(uid)?'':`<button class="cta" data-msgwith="${u}">Message</button>`}<button class="btn2" data-act="follow" data-uid="${u}">${fl}</button></div>`}
 // The personal board: jobs they posted and jobs they did. Who did a job is private, so on someone else's profile
 // it only shows jobs they did for you.
@@ -1419,17 +1432,14 @@ function viewPerson(uid,D){
   const d=pdoc(uid),st=stats(uid,D),isMe=uid===S.me.id,me=S.me.id,org=isOrg(uid);
   const bio=str(d.bio,BIO_MAX)||str(d.does,60),real=!org&&handleOf(uid)?realNameOf(uid):'';
   const menu=isMe?kebab('me',[{html:`<span class="ohead">Logged in as ${esc(S.me.email)}</span>`},
-     {i:'users',t:'Followers',at:'data-sheet="rel" data-about="followers"',v:String(Object.keys(S.followers).length)},
-     {i:'users',t:'Following',at:'data-sheet="rel" data-about="following"',v:String(Object.keys(S.following).length)},
-     {i:'users',t:'Friends',at:'data-sheet="rel" data-about="friends"',v:String(friendIds().length)},
      {sep:1},
      {i:'star',t:'Your reviews',at:'data-go="reviews"',v:(()=>{const l=reviewsOf(S.me.id);return l&&l.length?String(l.length):''})()},
-     {i:'bell',t:'Notifications',at:`data-act="${pushOn()?'pushOff':'pushOn'}"`,v:pushOn()?'On':'Off'},
+     IOS_APP?null:{i:'bell',t:'Notifications',at:`data-act="${pushOn()?'pushOff':'pushOn'}"`,v:pushOn()?'On':'Off'},
      {html:`<div class="themerow orow">${ic('moon',18)} Appearance<span class="seg" role="group" aria-label="Appearance">${[['dark','Dark'],['light','Light'],['system','Auto']].map(([k,l])=>`<button data-act="setThemeTo" data-k="${k}" class="${(themePref()||'dark')===k?'on':''}" aria-pressed="${(themePref()||'dark')===k}"${k==='system'?' title="Match your phone"':''}>${l}</button>`).join('')}</span></div>`},
      S.me.isOwner?{i:'users',t:'Invites and members',at:'data-go="invites"'}:null,
      {sep:1},{i:'board',t:'How tack works',at:'data-act="replayIntro"'},{i:'shield',t:'Settings and privacy',at:'data-go="settings"'},{i:'flag',t:'Report or feedback',at:'data-go="help"'},
      {sep:1},{i:'out',t:'Log out',at:'data-act="logout"',danger:true}],'Profile options')
-    :kebab('person',[followsMe(uid)?{i:'x',t:'Remove follower',at:`data-act="removeFollower" data-uid="${esc(uid)}"`}:null,{sep:1},{i:'eyeoff',t:'Restrict or block…',at:`data-sheet="who" data-about="${esc(uid)}"`},{i:'flag',t:'Report',at:`data-sheet="report" data-about="${esc(uid)}"`,danger:true}],'Options for '+shortName(uid));
+    :kebab('person',[{i:'eyeoff',t:'Restrict or block…',at:`data-sheet="who" data-about="${esc(uid)}"`},{i:'flag',t:'Report',at:`data-sheet="report" data-about="${esc(uid)}"`,danger:true}],'Options for '+shortName(uid));
   loadProfileNotes(uid);
   const tab=isMe&&PTABS.includes(S.ptab)?S.ptab:'notes',c=S.pnotes[uid];
   const name=org?'tack':handleOf(uid)?'@'+handleOf(uid):shortName(uid);
@@ -1500,6 +1510,7 @@ function viewSettings(D){const me=S.me.id,blocked=arr(S.priv.blocked).filter(u=>
    </div></section>
    <section class="setsec"><h2 class="seth">Help</h2><div class="setcard">
      ${row('Report or feedback','Report a problem with a job or a person, or tell us what to improve.','data-go="help"')}
+     ${SUPPORT_EMAIL?`<a class="setrow" href="mailto:${esc(SUPPORT_EMAIL)}"><span class="rowtext"><span class="t1">Contact support</span><span class="t2">${esc(SUPPORT_EMAIL)}</span></span><span class="chev">${ic('chev',16)}</span></a>`:''}
      ${row('How tack works','Replay the introduction.','data-act="replayIntro"')}
    </div></section>
    <section class="setsec"><h2 class="seth">Legal</h2><div class="setcard">
@@ -1640,7 +1651,7 @@ function sheetHTML(D){
   case'gig':{const x=D.jobByKey[s.key];if(!x||!x.pick){b='<h2 id="sheetT">This gig is no longer here</h2>';break}const pk=x.pick,pay=payOf(x),sent=sentOf(x),me=S.me.id,done=pk.status==='done';
     const row=(l,v)=>`<div class="gigrow"><span>${l}</span><b>${v}</b></div>`;
     b=`<p class="gigtag${done?' done':''}">${done?'Completed':'In progress'}</p><h2 id="sheetT">${esc(x.text)}</h2>
-    <div class="gigrows">${row('Agreed','₹'+fmt(x.agreed||x.price))}${x.where||x.when?row('Where · when',esc([x.where,x.when].filter(Boolean).join(' · '))):''}${row('Posted by',x.owner===me?'You':esc(shortName(x.owner)))}${row('Done by',x.accepted===me?'You':esc(shortName(x.accepted)))}${row('Started',stamp(num(pk.at)||x.takenAt))}${done?row('Completed',stamp(num(pk.doneAt)||x.doneAt)):''}${row('Payment',pay?.ok?'Paid':sent?'Sent, waiting for them to confirm':pay&&!pay.ok?'Not arrived yet':'Not paid yet')}</div>
+    <div class="gigrows">${row('Agreed','₹'+fmt(x.agreed||x.price))}${x.where||x.when?row('Where · when',esc([x.where,x.when].filter(Boolean).join(' · '))):''}${row('Posted by',x.owner===me?'You':esc(shortName(x.owner)))}${row('Done by',x.accepted===me?'You':esc(shortName(x.accepted)))}${row('Started',stamp(num(pk.at)||x.takenAt))}${done?row('Completed',stamp(num(pk.doneAt)||x.doneAt)):''}${PAY_ON?row('Payment',pay?.ok?'Paid':sent?'Sent, waiting for them to confirm':pay&&!pay.ok?'Not arrived yet':'Not paid yet'):''}</div>
     <button class="cta" data-gigopen="${esc(x.key)}">Open the job</button>`;break}
   case'msgmenu':{const m=chatMsg(s.mid);if(!m){b='<h2 id="sheetT">This message is gone</h2>';break}const mine=m.reactions?.[S.me.id];
     b=`<p id="sheetT" class="msgprev">${esc(msgSnip(m))}</p><p class="msgwhen">${m.by===S.me.id?'Sent':'Received'} ${stamp(m.at)}</p><div class="rxpick" role="group" aria-label="React">${REACTS.map(e=>`<button class="${mine===e?'on':''}" data-act="reactMsg" data-to="${m.id}" data-e="${e}" aria-label="React with ${e}" aria-pressed="${mine===e}">${e}</button>`).join('')}</div>
@@ -1651,7 +1662,7 @@ function sheetHTML(D){
       <button data-act="${rs?'unrestrict':'restrict'}" data-uid="${esc(u)}">${ic('eyeoff',18)}<span class="rowtext"><span class="t1">${rs?'Unrestrict':'Restrict'}</span><span class="t2">${rs?`${fn} can see when you’re online again.`:`${fn} won’t see when you’re online or be able to send you offers. Chats about jobs still work. They aren’t told.`}</span></span></button>
       <button class="danger" data-act="${bl?'unblock':'blockWho'}" data-uid="${esc(u)}">${ic('ban',18)}<span class="rowtext"><span class="t1">${bl?'Unblock':'Block'}</span><span class="t2">${bl?`You’ll see ${fn}’s jobs, bids and messages again.`:`You won’t see ${fn}’s jobs, bids or messages, and they can’t see when you’re online. They aren’t told.`}</span></span></button>
       <button class="danger" data-sheet="report" data-about="${esc(u)}">${ic('flag',18)}<span class="rowtext"><span class="t1">Report</span><span class="t2">The organiser looks at it. ${fn} isn’t told who reported.</span></span></button></div>`;break}
-  case'pick':b=`<h2 id="sheetT">Pick ${esc(firstName(s.uid))} for ₹${fmt(s.amt)}?</h2><p>The job leaves the board and you two can sort out the details in chat. Pay them on UPI or cash after.</p>
+  case'pick':b=`<h2 id="sheetT">Pick ${esc(firstName(s.uid))} for ₹${fmt(s.amt)}?</h2><p>The job leaves the board and you two can sort out the details in chat. Pay them directly, in cash or UPI, once it\u2019s done.</p>
     <button class="cta" data-act="confirmPick">Pick ${esc(firstName(s.uid))}</button><button class="linkbtn" data-act="closeSheet">Not yet</button>`;break;
   case'done':case'ratePoster':{const side=s.type==='done'?'d':'p',who=j?(side==='d'?j.accepted:j.owner):null,fn=esc(who?firstName(who):'them');
     const vals=['a','b','c','d'].map(x=>S.rate[x]),filled=vals.filter(Boolean),avg=filled.length===4?(vals.reduce((a,b)=>a+b,0)/4).toFixed(1):null;
@@ -1778,7 +1789,7 @@ const INTRO=[
   {k:'board',t:'This is the board.',b:'Classmates pin small jobs here. A print run, a lift down four floors, an hour of help before a deadline. People you’ve made a deal with show up at the top when they’re online.'},
   {k:'pin',t:'Need something? Pin it.',b:'Write it on a note, set a price, pick a colour. It goes up for everyone on campus to see.'},
   {k:'bid',t:'Bid what it’s worth.',b:'Name your price and pitch yourself in a line. Only the poster sees your bid.'},
-  {k:'pick',t:'Get picked. Pay safely.',b:'The poster picks one person and you plan it in chat. Pay on UPI or cash and confirm it in tack. tack never touches the money.'},
+  {k:'pick',t:'Get picked. Sort it out in chat.',b:'The poster picks one person and you plan it in chat. You pay each other directly, in cash or UPI. tack never touches the money.'},
   {k:'safe',t:'Keep it safe.',b:'tack is for students who are 18 or older. No assignments or exam work. Report or block anyone in two taps, and abusive posts never go up.'},
   {k:'rate',t:'Rate each other.',b:'When it’s done, you both rate the other. Profiles show the averages, never who gave them.'},
   {k:'end'}];
@@ -1795,13 +1806,13 @@ function introScene(k){const me=S.me?.id;
   if(k==='pick')return`<div class="isc isc-pick" aria-hidden="true">
     <span class="iwho w1">${me?face(me,52):''}</span><span class="ilink"></span><span class="iwho w2"><span class="av av-empty" style="width:52px;height:52px;font-size:20px">S</span></span>
     <span class="ibubble c1 msg">On my way. 10 minutes.</span>
-    <span class="ipay c2"><span class="ipayrow"><span>UPI · ₹120 sent</span><span class="iok">${ic('tick',13,3)} Confirmed</span></span></span></div>`;
+    <span class="ipay c2"><span class="ipayrow"><span>Done · ₹120</span><span class="iok">${ic('tick',13,3)} Rated</span></span></span></div>`;
   if(k==='safe')return`<div class="isc isc-safe" aria-hidden="true"><span class="ishield">${ic('shield',44,1.8)}</span>
     <span class="irules"><span class="ichip r1">18+ only</span><span class="ichip r2">No assignments or exams</span><span class="ichip r3">${ic('flag',12,2.2)} Report or block in two taps</span></span></div>`;
   if(k==='rate')return`<div class="isc isc-rate" aria-hidden="true"><span class="istars">${[0,1,2,3,4].map(i=>`<span class="ist" style="--i:${i}">${ic('star',30,2,'currentColor','currentColor')}</span>`).join('')}</span>
     <span class="ichip c2">${ic('shield',13,2.2)} Anonymous, always</span></div>`;
   return`<div class="isc isc-end" aria-hidden="true"><span class="iicon"></span></div>`}
-function introPushState(){if(pushOn())return'on';if(isIOS()&&!standalone())return'ios';return pushReady()?'ask':'none'}
+function introPushState(){if(IOS_APP)return'none';if(pushOn())return'on';if(isIOS()&&!standalone())return'ios';return pushReady()?'ask':'none'}
 function introSlideHTML(i){const sl=INTRO[i],fn=esc(S.me?firstName(S.me.id):'');
   if(sl.k!=='end')return`${introScene(sl.k)}<div class="itext"><span class="ik">${i+1} of ${INTRO.length-1}</span><h1 class="ia">${sl.t}</h1><p class="ib">${sl.b}</p></div>`;
   const ps=introPushState();
@@ -1858,7 +1869,7 @@ function moment(title,sub,ms=1300){
   document.body.appendChild(r);S.momentOn=true;const t=reduceMotion.matches?Math.min(ms,700):ms;
   return new Promise(res=>setTimeout(()=>{r.classList.add('out');setTimeout(()=>{r.remove();S.momentOn=false;res();if(S.phase==='app')render()},reduceMotion.matches?0:260)},t))}
 function stepsCard(D){if(!S.priv.introSeen||S.priv.stepsHidden||S.priv.stepsDone)return'';const me=S.me.id,d=S.myDoc||{};
-  const steps=[[!!d.photo,'Add a profile photo','A real face helps people say yes.','data-go="edit"'],[pushOn(),'Turn on notifications','Know the moment someone bids, picks you or messages.','data-act="pushOn"'],
+  const steps=[[!!d.photo,'Add a profile photo','A real face helps people say yes.','data-go="edit"'],...(IOS_APP?[]:[[pushOn(),'Turn on notifications','Know the moment someone bids, picks you or messages.','data-act="pushOn"']]),
     [D.jobs.some(j=>j.owner===me)||Object.keys(S.pitchMine).length>0,'Pin or bid on a job','The first one is the hardest.','data-go="post"']];
   const n=steps.filter(x=>x[0]).length;
   // Once all three are done the card is gone for good, even if a step is undone later.
@@ -2409,6 +2420,6 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&e.target.id==='invE'){e.preventDefault();ACT.invite();return}
 });
 setInterval(()=>{if(S.phase==='app'&&!document.activeElement?.matches?.('input,textarea'))render()},30000);
-setInterval(()=>{if(S.phase==='app'&&!document.hidden)loadFeed()},18e4);
+setInterval(()=>{if(FOLLOW_ON&&S.phase==='app'&&!document.hidden)loadFeed()},18e4);
 if(locOptIn())getLoc();setInterval(()=>{if(S.phase==='app'&&locOptIn()&&!document.hidden)getLoc()},3e5);
 boot();

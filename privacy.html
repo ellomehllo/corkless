@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy · tack</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Gabarito:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#060608;--fg:#ECEDEF;--fg2:#AEB1BA;--muted:#8F939D;--line:rgba(255,255,255,.08);--accent:#D4F57A}
+@media (prefers-color-scheme:light){:root{--bg:#F3F4F6;--fg:#121317;--fg2:#4B4F58;--muted:#666B75;--line:rgba(18,19,23,.09);--accent:#4C7A00}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.6 Figtree,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:720px;margin:0 auto;padding:40px 16px 80px}
+.mark{font:700 28px Gabarito,system-ui,sans-serif;letter-spacing:-.03em;color:var(--fg);text-decoration:none}
+h1{font:700 34px/1.15 Gabarito,system-ui,sans-serif;letter-spacing:-.02em;margin:28px 0 6px}
+h2{font:600 20px/1.3 Gabarito,system-ui,sans-serif;margin:32px 0 8px}
+p,li{color:var(--fg2)}
+b{color:var(--fg);font-weight:600}
+a{color:var(--accent)}
+.meta{color:var(--muted);font-size:14px;margin:0}
+nav{display:flex;gap:18px;flex-wrap:wrap;margin-top:48px;padding-top:20px;border-top:1px solid var(--line);font-size:14px}
+</style>
+</head>
+<body>
+<main>
+<a class="mark" href="./">tack</a>
+<h1>Privacy Policy</h1>
+<p class="meta" id="eff"></p>
+<div id="doc"></div>
+<nav><a href="support.html">Support</a><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms of Use</a><a href="./">Open tack</a></nav>
+</main>
+<script type="module">
+import {EFFECTIVE,PRIVACY} from './legal.js';
+document.getElementById('eff').textContent='Effective '+EFFECTIVE;
+document.getElementById('doc').innerHTML=PRIVACY;
+</script>
+</body>
+</html>
