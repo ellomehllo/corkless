@@ -416,23 +416,43 @@ const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator
 const IOS_APP=(()=>{try{const C=window.Capacitor;return!!(C&&C.isNativePlatform&&C.isNativePlatform()&&C.getPlatform&&C.getPlatform()==='ios')}catch{return false}})();
 // Shown in Settings when set. Leave empty to point people to Report or feedback only.
 const SUPPORT_EMAIL='';
-const pushReady=()=>!IOS_APP&&'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
-function pushOn(){try{return pushReady()&&Notification.permission==='granted'&&!!localStorage.getItem(PUSH_KEY)}catch{return false}}
+// The iOS app's native layer: a real tab bar (TackNative, in the app), haptics and Apple push.
+// The website and the Android app don't have these plugins, so all of this switches itself off there.
+// Plugins come from Capacitor's bridge (Capacitor.Plugins). The app's own TackNative plugin is added a moment
+// after this script starts, so each one is picked up as soon as it appears.
+const CAP=window.Capacitor;let NTabs=null,NPush=null,NHap=null;
+function whenPlug(n,cb,t=0){if(!IOS_APP)return;let p=null;try{p=CAP&&CAP.Plugins&&CAP.Plugins[n]}catch{}if(p&&(!CAP.isPluginAvailable||CAP.isPluginAvailable(n)))return cb(p);if(t<80)setTimeout(()=>whenPlug(n,cb,t+1),100)}
+whenPlug('Haptics',p=>{NHap=p});
+function haptic(k){if(!NHap)return;try{if(k==='success'||k==='warning')NHap.notification({type:k.toUpperCase()});else NHap.impact({style:k==='medium'?'MEDIUM':'LIGHT'})}catch{}}
+const pushReady=()=>IOS_APP?!!NPush:'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+function pushOn(){try{return IOS_APP?!!NPush&&!!localStorage.getItem(PUSH_KEY):pushReady()&&Notification.permission==='granted'&&!!localStorage.getItem(PUSH_KEY)}catch{return false}}
 // Each device's Firebase token is registered in Supabase (public.push_tokens). The database decides who to tell
 // and the "push" Edge Function sends through Firebase. Registering again each session moves a shared device to
 // whoever is signed in now.
-const pushRegister=t=>S.fb.rpc('push_register',{p_token:t,p_platform:'web'}).catch(e=>console.warn('push_register',e));
+const pushRegister=(t,pl=IOS_APP?'ios':'web')=>S.fb.rpc('push_register',{p_token:t,p_platform:pl}).catch(e=>console.warn('push_register',e));
 const pushUnregister=t=>S.fb.rpc('push_unregister',{p_token:t}).catch(e=>console.warn('push_unregister',e));
 function openLink(link){try{const u=new URL(link),j=u.searchParams.get('job'),c=u.searchParams.get('chat'),D=derive();
   if(c){const t=D.threads.find(x=>x.key===c);if(t){openThread(t);return}}
   if(j&&D.jobByKey[j]){S.sheet=null;S.openJob=j;S.bid={key:null};go('job');return}
   go(c?'chats':'bids')}catch(e){console.warn(e)}}
 if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='open'&&S.phase==='app')openLink(String(e.data.link||''))});
+// Apple hands the app a device token; it's registered like a browser's, as platform 'ios'.
+let nativePushWaiting=false,pendingLink='';
+whenPlug('PushNotifications',p=>{NPush=p;
+  NPush.addListener('registration',t=>{const tok=String(t&&t.value||'');if(!tok)return;let old='';try{old=localStorage.getItem(PUSH_KEY)||'';localStorage.setItem(PUSH_KEY,tok)}catch{}
+    if(old&&old!==tok)pushUnregister(old);if(S.me)pushRegister(tok,'ios');
+    if(nativePushWaiting){nativePushWaiting=false;S.busy=false;toast('Notifications are on');render()}});
+  NPush.addListener('registrationError',e=>{console.warn(e);if(nativePushWaiting){nativePushWaiting=false;S.busy=false;toast('Couldn\u2019t turn on notifications. Try again.');render()}});
+  NPush.addListener('pushNotificationActionPerformed',a=>{const l=String(a?.notification?.data?.link||'');if(!l)return;if(S.phase==='app')openLink(l);else pendingLink=l});
+  if(S.phase==='app')render()});
 async function pushToken(){const reg=await navigator.serviceWorker.register('sw.js');await navigator.serviceWorker.ready;
   const m=await import(FB+'firebase-messaging.js');S.msg=S.msg||m.getMessaging(await fcmApp());return{m,token:await m.getToken(S.msg,{serviceWorkerRegistration:reg})}}
 function dropPushField(t){const {doc,updateDoc,FieldPath,deleteField}=S.fb;return updateDoc(doc(S.db,'private',S.me.id),new FieldPath('push',t),deleteField()).catch(e=>console.warn(e))}
 async function enablePush(){
-  if(!pushReady()){if(IOS_APP)return;if(isIOS()&&!standalone()){S.sheet={type:'iosPush'};render()}else toast('This browser can\u2019t show notifications.');return}
+  if(IOS_APP){if(!NPush)return;let p;try{p=await NPush.requestPermissions()}catch{p={receive:'denied'}}
+    if(p.receive!=='granted'){toast('Notifications are off for tack. Turn them on in iPhone Settings → tack.');return}
+    S.busy=true;nativePushWaiting=true;render();try{await NPush.register()}catch(e){console.warn(e);nativePushWaiting=false;S.busy=false;toast('Couldn\u2019t turn on notifications. Try again.');render()}return}
+  if(!pushReady()){if(isIOS()&&!standalone()){S.sheet={type:'iosPush'};render()}else toast('This browser can\u2019t show notifications.');return}
   let perm=Notification.permission;if(perm==='default')perm=await Notification.requestPermission();
   if(perm!=='granted'){toast('Notifications are blocked. Allow them for tack in your browser settings.');return}
   S.busy=true;render();
@@ -441,13 +461,14 @@ async function enablePush(){
     await pushRegister(token);await savePriv({push:{...(S.priv.push||{}),[token]:Date.now()}});toast('Notifications are on')}
   catch(e){console.warn(e);toast('Couldn\u2019t turn on notifications. Try again.')}
   S.busy=false;render()}
-async function disablePush(){
+async function disablePush(){if(IOS_APP&&NPush){try{NPush.unregister()}catch{}}
   let t=null;try{t=localStorage.getItem(PUSH_KEY);localStorage.removeItem(PUSH_KEY)}catch{}
   if(t){const p={...(S.priv.push||{})};delete p[t];S.priv={...S.priv,push:p};dropPushField(t);pushUnregister(t);
     try{const m=await import(FB+'firebase-messaging.js');S.msg=S.msg||m.getMessaging(await fcmApp());await m.deleteToken(S.msg)}catch{}}
   toast('Notifications are off');render()}
 async function syncPush(){
   if(!pushOn())return;
+  if(IOS_APP){try{await NPush.register()}catch(e){console.warn(e)}return}
   try{const old=localStorage.getItem(PUSH_KEY),{token}=await pushToken();if(!token)return;pushRegister(token);if(token===old&&(S.priv.push||{})[token])return;
     localStorage.setItem(PUSH_KEY,token);const p={...(S.priv.push||{})};if(old&&old!==token){delete p[old];dropPushField(old);pushUnregister(old)}
     savePriv({push:{...p,[token]:Date.now()}})}catch(e){console.warn(e)}}
@@ -1445,7 +1466,7 @@ function viewPerson(uid,D){
   const menu=isMe?kebab('me',[{html:`<span class="ohead">Logged in as ${esc(S.me.email)}</span>`},
      {sep:1},
      {i:'star',t:'Your reviews',at:'data-go="reviews"',v:(()=>{const l=reviewsOf(S.me.id);return l&&l.length?String(l.length):''})()},
-     IOS_APP?null:{i:'bell',t:'Notifications',at:`data-act="${pushOn()?'pushOff':'pushOn'}"`,v:pushOn()?'On':'Off'},
+     IOS_APP&&!NPush?null:{i:'bell',t:'Notifications',at:`data-act="${pushOn()?'pushOff':'pushOn'}"`,v:pushOn()?'On':'Off'},
      {html:`<div class="themerow orow">${ic('moon',18)} Appearance<span class="seg" role="group" aria-label="Appearance">${[['dark','Dark'],['light','Light'],['system','Auto']].map(([k,l])=>`<button data-act="setThemeTo" data-k="${k}" class="${(themePref()||'dark')===k?'on':''}" aria-pressed="${(themePref()||'dark')===k}"${k==='system'?' title="Match your phone"':''}>${l}</button>`).join('')}</span></div>`},
      S.me.isOwner?{i:'users',t:'Invites and members',at:'data-go="invites"'}:null,
      {sep:1},{i:'board',t:'How tack works',at:'data-act="replayIntro"'},{i:'shield',t:'Settings and privacy',at:'data-go="settings"'},{i:'flag',t:'Report or feedback',at:'data-go="help"'},
@@ -1823,7 +1844,7 @@ function introScene(k){const me=S.me?.id;
   if(k==='rate')return`<div class="isc isc-rate" aria-hidden="true"><span class="istars">${[0,1,2,3,4].map(i=>`<span class="ist" style="--i:${i}">${ic('star',30,2,'currentColor','currentColor')}</span>`).join('')}</span>
     <span class="ichip c2">${ic('shield',13,2.2)} Anonymous, always</span></div>`;
   return`<div class="isc isc-end" aria-hidden="true"><span class="iicon"></span></div>`}
-function introPushState(){if(IOS_APP)return'none';if(pushOn())return'on';if(isIOS()&&!standalone())return'ios';return pushReady()?'ask':'none'}
+function introPushState(){if(IOS_APP)return NPush?(pushOn()?'on':'ask'):'none';if(pushOn())return'on';if(isIOS()&&!standalone())return'ios';return pushReady()?'ask':'none'}
 function introSlideHTML(i){const sl=INTRO[i],fn=esc(S.me?firstName(S.me.id):'');
   if(sl.k!=='end')return`${introScene(sl.k)}<div class="itext"><span class="ik">${i+1} of ${INTRO.length-1}</span><h1 class="ia">${sl.t}</h1><p class="ib">${sl.b}</p></div>`;
   const ps=introPushState();
@@ -1880,7 +1901,7 @@ function moment(title,sub,ms=1300){
   document.body.appendChild(r);S.momentOn=true;const t=reduceMotion.matches?Math.min(ms,700):ms;
   return new Promise(res=>setTimeout(()=>{r.classList.add('out');setTimeout(()=>{r.remove();S.momentOn=false;res();if(S.phase==='app')render()},reduceMotion.matches?0:260)},t))}
 function stepsCard(D){if(!S.priv.introSeen||S.priv.stepsHidden||S.priv.stepsDone)return'';const me=S.me.id,d=S.myDoc||{};
-  const steps=[[!!d.photo,'Add a profile photo','A real face helps people say yes.','data-go="edit"'],...(IOS_APP?[]:[[pushOn(),'Turn on notifications','Know the moment someone bids, picks you or messages.','data-act="pushOn"']]),
+  const steps=[[!!d.photo,'Add a profile photo','A real face helps people say yes.','data-go="edit"'],...(IOS_APP&&!NPush?[]:[[pushOn(),'Turn on notifications','Know the moment someone bids, picks you or messages.','data-act="pushOn"']]),
     [D.jobs.some(j=>j.owner===me)||Object.keys(S.pitchMine).length>0,'Pin or bid on a job','The first one is the hardest.','data-go="post"']];
   const n=steps.filter(x=>x[0]).length;
   // Once all three are done the card is gone for good, even if a step is undone later.
@@ -1944,9 +1965,24 @@ function render(){
     if(st&&st!==lastSheet)$('sheetRoot').classList.add('enter');else if(!st)$('sheetRoot').classList.remove('enter');
     if(st!==lastSheet&&st)requestAnimationFrame(()=>requestAnimationFrame(()=>$('sheetRoot').classList.remove('enter')));
     lastSheet=st;
+    if(pendingLink){const l=pendingLink;pendingLink='';setTimeout(()=>openLink(l),0)}
   }
+  syncNativeTabs();
   if(fid){const el=$(fid);if(el&&el!==document.activeElement){el.focus({preventScroll:true});try{if(s0!=null)el.setSelectionRange(s0,s1)}catch{}}}
 }
+// The iOS app draws the tab bar natively. The web bar keeps its space (invisible) so layouts don't move,
+// and its CSS rules (hidden in chat, while typing) decide when the native bar shows.
+const NTAB_ITEMS=[{key:'board',title:'Board',icon:'square.grid.2x2'},{key:'bids',title:'Activity',icon:'bell'},{key:'post',title:'Pin',icon:'plus.circle.fill'},{key:'chats',title:'Chats',icon:'bubble.left'},{key:'saved',title:'Saved',icon:'bookmark'}];
+let ntLast='';
+function syncNativeTabs(D){if(!NTabs)return;const tb=$('tabbar'),on=S.phase==='app'&&!!tb&&!$('app').hidden&&getComputedStyle(tb).display!=='none';
+  let active='',dots=[];
+  if(S.phase==='app'){D=D||derive();active=NTAB_ITEMS.some(x=>x.key===S.view)?S.view:['job','person'].includes(S.view)?'board':S.view==='chat'?'chats':'';
+    if(D.unread)dots.push('chats');if(D.toConfirm||D.offersWaiting||D.newNotes)dots.push('bids')}
+  const st={items:NTAB_ITEMS,active,dots,visible:on,dark:document.documentElement.dataset.theme!=='light'},k=JSON.stringify(st);
+  if(k===ntLast)return;ntLast=k;Promise.resolve(NTabs.setTabs(st)).catch(e=>console.warn(e))}
+whenPlug('TackNative',p=>{NTabs=p;document.documentElement.classList.add('nativetabs');ntLast='';
+  NTabs.addListener('tab',e=>{const k=String(e&&e.tab||'');if(S.phase!=='app'||!NTAB_ITEMS.some(x=>x.key===k))return;S.sheet=null;go(k)});
+  new MutationObserver(()=>syncNativeTabs()).observe(document.documentElement,{attributes:true,attributeFilter:['class','data-theme']});syncNativeTabs()});
 const NB={since:0,seen:new Set(),q:[],on:null,t:0};
 const nbKey=n=>n.at+'|'+n.who+'|'+n.html;
 function nbCheck(D){const now=Date.now();
@@ -2061,7 +2097,7 @@ const ACT={
     const pics=cleanPics(d.pics),geo=d.useLoc&&LOC.pos?{lat:Math.round(LOC.pos.lat*1e3)/1e3,lng:Math.round(LOC.pos.lng*1e3)/1e3}:null;
     saveMine(x=>{x.jobs={...(x.jobs||{}),[id]:{text:text.slice(0,400),more:d.more.trim().slice(0,600),price,kind:d.kind,when:d.when,where,at,deadline:deadlineFor(d.when,at),status:'open',color:d.white?NOTE_WHITE:hueHex(d.hue),...(d.friendsOnly?{friendsOnly:true}:{}),...(pics.length?{pics:pics.length}:{}),...(geo?{geo}:{}),...(S.me.isOwner?{campus:curCampus()}:{})}};return x});
     if(pics.length){S.pics['j:'+S.me.id+'~'+id]=pics;S.fb.setDoc(S.fb.doc(S.db,'jobpics',S.me.id+'~'+id),{owner:S.me.id,job:id,pics,at}).catch(e=>{console.warn(e);toast('Your job is up, but the photos didn\u2019t upload.')})}
-    S.draft=blankDraft();S.sort='newest';S.fresh=S.me.id+'~'+id;go('board');moment('Pinned.','Classmates can bid on it now.',1100);setTimeout(()=>{S.fresh=null},4000)},
+    S.draft=blankDraft();S.sort='newest';S.fresh=S.me.id+'~'+id;go('board');haptic('success');moment('Pinned.','Classmates can bid on it now.',1100);setTimeout(()=>{S.fresh=null},4000)},
   async editJob(el){const k=el?.dataset?.key||S.openJob,j=derive().jobByKey[k];if(!j||j.owner!==S.me.id||jobState(j)!=='open')return;
     let pics=S.pics['j:'+j.key];if(j.pics&&!Array.isArray(pics)){try{const x=await S.fb.getDoc(S.fb.doc(S.db,'jobpics',j.key));pics=x.exists()?cleanPics(x.data().pics):[]}catch{pics=[]}S.pics['j:'+j.key]=pics}
     const c=noteOf(j);S.draft={...blankDraft(),editId:j.id,hue:hexHue(c),white:c===NOTE_WHITE,text:j.text,price:String(j.price),kind:j.kind||'Errand',when:WHENS.includes(j.when)?j.when:'Today',
@@ -2074,7 +2110,7 @@ const ACT={
   bid(){const j=derive().jobByKey[S.openJob];if(!j)return;const amt=digits(S.bid.amt);
     if(!need(amt>=1&&amt<=50000,'bid','Enter a bid in rupees.'))return;if(!need(!sayOver(S.bid.say),'bid',SAY_MAX<1000?'Keep your pitch under '+SAY_MAX+' characters.':'Keep your pitch under '+SAY_WORDS+' words.'))return;if(modBlock('bid',S.bid.say))return;const had=!!myBidOn(j.key);
     const id=j.key+'~'+S.me.id,old=num(myBidOn(j.key)?.pics),pics=S.bid.pics?cleanPics(S.bid.pics):null,n=pics?pics.length:old;
-    S.bidEdit=null;savePitch(j.key,S.bid.say.trim(),amt,n,!!(pref('near')&&j.geo&&LOC.pos&&distM(LOC.pos,j.geo)<=NEAR_M));render();S.err={};toast(had?'Bid updated':'Bid placed');
+    S.bidEdit=null;savePitch(j.key,S.bid.say.trim(),amt,n,!!(pref('near')&&j.geo&&LOC.pos&&distM(LOC.pos,j.geo)<=NEAR_M));render();S.err={};haptic('medium');toast(had?'Bid updated':'Bid placed');
     if(pics){const {doc,setDoc,deleteDoc}=S.fb;S.pics['b:'+id]=pics;
       if(pics.length)setDoc(doc(S.db,'bidpics',id),{owner:j.owner,by:S.me.id,job:j.key,pics,at:Date.now()}).catch(e=>{console.warn(e);toast('Your bid is in, but the photos didn\u2019t upload.')});
       else if(old)deleteDoc(doc(S.db,'bidpics',id)).catch(()=>{})}},
@@ -2192,7 +2228,7 @@ const ACT={
   toggleJobLoc(){const d=S.draft;if(d.useLoc){d.useLoc=false;render();return}
     getLoc().then(p=>{if(p){d.useLoc=true;render()}else toast('Couldn\u2019t get your location. Allow location for this site in your browser settings.')})},
   nextPic(){const s=S.sheet,l=S.pics[s?.k];if(!l||!l.length)return;S.sheet={...s,i:(s.i+1)%l.length};render()},
-  confirmPick(){const j=derive().jobByKey[S.openJob],s=S.sheet;if(!j||!s)return;
+  confirmPick(){const j=derive().jobByKey[S.openJob],s=S.sheet;if(!j||!s)return;haptic('success');
     saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.status='assigned';o.takenAt=Date.now();delete o.repickAt}return x});
     S.picks={...S.picks,[j.key]:{owner:S.me.id,job:j.id,doer:s.uid,agreed:s.amt,at:Date.now(),status:'assigned',posterName:myRealName()}};
     S.fb.setDoc(S.fb.doc(S.db,'picks',j.key),{owner:S.me.id,job:j.id,doer:s.uid,agreed:s.amt,at:Date.now(),status:'assigned',posterName:myRealName()}).catch(e=>{console.warn(e);toast('Couldn\u2019t save the pick. Try again.')});
@@ -2204,7 +2240,7 @@ const ACT={
     if(j.status!=='done')saveMine(x=>{const o=x.jobs?.[j.id];if(o){o.status='done';o.doneAt=at}return x});
     S.busy=true;render();
     try{await rateBatch(j.key,j.accepted,'d',vals,{status:'done',doneAt:num(j.pick.doneAt)||at,ratedDoer:true,...(note?{noteToDoer:note}:{})});
-      savePriv({gave:{...(S.priv.gave||{}),[j.key]:(r.a+r.b+r.c+r.d)/4}});S.sheet=null;toast('Marked done. Thanks for rating.');
+      savePriv({gave:{...(S.priv.gave||{}),[j.key]:(r.a+r.b+r.c+r.d)/4}});S.sheet=null;haptic('success');toast('Marked done. Thanks for rating.');
       const rev=r.rev.trim().slice(0,400);if(rev){try{await reviewBatch(j.key,j.accepted,rev,cleanPics(r.pics),(r.a+r.b+r.c+r.d)/4)}catch(e){console.warn(e);toast('Rating saved, but the review didn\u2019t post. Try again from the job.')}}}
     catch(e){console.warn(e);S.err={rate:'Couldn\u2019t save your rating. Try again.'}}
     S.busy=false;render()},
@@ -2213,7 +2249,7 @@ const ACT={
     const vals={payment:r.a,clarity:r.b,comm:r.c,respect:r.d},note=r.text.trim().slice(0,200);
     S.busy=true;render();
     try{await rateBatch(j.key,j.owner,'p',vals,{ratedPoster:true,...(note?{noteToPoster:note}:{})});
-      savePriv({gave:{...(S.priv.gave||{}),[j.key]:(r.a+r.b+r.c+r.d)/4}});S.sheet=null;toast('Thanks for rating.')}
+      savePriv({gave:{...(S.priv.gave||{}),[j.key]:(r.a+r.b+r.c+r.d)/4}});S.sheet=null;haptic('success');toast('Thanks for rating.')}
     catch(e){console.warn(e);S.err={rate:'Couldn\u2019t save your rating. Try again.'}}
     S.busy=false;render()},
   confirmClose(){const j=derive().jobByKey[S.openJob];if(!j)return;saveMine(x=>{if(x.jobs?.[j.id])x.jobs[j.id].status='closed';return x});S.sheet=null;toast('Job closed')},
@@ -2360,7 +2396,7 @@ document.addEventListener('click',e=>{
   if(ds.cnote!==undefined){S.cnote=ds.cnote;go('cnote');return}
   if(ds.pic!==undefined){S.sheet={type:'pic',k:ds.pic,i:+ds.i||0};render();return}
   if(ds.unpic!==undefined){const o=ds.unpic==='draft'?S.draft:ds.unpic==='rev'?S.rate:S.bid;o.pics=(o.pics||[]).filter((_,i)=>i!==+ds.i);render();return}
-  if(ds.star!==undefined){S.rate[ds.star[0]]=+ds.star.slice(1);render();return}
+  if(ds.star!==undefined){S.rate[ds.star[0]]=+ds.star.slice(1);haptic('light');render();return}
   if(ds.why!==undefined){S.rep.why=ds.why;render();return}
   const D=derive(),me=S.me.id;
   if(ds.thread!==undefined){const t=D.threads.find(x=>x.key===ds.thread);if(t)openThread(t);return}
@@ -2376,7 +2412,7 @@ document.addEventListener('click',e=>{if(!S.omenu)return;if(!e.target.closest('.
 let lp=null;
 function openJobMenu(k){S.sheet={type:'jobmenu',key:k};render()}
 // Hold a note for its menu, or hold a person (chats, the free row) to restrict, block or report them.
-const holdOpen=t=>{if(t.dataset.mid){if(S.view==='chat'){S.sheet={type:'msgmenu',mid:+t.dataset.mid};render()}return}if(t.dataset.job)openJobMenu(t.dataset.job);else if(t.dataset.hold&&t.dataset.hold!==S.me?.id){S.sheet={type:'who',about:t.dataset.hold};render()}};
+const holdOpen=t=>{haptic('medium');if(t.dataset.mid){if(S.view==='chat'){S.sheet={type:'msgmenu',mid:+t.dataset.mid};render()}return}if(t.dataset.job)openJobMenu(t.dataset.job);else if(t.dataset.hold&&t.dataset.hold!==S.me?.id){S.sheet={type:'who',about:t.dataset.hold};render()}};
 document.addEventListener('pointerdown',e=>{const t=e.target.closest('.tile[data-job],[data-hold],.msgs [data-mid]');if(!t||e.button>0)return;if(lp)clearTimeout(lp.t);
   lp={x:e.clientX,y:e.clientY,fired:false,t:setTimeout(()=>{lp.fired=true;navigator.vibrate?.(12);holdOpen(t)},480)}});
 document.addEventListener('pointermove',e=>{if(lp&&!lp.fired&&Math.hypot(e.clientX-lp.x,e.clientY-lp.y)>10)clearTimeout(lp.t)});

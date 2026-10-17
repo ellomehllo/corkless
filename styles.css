@@ -1681,3 +1681,6 @@ button.igstat:active b{opacity:.7}
 @media (min-width:900px){.pboard{margin:0;border-radius:var(--r-md)}}
 :root[data-theme="light"] .tile.ntile .pst{color:oklch(from var(--nc) .42 .06 h / .85)}
 :root[data-theme="light"] .tile.ntile .pst.on{color:var(--accent)}
+
+/* iOS app: the tab bar is drawn natively; the web bar keeps its space so nothing shifts */
+.nativetabs .tabbar{visibility:hidden;margin:0!important;padding:0!important;border:0!important;height:calc(49px + env(safe-area-inset-bottom,0px));min-height:0}
