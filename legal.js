@@ -14,6 +14,7 @@ export const PRIVACY=`
 <p><b>Messages.</b> Messages you send in job chats, and, if read receipts are on, the time you last read a chat.</p>
 <p><b>Location.</b> Only if you choose to tag a job with your location, that spot rounded to about 100 metres. When you bid, only whether you were near the job (yes or no), and only if you allow it in Settings. Your live location is used on your device to show jobs near you and is never sent to us.</p>
 <p><b>Settings and technical data.</b> Your settings, the people you block, which chats and notifications you have seen, and the version of the Terms you accepted. We do not use advertising trackers or analytics cookies.</p>
+<p><b>Notifications.</b> Only if you turn notifications on: a token for each device, issued by Google Firebase Cloud Messaging, so we can reach that device. When something happens for you (a bid, a pick, a message, a board invite or a review), the notification text passes through Firebase to your device. It contains the other person’s username, the job title or the start of the message, and nothing else. Turning notifications off or logging out on a device deletes its token.</p>
 <p>Photos are resized on your device before upload, which removes embedded data such as GPS location.</p>
 
 <h2>3. Why we use it</h2>

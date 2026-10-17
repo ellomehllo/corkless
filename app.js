@@ -1,7 +1,7 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
 import {makeDb} from './db.js?v=202610122323';
-import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610142017';
+import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610171318';
 import {modHit,MOD_CAT} from './mod.js?v=202610142017';
 
 const FB = window.__TACK_FB_BASE || 'https://www.gstatic.com/firebasejs/12.19.0/';
@@ -81,6 +81,7 @@ const ic=(n,s=20,w=2,c='currentColor',fill='none')=>`<svg width="${s}" height="$
 const blankDraft=()=>({text:'',price:'',kind:'Errand',when:'Today',where:'Gate 1',whereText:'',more:'',pics:[],useLoc:locOptIn(),hue:199});
 const inviteParam=(new URLSearchParams(location.search).get('invite')||'').trim().toLowerCase();
 const jobParam=(new URLSearchParams(location.search).get('job')||'').slice(0,80);
+const chatParam=(new URLSearchParams(location.search).get('chat')||'').slice(0,160);
 const codeParam=((new URLSearchParams(location.search).get('code')||'').trim().toLowerCase().match(/^[a-z0-9]{8,24}$/)||[''])[0];
 const S={
   phase:'loading', fb:null, db:null, auth:null, user:null, me:null, signingUp:false, erased:false,
@@ -417,6 +418,16 @@ const IOS_APP=(()=>{try{const C=window.Capacitor;return!!(C&&C.isNativePlatform&
 const SUPPORT_EMAIL='';
 const pushReady=()=>!IOS_APP&&'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
 function pushOn(){try{return pushReady()&&Notification.permission==='granted'&&!!localStorage.getItem(PUSH_KEY)}catch{return false}}
+// Each device's Firebase token is registered in Supabase (public.push_tokens). The database decides who to tell
+// and the "push" Edge Function sends through Firebase. Registering again each session moves a shared device to
+// whoever is signed in now.
+const pushRegister=t=>S.fb.rpc('push_register',{p_token:t,p_platform:'web'}).catch(e=>console.warn('push_register',e));
+const pushUnregister=t=>S.fb.rpc('push_unregister',{p_token:t}).catch(e=>console.warn('push_unregister',e));
+function openLink(link){try{const u=new URL(link),j=u.searchParams.get('job'),c=u.searchParams.get('chat'),D=derive();
+  if(c){const t=D.threads.find(x=>x.key===c);if(t){openThread(t);return}}
+  if(j&&D.jobByKey[j]){S.sheet=null;S.openJob=j;S.bid={key:null};go('job');return}
+  go(c?'chats':'bids')}catch(e){console.warn(e)}}
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='open'&&S.phase==='app')openLink(String(e.data.link||''))});
 async function pushToken(){const reg=await navigator.serviceWorker.register('sw.js');await navigator.serviceWorker.ready;
   const m=await import(FB+'firebase-messaging.js');S.msg=S.msg||m.getMessaging(await fcmApp());return{m,token:await m.getToken(S.msg,{serviceWorkerRegistration:reg})}}
 function dropPushField(t){const {doc,updateDoc,FieldPath,deleteField}=S.fb;return updateDoc(doc(S.db,'private',S.me.id),new FieldPath('push',t),deleteField()).catch(e=>console.warn(e))}
@@ -427,18 +438,18 @@ async function enablePush(){
   S.busy=true;render();
   try{const {token}=await pushToken();if(!token)throw new Error('no token');
     try{localStorage.setItem(PUSH_KEY,token)}catch{}
-    await savePriv({push:{...(S.priv.push||{}),[token]:Date.now()}});toast('Notifications are on')}
+    await pushRegister(token);await savePriv({push:{...(S.priv.push||{}),[token]:Date.now()}});toast('Notifications are on')}
   catch(e){console.warn(e);toast('Couldn\u2019t turn on notifications. Try again.')}
   S.busy=false;render()}
 async function disablePush(){
   let t=null;try{t=localStorage.getItem(PUSH_KEY);localStorage.removeItem(PUSH_KEY)}catch{}
-  if(t){const p={...(S.priv.push||{})};delete p[t];S.priv={...S.priv,push:p};dropPushField(t);
+  if(t){const p={...(S.priv.push||{})};delete p[t];S.priv={...S.priv,push:p};dropPushField(t);pushUnregister(t);
     try{const m=await import(FB+'firebase-messaging.js');S.msg=S.msg||m.getMessaging(await fcmApp());await m.deleteToken(S.msg)}catch{}}
   toast('Notifications are off');render()}
 async function syncPush(){
   if(!pushOn())return;
-  try{const old=localStorage.getItem(PUSH_KEY),{token}=await pushToken();if(!token||(token===old&&(S.priv.push||{})[token]))return;
-    localStorage.setItem(PUSH_KEY,token);const p={...(S.priv.push||{})};if(old&&old!==token){delete p[old];dropPushField(old)}
+  try{const old=localStorage.getItem(PUSH_KEY),{token}=await pushToken();if(!token)return;pushRegister(token);if(token===old&&(S.priv.push||{})[token])return;
+    localStorage.setItem(PUSH_KEY,token);const p={...(S.priv.push||{})};if(old&&old!==token){delete p[old];dropPushField(old);pushUnregister(old)}
     savePriv({push:{...p,[token]:Date.now()}})}catch(e){console.warn(e)}}
 function bannerHTML(){const b=S.config.banner;if(!b||!b.on||typeof b.text!=='string'||!b.text.trim())return'';const k='tack.banner.'+num(b.at);
   try{if(localStorage.getItem(k))return''}catch{}
@@ -633,7 +644,7 @@ async function doReset(){
   S.busy=false;S.authMsg=`If ${email} has an account, a reset link is on its way. Check spam too.`;render();
 }
 function authFail(m){S.authErr=m;S.busy=false;render();return false}
-async function logOut(){stopSubs();firstLoadDone=false;S.view='board';S.myDoc=null;S.authMode='login';S.authErr='';S.authMsg='';S.form.pw='';try{await S.sb.auth.signOut()}catch{}}
+async function logOut(){try{const t=localStorage.getItem(PUSH_KEY);if(t&&S.me)await pushUnregister(t)}catch{}stopSubs();firstLoadDone=false;S.view='board';S.myDoc=null;S.authMode='login';S.authErr='';S.authMsg='';S.form.pw='';try{await S.sb.auth.signOut()}catch{}}
 async function setNewPw(){if(!need(S.pw.nw.length>=8,'pw','Use a new password of at least 8 characters.'))return;
   S.busy=true;render();const {data,error}=await S.sb.auth.updateUser({password:S.pw.nw});S.busy=false;
   if(error){S.err={pw:authMsg(authErr(error))};render();return}
@@ -1911,7 +1922,7 @@ function render(){
     if(m0&&S.phase!=='loading'&&!reduceMotion.matches)gateHandoff(gate,m0);lastGate=S.phase;
   }else{
     gate.hidden=true;app.hidden=false;if(gate.innerHTML)gate.innerHTML='';lastGate=null;
-    const D=derive(),main=$('main');syncDealNames();if(S.me.isOwner)loadNames(D);if(jobParam&&!S.deepDone&&D.jobByKey[jobParam]){S.deepDone=true;S.openJob=jobParam;S.bid={key:null};S.view='job'}if(lastView&&lastView!==S.view)scrollMem[lastView]=main.scrollTop;
+    const D=derive(),main=$('main');syncDealNames();if(S.me.isOwner)loadNames(D);if(jobParam&&!S.deepDone&&D.jobByKey[jobParam]){S.deepDone=true;S.openJob=jobParam;S.bid={key:null};S.view='job'}if(chatParam&&!S.chatDeep){const t=D.threads.find(x=>x.key===chatParam);if(t){S.chatDeep=true;setTimeout(()=>openThread(t),0)}}if(lastView&&lastView!==S.view)scrollMem[lastView]=main.scrollTop;
     const keep=lastView===S.view?main.scrollTop:((DEPTH[S.view]??1)===0?scrollMem[S.view]||0:0);
     main.dataset.view=S.view;main.innerHTML=((DEPTH[S.view]??1)===0?bannerHTML():'')+(VIEWS[S.view]||viewBoard)(D);main.scrollTop=keep;
     if(lastView!==S.view&&S.view==='chat')requestAnimationFrame(()=>{main.scrollTop=main.scrollHeight});
