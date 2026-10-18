@@ -142,7 +142,7 @@ function handleCheck(raw){const h=String(raw||'').trim().replace(/^@/,'').toLowe
 let handleT=null;
 function checkHandle(raw){const r=handleCheck(raw);S.hcheck={...r};clearTimeout(handleT);
   if(r.st==='check'){if(r.h===handleOf(S.me.id)){S.hcheck.st='mine';return}handleT=setTimeout(()=>{handleOwner(r.h).then(u=>{if(S.hcheck.h!==r.h)return;S.hcheck.st=u&&u!==S.me.id?'taken':'ok';paintHandle()}).catch(()=>{S.hcheck.st='ok';paintHandle()})},350)}}
-function handleMsg(){const c=S.hcheck||{};return{empty:'',short:'At least 4 characters',chars:'Letters, numbers, . and _ only',taken:'Not available',check:'Checking…',ok:'Available ✓',mine:'This is your username'}[c.st]||''}
+function handleMsg(){const c=S.hcheck||{};return{empty:'',short:'At least 4 characters',chars:'Letters, numbers, . and _ only',taken:'Not available',check:'Checking…',ok:'Available ✓ · you can log in with it too',mine:'This is your username'}[c.st]||''}
 function paintHandle(){const el=$('hMsg');if(el){el.textContent=handleMsg();el.className='hmsg '+(S.hcheck?.st||'')}syncNeed()}
 function handleLockedUntil(){const at=num(S.myDoc?.handleAt);return handleOf(S.me.id)&&at&&Date.now()<at+HANDLE_DAYS*864e5?at+HANDLE_DAYS*864e5:0}
 function handleField(locked){const h=S.onb.handle||'';return`<div class="stack gap8"><label class="formlabel" for="ohd">Username <span class="muted">· what people see on the board</span></label>
@@ -652,10 +652,20 @@ async function doVerifyOtp(){
   if(error||!data?.session){S.err={otp:'That code isn\u2019t right, or it has expired. Check the latest email, or send a new code.'};render();return}
   S.form.otp='';handleUser(userOf(data.session.user));
 }
+// Log in with an email, or with a username: login_email() (username-login.sql) returns the account's email only when
+// the password is right, then the normal email login runs.
 async function doLogin(){
-  const f=S.form,email=f.email.trim().toLowerCase();
-  if(!validEmail(email))return authFail('That doesn’t look like an email address.');
+  const f=S.form,raw=f.email.trim().replace(/^@/,'');let email=raw.toLowerCase();
   if(!f.pw)return authFail('Enter your password.');
+  if(!raw.includes('@')){
+    if(!HANDLE_RE.test(email))return authFail('Enter your email or your tack username.');
+    S.busy=true;S.authErr='';render();
+    const {data,error}=await S.sb.rpc('login_email',{p_handle:email,p_password:f.pw});
+    if(error)return authFail(authMsg(authErr(error)));
+    if(data==='!locked')return authFail('Too many tries with this username. Wait 15 minutes, or log in with your email.');
+    if(!data)return authFail('Wrong username or password.');
+    email=String(data).toLowerCase();
+  }else if(!validEmail(email))return authFail('That doesn’t look like an email address.');
   S.busy=true;S.authErr='';render();
   const {error}=await S.sb.auth.signInWithPassword({email,password:f.pw});
   if(error){const e=authErr(error);if(e.code==='auth/email-not-confirmed'){S.user={email,emailVerified:false};S.form.otp='';S.err={};S.phase='verify';S.busy=false;render();sendVerify(S.user).catch(()=>{});return}authFail(authMsg(e))}else{S.form.pw='';S.authMsg=''}
@@ -889,7 +899,7 @@ function collegeField(){const f=S.form,c=f.college?catById(f.college):null;if(!S
 function authHTML(){
   const m=S.authMode,f=S.form;
   const field=(id,label,type,key,ph,ac)=>`<div class="stack gap8"><label class="formlabel" for="${id}">${label}</label>
-    ${type==='password'?`<span class="pwwrap">`:''}<input id="${id}" class="inp" type="${type==='password'&&S.showPw?'text':type}" autocomplete="${ac}" placeholder="${esc(ph)}" value="${esc(f[key])}" data-bind="form.${key}" ${type==='email'?'inputmode="email" autocapitalize="off" spellcheck="false"':''}>${type==='password'?`<button type="button" class="pwtoggle" data-act="togglePw" aria-label="${S.showPw?'Hide':'Show'} password">${S.showPw?'Hide':'Show'}</button></span>`:''}</div>`;
+    ${type==='password'?`<span class="pwwrap">`:''}<input id="${id}" class="inp" type="${type==='password'&&S.showPw||type==='login'?'text':type}" autocomplete="${ac}" placeholder="${esc(ph)}" value="${esc(f[key])}" data-bind="form.${key}" ${type==='email'?'inputmode="email" autocapitalize="off" spellcheck="false"':type==='login'?'autocapitalize="off" autocorrect="off" spellcheck="false"':''}>${type==='password'?`<button type="button" class="pwtoggle" data-act="togglePw" aria-label="${S.showPw?'Hide':'Show'} password">${S.showPw?'Hide':'Show'}</button></span>`:''}</div>`;
   const tabs=`<div class="authtabs" role="tablist"><button type="button" role="tab" aria-selected="${m==='login'}" class="${m==='login'?'on':''}" data-auth="login">Log in</button>
     <button type="button" role="tab" aria-selected="${m==='signup'}" class="${m==='signup'?'on':''}" data-auth="signup">Sign up</button></div>`;
   let body='';
@@ -903,7 +913,7 @@ function authHTML(){
      <button class="cta" type="submit" data-need="signup" ${S.busy?'disabled':''}>${S.busy?'Creating your account…':'Create account'}</button>
      <p class="note">No college email? Ask the organiser for an invite.</p></form>`;
   else if(m==='login')body=`<form class="stack" id="authForm" data-form="login" novalidate style="gap:14px">
-     ${field('fEmail','Email','email','email','you@college.edu.in','email')}
+     ${field('fEmail','Email or username','login','email','you@college.edu.in or your username','username')}
      ${field('fPw','Password','password','pw','Your password','current-password')}
      ${S.authErr?`<p class="err" role="alert">${esc(S.authErr)}</p>`:''}
      <button class="cta" type="submit" data-need="login" ${S.busy?'disabled':''}>${S.busy?'Logging in…':'Log in'}</button>
@@ -1915,7 +1925,7 @@ function stepsCard(D){if(!S.priv.introSeen||S.priv.stepsHidden||S.priv.stepsDone
     ${steps.map(([done,t,h,at])=>`<button class="step ${done?'done':''}" ${done?'disabled':at}><span class="stepdot">${done?ic('tick',12,3.2):''}</span><span class="rowtext"><span class="t1">${t}</span><span class="t2">${done?'Done':h}</span></span>${done?'':`<span class="chev">${ic('chev',16)}</span>`}</button>`).join('')}</section>`}
 const NEED={
   signup:()=>S.form.name.trim().length>=2&&validEmail(S.form.email.trim())&&S.form.pw.length>=8,
-  login:()=>validEmail(S.form.email.trim())&&!!S.form.pw,
+  login:()=>S.form.email.trim().length>=4&&!!S.form.pw,
   reset:()=>validEmail(S.form.email.trim()),
   handle:()=>S.hcheck?.st==='ok',
   join:()=>(S.hcheck?.st==='ok')&&S.onb.name.trim().length>=2&&!!S.onb.year&&!!S.onb.branch.trim()&&!!S.onb.adult&&!!S.onb.rules,
