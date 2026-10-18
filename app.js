@@ -706,7 +706,8 @@ function ciSugsHTML(){const l=ciSugs(),q=S.cdraft.handle.trim();
 const comName=id=>str(S.coms[id]?.name,40)||'Board';
 const comOwner=id=>S.cmine[id]==='owner';
 function comChips(){const mine=Object.keys(S.cmine).filter(id=>S.coms[id]).sort((a,b)=>comName(a).localeCompare(comName(b))),inv=Object.keys(S.cinv).filter(id=>S.coms[id]);
-  return`<div class="comrow" role="navigation" aria-label="Boards"><button class="comchip on">${esc(campus())}</button>${mine.map(id=>`<button class="comchip" data-com="${esc(id)}">${esc(comName(id))}</button>`).join('')}${inv.map(id=>`<button class="comchip invited" data-sheet="cjoin" data-about="${esc(id)}">${ic('mail',13)} ${esc(comName(id))}</button>`).join('')}<button class="comchip cnewchip" data-sheet="cnew">${ic('plus',14)} New board</button></div>`}
+  const home=S.me.isOwner?`<button class="comchip on" data-sheet="campus" aria-current="page" aria-label="${esc(campus())}, switch campus">${esc(campus())}${ic('chev',12,2.4)}</button>`:`<button class="comchip on" aria-current="page">${esc(campus())}</button>`;
+  return`<div class="comrow" role="navigation" aria-label="Boards">${home}${mine.map(id=>`<button class="comchip" data-com="${esc(id)}">${esc(comName(id))}</button>`).join('')}${inv.map(id=>`<button class="comchip invited" data-sheet="cjoin" data-about="${esc(id)}">${ic('mail',13)} ${esc(comName(id))}</button>`).join('')}<button class="comchip cnewchip" data-sheet="cnew">${ic('plus',14)} New board</button></div>`}
 function cnoteTile(n,i){const c=COLOR_RE.test(n.color||'')?n.color:'#7FA2FF',k=Object.values(S.ccoms).filter(x=>x.note===n.id).length,ph=n.pics?(picsOf('c:'+n.id)||[])[0]:'',tags=[n.where,n.when].filter(Boolean).join(' · ');
   return`<button class="tile ntile cntile r${i%3}" data-cnote="${esc(n.id)}" style="--nc:${c};--i:${i};--d:0s"><span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span><span class="pin"></span>${n.pics?`<span class="tpics">${ic('camera',12,2.2)} ${n.pics} ${n.pics===1?'photo':'photos'}</span>`:''}<p>${esc(n.text)}</p>${tags?`<span class="where">${ic('place',12,2.2)}<span>${esc(tags)}</span></span>`:''}
     <span class="by">${face(n.by,22)}<span class="nm">${esc(firstName(n.by))}</span><span class="n">${ic('chat',12,2.2)} ${k}</span></span></button>`}
@@ -1130,14 +1131,14 @@ function viewBoard(D){
   const drop=!S.boardDropped&&!S.intro.on&&!S.momentOn&&!S.joining&&S.priv.introSeen&&!reduceMotion.matches;if(drop){S.boardDropped=true;S.dropping=true;setTimeout(()=>{S.dropping=false},2200)}
   const all=boardJobs(D),list=findJobs(all),filtered=!!(S.find.q.trim()||S.near),online=onlinePeople(D);
   return`<div class="boardpage"><header class="top">
-    <div><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${S.me.isOwner?`<button class="campbtn" data-sheet="campus">${esc(campus())}${ic('chev',12,2.4)}</button>`:esc(campus())} · ${all.length} pinned</span></div></div>
+    <div><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${all.length} pinned</span></div></div>
     <button data-go="me" aria-label="Your profile">${ring(S.me.id,48)}</button>
   </header>
   ${online.length?`<section class="stripwrap" aria-label="Online"><p class="label">Online</p>
     <div class="strip">${online.map(u=>`<button class="person" data-person="${esc(u)}" data-hold="${esc(u)}" aria-label="${esc(firstName(u))} is online">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}</div></section>`:''}
   ${comChips()}
   ${stepsCard(D)}
-  <div class="dhead"><h1 class="h1">The board</h1><span class="muted">${all.length} pinned at ${S.me.isOwner?`<button class="campbtn" data-sheet="campus">${esc(campus())}${ic('chev',12,2.4)}</button>`:esc(campus())}</span></div>
+  <div class="dhead"><h1 class="h1">The board</h1><span class="muted">${all.length} pinned</span></div>
   <label class="search" for="q">${ic('search',17)}<input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search jobs: print, shawarma, today, library" value="${esc(S.find.q)}" data-bind="find.q" aria-label="Search jobs">${S.find.q?`<button class="sclear" data-act="clearSearch" aria-label="Clear search">${ic('x',14,2.4)}</button>`:''}</label>
   <div class="pills" role="group" aria-label="Filter and sort jobs"><button class="pill ${S.near?'on':''}" data-act="toggleNear" aria-pressed="${S.near}">${ic('place',13,2.2)} Near you</button><span class="pillsep" aria-hidden="true"></span>${[['high','Top pay'],['newest','Newest'],['closing','Closing soon']].map(([k,l])=>`<button class="pill ${S.sort===k?'on':''}" data-sort="${k}" aria-pressed="${S.sort===k}">${l}</button>`).join('')}</div>
   <div class="wallzone ${S.dropping?'dropin':''}">${filtered&&!list.length&&all.length?`<div class="empty"><b>${S.near&&!S.find.q.trim()?'Nothing near you right now':'No jobs match that'}</b><p>${S.near?'Only jobs pinned with a location can show as near you.':'Try another word, like the place, the time or what you need.'}</p><button class="btn2" data-act="clearFind">Show all jobs</button></div>`:list.length?wallHTML(list,D)+`<div class="boardend"><span class="endpin" aria-hidden="true"></span>${filtered?`<p>${list.length} of ${all.length} jobs shown.</p>`:''}<button class="btn2" data-go="post">Pin a job</button></div>`

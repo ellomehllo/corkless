@@ -1296,13 +1296,14 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .tkshare .slogos{justify-content:space-between}
 
 /* community boards */
-.comrow{display:flex;gap:8px;overflow-x:auto;padding:2px 16px 12px;scrollbar-width:none}
+/* boards are places, so they're tabs (filters below are pills) */
+.comrow{display:flex;gap:22px;overflow-x:auto;margin:14px 16px 4px;border-bottom:1px solid var(--line);scrollbar-width:none}
 .comrow::-webkit-scrollbar{display:none}
-.comchip{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;background:var(--surface2);color:var(--fg2);font-size:var(--fs-c);font-weight:600;white-space:nowrap}
-.comchip.on{background:var(--grad);color:var(--on-grad)}
-.comchip.invited{background:rgba(198,242,78,.12);color:var(--accent);border:1px solid rgba(198,242,78,.35)}
-.comchip.cnewchip{background:transparent;border:1px dashed rgba(255,255,255,.22)}
-@media (min-width:900px){.comrow{padding:0 28px 14px}}
+.comchip{flex-shrink:0;display:inline-flex;align-items:center;gap:5px;padding:2px 0 11px;background:none;color:var(--muted);font-size:var(--t-14);font-weight:600;white-space:nowrap}
+.comchip.on{color:var(--fg);box-shadow:inset 0 -2px 0 var(--fg)}
+.comchip.invited{color:var(--accent)}
+.comchip.cnewchip{font-weight:500}
+@media (min-width:900px){.comrow{margin:0 28px 6px}}
 .cboard,.cnotepage{display:flex;flex-direction:column;gap:16px;padding-bottom:28px}
 .chead{display:flex;flex-direction:column;gap:8px}
 .cabout{margin:0;color:var(--fg2);font-size:var(--fs-b);line-height:1.5}
@@ -1381,7 +1382,6 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 
 /* Bits that were drawn in white-on-dark */
 :root[data-theme="light"] .campbtn{text-decoration-color:rgba(18,19,23,.25)}
-:root[data-theme="light"] .comchip.cnewchip{border-color:rgba(18,19,23,.22)}
 :root[data-theme="light"] .in .mwave{background:rgba(18,19,23,.12)}
 :root[data-theme="light"] .bnpics .pic{box-shadow:0 0 0 1px rgba(18,19,23,.1)}
 :root[data-theme="light"] .bnpics .pic.add{border-color:rgba(18,19,23,.2);background:rgba(255,255,255,.6)}
