@@ -278,6 +278,11 @@ html[data-nav="tab"]::view-transition-new(main){animation:fadeIn .2s ease both}
 
 .boardpage{display:flex;flex-direction:column;min-height:100%}
 .wallzone{flex:1;display:flex;flex-direction:column;background-image:radial-gradient(circle,rgba(244,241,250,.07) 0 1.2px,transparent 1.7px);background-size:22px 22px}
+/* the board: everything above the notes stays put, only the notes scroll */
+.main[data-view="board"]{overflow:hidden;display:flex;flex-direction:column}
+.main[data-view="board"]>.boardpage{flex:1;min-height:0}
+.boardpage>*{flex-shrink:0}
+.boardpage>.wallzone{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;background-attachment:local;-webkit-overflow-scrolling:touch}
 .boardend{display:flex;flex-direction:column;align-items:center;gap:10px;padding:6px 16px 36px;text-align:center}
 .boardend p{margin:0;font-size:var(--t-12);font-weight:500;color:var(--dim)}
 .boardend .btn2{width:auto;padding:10px 20px;font-size:var(--t-12)}
@@ -1684,5 +1689,3 @@ button.igstat:active b{opacity:.7}
 :root[data-theme="light"] .tile.ntile .pst{color:oklch(from var(--nc) .42 .06 h / .85)}
 :root[data-theme="light"] .tile.ntile .pst.on{color:var(--accent)}
 
-/* iOS app: the tab bar is drawn natively; the web bar keeps its space so nothing shifts */
-.nativetabs .tabbar{visibility:hidden;margin:0!important;padding:0!important;border:0!important;height:calc(49px + env(safe-area-inset-bottom,0px));min-height:0}
