@@ -624,6 +624,8 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{outline:none}
 .bnprice input{width:4.6ch;font:inherit;letter-spacing:inherit;color:inherit;caret-color:var(--nc);padding:0;font-variant-numeric:tabular-nums}
 .bnprice input::placeholder{color:color-mix(in srgb,var(--fg) 38%,transparent)}
 .bnprice.blank span{color:color-mix(in srgb,var(--fg) 38%,transparent)}
+.bnprice .bnopt{align-self:center;margin-left:6px;font-family:var(--body);font-size:var(--t-12);font-weight:600;letter-spacing:0}
+.bnprice:not(.blank) .bnopt{display:none}
 .bntext{flex:1;width:100%;min-height:150px;resize:none;font-size:var(--t-19);font-weight:500;line-height:1.38;letter-spacing:-.01em;color:var(--fg);caret-color:var(--nc);outline:0;overflow-wrap:anywhere}
 .bntext::placeholder{color:color-mix(in srgb,var(--fg) 38%,transparent)}
 .bnfoot{display:flex;align-items:center;justify-content:space-between;gap:10px}
