@@ -1316,6 +1316,12 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .cbody .linkbtn{align-self:flex-start;padding:0;font-size:var(--fs-c);color:var(--muted)}
 .ccomposer{position:sticky;bottom:10px;background:var(--bg);padding-top:6px}
 .ccomposer .csend{display:none}.ccomposer.hastext .csend{display:flex}
+.jcoms{margin-top:26px;gap:14px}
+.jcomposer{position:static;padding-top:2px}
+.jcomnone{margin:0;font-size:var(--fs-c);line-height:1.45}
+.ccom .cface{flex-shrink:0;padding:0;border-radius:50%}
+.cacts{display:flex;gap:14px}
+.ctag{font-size:var(--t-11);font-weight:600;color:var(--accent);margin-left:2px}
 .ccolors{display:flex;gap:10px}
 .ccol{width:30px;height:30px;border-radius:50%;background:var(--nc);box-shadow:0 0 0 2px var(--bg),0 0 0 3px transparent}
 .ccol.on{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--fg)}
