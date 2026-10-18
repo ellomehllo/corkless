@@ -1,6 +1,6 @@
 import firebaseConfig from './firebase-config.js';
 import supaConfig from './supabase-config.js';
-import {makeDb} from './db.js?v=202610190339';
+import {makeDb} from './db.js?v=202610190341';
 import {TERMS_V,EFFECTIVE,PRIVACY,TERMS} from './legal.js?v=202610171318';
 import {modHit,MOD_CAT} from './mod.js?v=202610142017';
 
@@ -94,7 +94,7 @@ const S={
   view:'board', openJob:null, personOf:null, sort:'high', find:{q:''}, near:false,
   draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, pw:{cur:'',nw:''}, pwOpen:false, help:{kind:null,job:null,why:'',note:'',sent:null}, actTab:'all', actSeenAt:0, intro:{on:false,i:0}, fresh:null, chatDraft:{text:''}, pay:{upi:null,ref:''},
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',banner:'',adult:false,rules:false},
-  inv:{email:'',campus:'',camp:''}, camp:{q:''}, coms:{}, cmine:{}, cinv:{}, cid:null, cnote:null, cnotes:{}, ccoms:{}, jcoms:{}, jcomFor:null, jcomOk:false, jc:{draft:''}, cmembers:{}, cdraft:{name:'',about:'',text:'',more:'',color:'#7FA2FF',handle:'',comment:''}, lastInvite:null, myCampus:null, campuses:{}, viewCampus:(()=>{try{return localStorage.getItem('tack.viewCampus')||''}catch{return''}})(),
+  inv:{email:'',campus:'',camp:''}, camp:{q:''}, coms:{}, cmine:{}, cinv:{}, cid:null, cnote:null, cnotes:{}, ccoms:{}, cmembers:{}, cdraft:{name:'',about:'',text:'',more:'',color:'#7FA2FF',handle:'',comment:''}, lastInvite:null, myCampus:null, campuses:{}, viewCampus:(()=>{try{return localStorage.getItem('tack.viewCampus')||''}catch{return''}})(),
   picks:{}, repDocs:{},
   sheet:null, omenu:null, pnotes:{}, ptab:'notes', following:{}, followers:{}, ffeed:[], rate:{a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]}, rep:{why:'',note:'',block:false}, erase:{pw:''},
   chat:{key:null}, err:{}
@@ -1158,22 +1158,6 @@ function viewTackNote(j){if(S.shareImg?.key!==j.key&&!S.shareBusy){S.shareBusy=t
    ${paras.length?`<div class="tkcard">${paras.map((p,i)=>`<p style="--k:${i}">${esc(p)}</p>`).join('')}</div>`:''}
    <div class="tkshare"><span class="tklabel">Share</span><div class="slogos">${slogo('ig','Instagram','data-act="tackShare" data-to="ig"')}${slogo('wa','WhatsApp','data-act="tackShare" data-to="wa"')}${slogo('share','More','data-act="tackShare" data-to="sys"')}${slogo('link','Copy link','data-act="tackShare" data-to="copy"')}</div></div>
   </div>`}
-// Comments on a campus note: public to everyone who can see it (bids stay private). Loaded live while its page is open.
-let jcomUnsub=null;
-function syncJobComs(){const k=S.phase==='app'&&S.view==='job'&&S.openJob&&!isOrg(S.openJob.split('~')[0])?S.openJob:null;
-  if(k===S.jcomFor)return;try{jcomUnsub&&jcomUnsub()}catch{}jcomUnsub=null;S.jcoms={};S.jcomOk=false;S.jcomFor=k;S.jc.draft='';if(!k)return;
-  const {collection,query,where,onSnapshot}=S.fb;
-  jcomUnsub=onSnapshot(query(collection(S.db,'jcomments'),where('jkey','==',k)),snap=>{const c={};snap.forEach(x=>{c[x.id]=x.data()});S.jcoms=c;S.jcomOk=true;if(S.jcomFor===k)render()},e=>console.warn(e))}
-function jcomSec(j,D){const me=S.me.id,mine=j.owner===me;
-  const coms=Object.entries(S.jcoms).map(([k,v])=>({...v,id:k})).filter(x=>x.jkey===j.key&&!D.blocked.has(x.by)).sort((a,b)=>a.at-b.at);
-  const open=j.status!=='removed';
-  return`<section class="jcoms stack" aria-labelledby="jcomH"><h2 class="h2" id="jcomH">${coms.length?`${coms.length} ${coms.length===1?'comment':'comments'}`:'Comments'}</h2>
-    ${coms.length?`<div class="ccoms">${coms.map(x=>`<div class="ccom"><button class="cface" data-person="${esc(x.by)}" aria-label="${esc(shortName(x.by))}">${face(x.by,30)}</button><div class="cbody"><span class="cwho">${esc(shortName(x.by))}${x.by===j.owner?' <span class="ctag">Poster</span>':''} <span class="muted">${since(x.at)}</span></span><p>${esc(x.t)}</p>
-      <span class="cacts">${x.by===me||mine?`<button class="linkbtn" data-act="jcomDel" data-id="${esc(x.id)}">Delete</button>`:''}${x.by!==me?`<button class="linkbtn" data-sheet="report" data-about="${esc(x.by)}">Report</button>`:''}</span></div></div>`).join('')}</div>`
-      :S.jcomOk?`<p class="muted jcomnone">${mine?'Questions people ask about this job show up here.':'Ask a question about this job. Everyone who can see it sees comments. Bids stay private.'}</p>`:''}
-    ${open?`<div class="composer ccomposer jcomposer ${S.jc.draft.trim()?'hastext':''}" id="jcomposer"><label class="field" for="jcomIn"><input id="jcomIn" maxlength="500" placeholder="Add a comment…" value="${esc(S.jc.draft)}" data-bind="jc.draft" autocomplete="off" enterkeyhint="send" aria-label="Add a comment"></label>
-      <button class="csend" data-act="jcomSend" aria-label="Post comment">${ic('send',19,2,'var(--on-grad)')}</button></div>`:''}
-  </section>`}
 function viewJob(D){
   const j0=D.jobByKey[S.openJob],j=j0&&hiddenFor(j0)&&j0.accepted!==S.me.id&&!myBidOn(j0.key)?null:j0;
   if(!j)return`<div class="pad">${back('board')}<div class="empty" style="margin:18px 0"><b>This job is gone</b><p>The poster closed it or it was taken off the board.</p></div></div>`;
@@ -1290,7 +1274,6 @@ function viewJob(D){
     ${j.more?`<p class="jmore">${esc(j.more)}</p>`:''}
   </div>
   ${mine?bidsSec+foot:foot+(st==='open'?'':bidsSec)}
-  ${jcomSec(j,D)}
   </div>`;
 }
 const NOTE_MAX=100,noteCount=t=>`${String(t||'').length} / ${NOTE_MAX}`;
@@ -1998,7 +1981,7 @@ function render(){
     lastSheet=st;
     if(pendingLink){const l=pendingLink;pendingLink='';setTimeout(()=>openLink(l),0)}
   }
-  syncNativeTabs();syncJobComs();
+  syncNativeTabs();
   if(fid){const el=$(fid);if(el&&el!==document.activeElement){el.focus({preventScroll:true});try{if(s0!=null)el.setSelectionRange(s0,s1)}catch{}}}
 }
 // The iOS app draws the tab bar natively. The web bar keeps its space (invisible) so layouts don't move,
@@ -2181,9 +2164,6 @@ const ACT={
   cnoteDel(){const id=S.cnote;S.fb.deleteDoc(S.fb.doc(S.db,'cnotes',id)).then(()=>toast('Note removed')).catch(()=>toast('Couldn\u2019t remove it.'));go('cboard')},
   ccomSend(){const t=S.cdraft.comment.trim();if(!t)return;if(modBlock('chat',t))return;S.cdraft.comment='';
     S.fb.addDoc(S.fb.collection(S.db,'ccomments'),{note:S.cnote,community:S.cid,by:S.me.id,t:t.slice(0,500),at:Date.now()}).catch(e=>{console.warn(e);toast('Couldn\u2019t post your comment.')});render()},
-  jcomSend(){const t=S.jc.draft.trim(),j=derive().jobByKey[S.openJob];if(!t||!j)return;if(modBlock('chat',t))return;S.jc.draft='';render();
-    S.fb.addDoc(S.fb.collection(S.db,'jcomments'),{owner:j.owner,job:j.id,by:S.me.id,t:t.slice(0,500)}).catch(e=>{console.warn(e);if(!S.jc.draft)S.jc.draft=t;toast('Couldn\u2019t post your comment.');render()})},
-  jcomDel(el){const id=el.dataset.id,m={...S.jcoms};delete m[id];S.jcoms=m;render();S.fb.deleteDoc(S.fb.doc(S.db,'jcomments',id)).catch(()=>toast('Couldn\u2019t delete it.'))},
   ccomDel(el){S.fb.deleteDoc(S.fb.doc(S.db,'ccomments',el.dataset.id)).catch(()=>toast('Couldn\u2019t delete it.'))},
   recStart(){recStart()},recCancel(){recStop(false)},recSend(){recStop(true)},
   playVoice(el){playVoice(el.dataset.src)},
@@ -2469,7 +2449,7 @@ document.addEventListener('submit',e=>{
   if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset,newpw:setNewPw,otp:doVerifyOtp})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
-document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ciIn'){const c=$('ciSugs');if(c)c.innerHTML=ciSugsHTML();return}if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='msg'){$('composer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='ccomIn'){$('ccomposer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='jcomIn'){$('jcomposer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='q'||e.target.id==='campQ')render();else if(e.target.id==='fCol'||e.target.id==='cpQ')paintCol();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jhue'&&S.draft.white){S.draft.white=false;$('jwhite')?.classList.remove('on')}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
+document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ciIn'){const c=$('ciSugs');if(c)c.innerHTML=ciSugsHTML();return}if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='msg'){$('composer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='ccomIn'){$('ccomposer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='q'||e.target.id==='campQ')render();else if(e.target.id==='fCol'||e.target.id==='cpQ')paintCol();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jhue'&&S.draft.white){S.draft.white=false;$('jwhite')?.classList.remove('on')}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
 document.addEventListener('change',async e=>{
   bind(e);syncNeed();
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}
@@ -2498,7 +2478,6 @@ document.addEventListener('keydown',e=>{
   if(S.intro.on){if(e.key==='ArrowRight'){e.preventDefault();introStep(1)}else if(e.key==='ArrowLeft'){e.preventDefault();introStep(-1)}else if(e.key==='Escape')closeIntro();return}
   if(e.key==='Escape'&&S.sheet){closeSheet();return}
   if(e.key==='Enter'&&e.target.id==='msg'){e.preventDefault();sendMsg();return}
-  if(e.key==='Enter'&&e.target.id==='jcomIn'){e.preventDefault();ACT.jcomSend();return}
   if(e.key==='Enter'&&e.target.id==='invE'){e.preventDefault();ACT.invite();return}
 });
 setInterval(()=>{if(S.phase==='app'&&!document.activeElement?.matches?.('input,textarea'))render()},30000);
