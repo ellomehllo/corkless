@@ -1244,7 +1244,7 @@ function viewBoard(D){
     <button data-go="me" aria-label="Your profile">${ring(S.me.id,48)}</button>
   </header>
   ${online.length?`<section class="stripwrap" aria-label="Online"><p class="label">Online</p>
-    <div class="strip">${online.map(u=>`<button class="person" data-person="${esc(u)}" data-hold="${esc(u)}" aria-label="${esc(firstName(u))} is online">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}</div></section>`:''}
+    <div class="strip">${online.map(u=>`<button class="person" data-person="${esc(u)}" data-hold="${esc(u)}" aria-label="${esc(firstName(u))} is online">${ring(u,74)}<span>${esc(firstName(u))}</span></button>`).join('')}</div></section>`:''}
   ${comChips(cm)}
   <div class="bbody">${cm?comBody(cm,cnotes,tk,D):`${stepsCard(D)}
   
@@ -1460,7 +1460,7 @@ function viewBids(D){
         const np=([l,c])=>[String(l).replace(/\s*·\s*₹[\d,]+/g,'').replace(/₹[\d,]+\s*·\s*/g,''),c];
         const one=f=>f.kind==='j'?row(f.j,np(jobLine(f.j)),f.j.price,me):f.kind==='b'?row(f.y.j,np(bidLine(f.y.x||{j:f.y.j})),f.y.amt)
           :f.cinv||f.fb||f.mreq?`<div class="item notif ninv ${f.at>S.actSeenAt?'new':''}">${ring(f.who,38)}<span class="itext"><span class="ntext">${f.html} <span class="ntime">${shortAgo(f.at)}</span></span>${actBtns(f)}</span>${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</div>`
-          :`<button class="item notif ${f.at>S.actSeenAt?'new':''}${f.earn?' earned':''}" ${f.rev?`data-review="${esc(f.rev)}"`:f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.whos?.length>1?`<span class="avstack">${ring(f.whos[1],34)}${ring(f.whos[0],34)}</span>`:f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html} <span class="ntime">${shortAgo(f.at)}</span></span></span>${f.earn?`<b class="earn">+₹${fmt(f.earn)}</b>`:''}${miniNote(f.job&&D.jobByKey[f.job])}${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`;
+          :`<button class="item notif ${f.at>S.actSeenAt?'new':''}${f.earn?' earned':''}" ${f.rev?`data-review="${esc(f.rev)}"`:f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.whos?.length>1?`<span class="avstack">${ring(f.whos[1],42)}${ring(f.whos[0],42)}</span>`:f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html} <span class="ntime">${shortAgo(f.at)}</span></span></span>${f.earn?`<b class="earn">+₹${fmt(f.earn)}</b>`:''}${miniNote(f.job&&D.jobByKey[f.job])}${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`;
         const names=w=>{const b=u=>'<b>'+esc(firstName(u))+'</b>';return w.length===2?`${b(w[0])} and ${b(w[1])}`:`${b(w[0])}, ${b(w[1])} and ${w.length-2} ${w.length===3?'other':'others'}`};
         const merge=l=>{const out=[],by={};for(const f of l){if(f.kind!=='n'||!f.agg){out.push(f);continue}const g=by[f.agg];if(g){if(!g.whos.includes(f.who))g.whos.push(f.who);continue}const x={...f,whos:[f.who]};by[f.agg]=x;out.push(x)}
           for(const x of Object.values(by))if(x.whos.length>1)x.html=names(x.whos)+' '+x.tail;return out};
@@ -1488,8 +1488,8 @@ function viewChats(D){
   const isReq=t=>(t.keys||[t.key]).every(k=>reqIn(k,t.other)),reqs=D.convos.filter(isReq),rest=D.convos.filter(t=>!isReq(t));
   const reqRow=t=>`<button class="item" data-thread="${esc(t.key)}" data-hold="${esc(t.other)}">${ring(t.other,46)}<span class="itext"><span class="t1">${esc(shortName(t.other))}</span><span class="t2">${esc(t.sub)}</span></span><span class="iend"><span class="tag">Request</span></span></button>`;
   return`<div class="pad narrow"><h1 class="pageh">Chats</h1>
-  ${reqs.length?`<div class="ifeed"><section class="igroup"><h2 class="ihead">Message requests</h2>${reqs.map(reqRow).join('')}</section></div>`:''}
-  ${rest.length?`<div class="ifeed">${dateGroups(rest,t=>t.last?.at||t.job?.at||0).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(t=>`<button class="item" data-thread="${esc(t.key)}" data-hold="${esc(t.other)}">${ring(t.other,46)}
+  ${reqs.length?`<div class="ifeed chatfeed"><section class="igroup"><h2 class="ihead">Message requests</h2>${reqs.map(reqRow).join('')}</section></div>`:''}
+  ${rest.length?`<div class="ifeed chatfeed">${dateGroups(rest,t=>t.last?.at||t.job?.at||0).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(t=>`<button class="item" data-thread="${esc(t.key)}" data-hold="${esc(t.other)}">${ring(t.other,46)}
     <span class="itext"><span class="t1">${esc(shortName(t.other))}</span><span class="t2" style="${t.unread?'color:var(--fg);font-weight:500':''}">${esc(t.sub)}</span></span>
     <span class="iend"><span class="time">${t.last?ago(t.last.at):''}</span>${t.unread?'<span class="udot" aria-label="Unread"></span>':''}</span></button>`).join('')}</section>`).join('')}</div>`
    :reqs.length?'':inviteCard(D,true)}
