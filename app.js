@@ -1141,7 +1141,7 @@ async function tackStoryCard(j){
   const blob=(cx,cy,r,col)=>{const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(0,0,W,H)};
   blob(120,180,900,'rgba(198,242,78,.42)');blob(1040,520,900,'rgba(74,114,214,.55)');blob(420,1100,700,'rgba(159,219,116,.18)');
   x.fillStyle='rgba(255,255,255,.07)';for(let yy=22;yy<H;yy+=44)for(let xx=22;xx<W;xx+=44){x.beginPath();x.arc(xx,yy,2.4,0,7);x.fill()}
-  const icon=await new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(null);i.src='icon-512.png?v=202610191809'});
+  const icon=await new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(null);i.src='icon-512.png?v=202610191814'});
   let y=190;if(icon){x.save();x.shadowColor='rgba(198,242,78,.5)';x.shadowBlur=70;rrect(x,W/2-110,y,220,220,60);x.clip();x.drawImage(icon,W/2-110,y,220,220);x.restore()}y+=300;
   x.fillStyle='#fff';x.textAlign='center';x.font='800 84px Gabarito';const hl=wrapLines(x,j.text,900,5);for(const l of hl){x.fillText(l,W/2,y);y+=96}y+=40;
   const paras=str(j.more,600).split(/\n+/).map(t=>t.trim()).filter(Boolean);
@@ -1238,7 +1238,7 @@ function viewBoard(D){
   const all=boardJobs(D),list=findJobs(all),filtered=!!(S.find.q.trim()||fCount({...fState(),sort:SORT_DEFAULT})),online=onlinePeople(D);
   const cm=S.view==='cboard'&&S.cid&&S.coms[S.cid]&&S.cmine[S.cid]?S.cid:null,cnotes=cm?Object.entries(S.cnotes).map(([k,v])=>({...v,id:k})).sort((a,b)=>b.at-a.at):[],tk=cm?all.filter(j=>isOrg(j.owner)):[];
   return`<div class="boardpage${cm?' oncom':''}"><header class="top">
-    <div><span class="orb homeorb" role="img" aria-label="tack"></span><div class="sub"><span class="dot"></span><span>${cm?tk.length+cnotes.length:all.length} pinned</span></div></div>
+    <div><div class="hometitle">tack</div><div class="sub"><span class="dot"></span><span>${cm?tk.length+cnotes.length:all.length} pinned</span></div></div>
     <button data-go="me" aria-label="Your profile">${ring(S.me.id,48)}</button>
   </header>
   ${online.length?`<section class="stripwrap" aria-label="Online"><p class="label">Online</p>
@@ -2092,7 +2092,7 @@ function render(){
     lastView=S.view;CUR=snap();nbCheck(D);
     $('rail').innerHTML=railHTML(D);
     const navOn=v=>S.view===v||(v==='board'&&['job','person','cboard','cnote','cset'].includes(S.view))||(v==='chats'&&S.view==='chat')||(v==='me'&&['privacy','edit','settings','help'].includes(S.view))||(v==='invites'&&S.view==='invites');
-    $('sidebar').innerHTML=`<div style="padding:0 6px"><span class="orb homeorb" role="img" aria-label="tack"></span><div class="sub"><span class="dot"></span><span>${S.me.isOwner?`<button class="campbtn" data-sheet="campus">${esc(campus())}${ic('chev',12,2.4)}</button>`:esc(campus())} · ${boardJobs(D).length} pinned</span></div></div>
+    $('sidebar').innerHTML=`<div style="padding:0 6px"><div class="hometitle">tack</div><div class="sub"><span class="dot"></span><span>${S.me.isOwner?`<button class="campbtn" data-sheet="campus">${esc(campus())}${ic('chev',12,2.4)}</button>`:esc(campus())} · ${boardJobs(D).length} pinned</span></div></div>
       <button class="cta" data-go="post" style="padding:13px 10px;font-size:var(--t-16)">+ Pin a post</button>
       <nav style="display:flex;flex-direction:column;gap:3px" aria-label="Sections">${[['board','Board','board'],['bids','Activity','bids'],['chats','Chats','chat'],['saved','Saved','bookmark']].concat(S.me.isOwner?[['invites','Invites','users']]:[])
         .map(([v,l,i])=>`<button class="navitem ${navOn(v)?'on':''}" data-go="${v}" ${navOn(v)?'aria-current="page"':''}>${ic(i,18)} ${l}${v==='chats'&&D.unread?'<span class="udot" aria-label="Unread"></span>':''}${v==='bids'&&(D.toConfirm||D.offersWaiting||D.newNotes)?'<span class="udot" aria-label="New activity"></span>':''}</button>`).join('')}</nav>
