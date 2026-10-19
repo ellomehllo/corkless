@@ -1699,9 +1699,11 @@ button.igstat:active b{opacity:.7}
 /* search + filter button; filters in use show as removable chips; the filter sheet */
 .searchrow{display:flex;align-items:center;gap:8px;margin:4px 16px 0}
 .searchrow .search{flex:1;min-width:0;margin:0}
-.fbtn{position:relative;flex-shrink:0;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--surface);color:var(--fg)}
+.sicon{display:flex;align-items:center;cursor:text;color:inherit}
+.sdiv{flex-shrink:0;width:1px;height:20px;background:var(--line)}
+.fbtn{position:relative;flex-shrink:0;width:38px;height:38px;margin-right:-10px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:none;color:var(--fg2)}
 .fbtn.on{color:var(--accent)}
-.fbadge{position:absolute;top:2px;right:2px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:var(--grad);color:var(--on-grad);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.fbadge{position:absolute;top:0;right:0;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:var(--grad);color:var(--on-grad);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
 .fchips{display:flex;gap:7px;overflow-x:auto;padding:10px 16px 2px;scrollbar-width:none}
 .fchips::-webkit-scrollbar{display:none}
 .fchip{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;padding:7px 10px 7px 13px;border-radius:999px;background:var(--surface2);color:var(--fg);font-size:var(--t-12);font-weight:600;white-space:nowrap}
