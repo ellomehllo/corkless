@@ -1141,7 +1141,7 @@ async function tackStoryCard(j){
   const blob=(cx,cy,r,col)=>{const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(0,0,W,H)};
   blob(120,180,900,'rgba(198,242,78,.42)');blob(1040,520,900,'rgba(74,114,214,.55)');blob(420,1100,700,'rgba(159,219,116,.18)');
   x.fillStyle='rgba(255,255,255,.07)';for(let yy=22;yy<H;yy+=44)for(let xx=22;xx<W;xx+=44){x.beginPath();x.arc(xx,yy,2.4,0,7);x.fill()}
-  const icon=await new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(null);i.src='icon-512.png?v=202610191523'});
+  const icon=await new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(null);i.src='icon-512.png?v=202610191558'});
   let y=190;if(icon){x.save();x.shadowColor='rgba(198,242,78,.5)';x.shadowBlur=70;rrect(x,W/2-110,y,220,220,60);x.clip();x.drawImage(icon,W/2-110,y,220,220);x.restore()}y+=300;
   x.fillStyle='#fff';x.textAlign='center';x.font='800 84px Gabarito';const hl=wrapLines(x,j.text,900,5);for(const l of hl){x.fillText(l,W/2,y);y+=96}y+=40;
   const paras=str(j.more,600).split(/\n+/).map(t=>t.trim()).filter(Boolean);
