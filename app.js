@@ -1126,10 +1126,13 @@ const isSaved=k=>Array.isArray(S.priv.saved)&&S.priv.saved.includes(k);
 function wrapLines(x,t,w,max){const out=[];let line='';for(const word of String(t).split(/\s+/)){const tryL=line?line+' '+word:word;if(x.measureText(tryL).width>w&&line){out.push(line);line=word}else line=tryL;if(out.length===max)break}
   if(out.length<max&&line)out.push(line);if(out.length===max&&out.join(' ').length<String(t).trim().length){let l=out[max-1];while(l&&x.measureText(l+'…').width>w)l=l.slice(0,-1);out[max-1]=l.trimEnd()+'…'}return out}
 function rrect(x,X,Y,W,H,R){x.beginPath();x.moveTo(X+R,Y);x.arcTo(X+W,Y,X+W,Y+H,R);x.arcTo(X+W,Y+H,X,Y+H,R);x.arcTo(X,Y+H,X,Y,R);x.arcTo(X,Y,X+W,Y,R);x.closePath()}
-function wordmark(F,col='#F4F6FB'){const c=document.createElement('canvas'),x=c.getContext('2d');x.font=`800 ${F}px Unbounded, Gabarito, sans-serif`;
-  const m=x.measureText('tack'),A=m.fontBoundingBoxAscent||F*.9,D=m.fontBoundingBoxDescent||F*.25;c.width=Math.ceil(m.width+4);c.height=Math.ceil(F);
-  x.font=`800 ${F}px Unbounded, Gabarito, sans-serif`;x.fillStyle=col;x.textBaseline='alphabetic';x.fillText('tack',0,(F-(A+D))/2+A);
-  x.globalCompositeOperation='destination-out';x.beginPath();x.arc(.235*F,.4*F,Math.max(.048*F,1.8),0,7);x.fill();return c}
+function wordmark(F,col='#F4F6FB'){const c=document.createElement('canvas'),x=c.getContext('2d'),k=F*.884/74;c.width=Math.ceil(226*k);c.height=Math.ceil(74*k);
+  x.scale(k,k);x.translate(-77,-318);x.strokeStyle=x.fillStyle=col;x.lineWidth=13.4;x.lineCap=x.lineJoin='round';
+  x.stroke(new Path2D('M99 325.7V370.3a14 14 0 0 0 14 14h7M181.3 345.7V384.3M239.1 352.31A19.8 19.8 0 1 0 238.67 377.23M261.5 325.7V384.3M292.5 345L268.5 366.5L286 384'));
+  x.beginPath();x.arc(161.5,364.5,19.8,0,7);x.stroke();
+  const bar=(w,h)=>{x.save();x.translate(103,344);x.rotate(-8.5*Math.PI/180);x.beginPath();x.roundRect(-w/2,-h/2,w,h,h/2);x.restore()};
+  x.globalCompositeOperation='destination-out';bar(52.6,18.8);x.fill();x.globalCompositeOperation='source-over';bar(47,13.2);x.fill();
+  x.globalCompositeOperation='destination-out';x.lineWidth=2.5;x.beginPath();x.arc(99,345,4.5,0,7);x.stroke();return c}
 function drawPin(x,cx,cy,r,col){x.fillStyle=col;x.beginPath();x.arc(cx,cy,r,0,7);x.fill();x.fillStyle='rgba(6,6,8,.28)';x.beginPath();x.arc(cx-r*.35,cy-r*.32,r*.28,0,7);x.fill();x.fillStyle=col;rrect(x,cx-r*.17,cy+r*.75,r*.35,r*1.5,r*.17);x.fill()}
 async function tackStoryCard(j){
   try{await Promise.all(['800 84px Gabarito','500 40px Figtree','600 34px Figtree','800 76px Unbounded'].map(f=>document.fonts.load(f)))}catch{}
@@ -1138,7 +1141,7 @@ async function tackStoryCard(j){
   const blob=(cx,cy,r,col)=>{const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(0,0,W,H)};
   blob(120,180,900,'rgba(198,242,78,.42)');blob(1040,520,900,'rgba(74,114,214,.55)');blob(420,1100,700,'rgba(159,219,116,.18)');
   x.fillStyle='rgba(255,255,255,.07)';for(let yy=22;yy<H;yy+=44)for(let xx=22;xx<W;xx+=44){x.beginPath();x.arc(xx,yy,2.4,0,7);x.fill()}
-  const icon=await new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(null);i.src='icon-512.png?v=202610050117'});
+  const icon=await new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(null);i.src='icon-512.png?v=202610191523'});
   let y=190;if(icon){x.save();x.shadowColor='rgba(198,242,78,.5)';x.shadowBlur=70;rrect(x,W/2-110,y,220,220,60);x.clip();x.drawImage(icon,W/2-110,y,220,220);x.restore()}y+=300;
   x.fillStyle='#fff';x.textAlign='center';x.font='800 84px Gabarito';const hl=wrapLines(x,j.text,900,5);for(const l of hl){x.fillText(l,W/2,y);y+=96}y+=40;
   const paras=str(j.more,600).split(/\n+/).map(t=>t.trim()).filter(Boolean);
