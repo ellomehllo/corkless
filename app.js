@@ -64,7 +64,8 @@ const I={
  mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/>',
  play:'<polygon points="7 4 20 12 7 20 7 4"/>',
  pause:'<line x1="8" y1="5" x2="8" y2="19"/><line x1="16" y1="5" x2="16" y2="19"/>',
- bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
+ bellset:'<path d="M16.4 6.6A5.5 5.5 0 0 0 5.5 8.5c0 6.5-2.5 8.5-2.5 8.5h10"/><path d="M8.8 20.6a1.8 1.8 0 0 0 3.1 0"/><circle cx="18" cy="17.5" r="2.3"/><path d="M18 13.4v1.3M18 20.3v1.3M13.9 17.5h1.3M20.8 17.5h1.3M15.1 14.6l.9.9M20 19.5l.9.9M15.1 20.4l.9-.9M20 15.5l.9-.9"/>',
+  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
  camera:'<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.5" r="3.5"/>',
  eyeoff:'<path d="M10.6 5.1A9.7 9.7 0 0 1 12 5c6.5 0 10 7 10 7a17.4 17.4 0 0 1-2.4 3.3M6.6 6.6C3.6 8.5 2 12 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="m3 3 18 18"/>',
  ban:'<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
@@ -118,6 +119,7 @@ const arr=v=>Array.isArray(v)?v.filter(x=>typeof x==='string'):[];
 const validEmail=e=>/^[^\s@/]+@[^\s@/]+\.[^\s@/]{2,}$/.test(e);
 function clock(t){const d=new Date(t),h=d.getHours()%12||12,m=String(d.getMinutes()).padStart(2,'0');return `${h}:${m} ${d.getHours()<12?'am':'pm'}`}
 function ago(t){const s=(Date.now()-t)/1000;if(s<60)return'now';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';const d=new Date(t);return d.toLocaleDateString('en-IN',{day:'numeric',month:'short'})}
+const shortAgo=t=>{const s=(Date.now()-t)/1e3;return s<60?'now':s<3600?Math.floor(s/60)+'m':s<86400?Math.floor(s/3600)+'h':s<604800?Math.floor(s/86400)+'d':s<2419200?Math.floor(s/604800)+'w':new Date(t).toLocaleDateString('en-IN',{day:'numeric',month:'short'})};
 function since(t){const a=ago(t);return a==='now'?'just now':/^\d+[mh]$/.test(a)?a+' ago':'on '+a}
 function chatStamp(t){const d=new Date(t),now=new Date(),day=x=>new Date(x).setHours(0,0,0,0),days=Math.round((day(now)-day(d))/864e5);
   if(days===0)return clock(t);if(days===1)return'Yesterday '+clock(t);if(days<7)return d.toLocaleDateString('en-IN',{weekday:'short'})+' '+clock(t);
@@ -256,7 +258,7 @@ function notesOf(D){const me=S.me.id,out=[],J=k=>D.jobByKey[k],t=j=>{const x=str
   const joined=num(S.myDoc?.joinedAt);add(joined,'tack','Welcome to tack. Pin a small post or comment on one from the board.',{go:'board'});
   for(const j of D.jobs){
     if(j.owner===me){
-      for(const b of bidsFor(D,j.key))if(b.by!==me&&ok(b.by))add(b.at,b.by,`${nm(b.by)} ${A('commented on')} ${t(j)}`,{job:j.key});
+      for(const b of bidsFor(D,j.key))if(b.by!==me&&ok(b.by))add(b.at,b.by,`${nm(b.by)} ${A('commented on')} ${t(j)}`,{job:j.key,agg:'c~'+j.key,tail:`${A('commented on')} ${t(j)}`});
       const pk=j.pick;if(PAY_ON&&pk&&ok(pk.doer)){const pay=payOf(j);
         if(pay)add(pay.at,pk.doer,pay.ok?`${nm(pk.doer)} ${A('confirmed your payment')} for ${t(j)}`:`${nm(pk.doer)} says your payment for ${t(j)} ${A('hasn\u2019t arrived yet')}`,{job:j.key})}
       const st=jobState(j);
@@ -1439,7 +1441,7 @@ function viewBids(D){
     <span style="font-size:var(--t-14);line-height:1.4;color:var(--fg);overflow-wrap:anywhere">${esc(o.text)}</span>
     ${o.status==='pending'?`<div class="offeracts"><button class="ghostbtn" data-act="declineOffer" data-key="${esc(o.key)}">Not this time</button><button class="pick" data-act="acceptOffer" data-key="${esc(o.key)}">Accept</button></div>`
       :`<p class="okmsg">Accepted. ${esc(firstName(o.owner))} will message you here.</p>`}</div>`;
-  return`<div class="pad narrow"><h1 class="pageh">Activity</h1>
+  return`<div class="pad narrow"><div class="acthead"><h1 class="pageh">Activity</h1><button class="iconbtn" data-sheet="notifset" aria-label="Notification settings">${ic('bellset',22)}</button></div>
    <div class="stack">
     ${oin.length?`<div class="sect"><h2 class="h2">Offers for you</h2></div><div class="stack gap8">${oin.map(offerCard).join('')}</div>`:''}
     ${oout.length?`<div class="sect"><h2 class="h2">Offers you sent</h2></div><div class="stack gap8">${oout.map(o=>`<div class="row">${ring(o.to,38)}<span class="rowtext"><span class="t1">${esc(shortName(o.to))} · ₹${fmt(o.price)}</span><span class="t2">${askStale(o)?'No answer':'Waiting for them to answer'} · ${esc(o.text)}</span></span>
@@ -1457,9 +1459,12 @@ function viewBids(D){
       ${S.actTab==='all'?(()=>{const feed=[...D.notes.map(n=>({...n,kind:'n'})),...jobsNow.map(j=>({kind:'j',j,at:j.at})),...[...active,...waiting,...notPicked].map(y=>({kind:'b',y,at:y.at||y.j.at}))].sort((a,b)=>b.at-a.at);
         const np=([l,c])=>[String(l).replace(/\s*·\s*₹[\d,]+/g,'').replace(/₹[\d,]+\s*·\s*/g,''),c];
         const one=f=>f.kind==='j'?row(f.j,np(jobLine(f.j)),f.j.price,me):f.kind==='b'?row(f.y.j,np(bidLine(f.y.x||{j:f.y.j})),f.y.amt)
-          :f.cinv||f.fb||f.mreq?`<div class="item notif ninv ${f.at>S.actSeenAt?'new':''}">${ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span>${actBtns(f)}</span>${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</div>`
-          :`<button class="item notif ${f.at>S.actSeenAt?'new':''}${f.earn?' earned':''}" ${f.rev?`data-review="${esc(f.rev)}"`:f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html}</span><span class="t2">${since(f.at)}</span></span>${f.earn?`<b class="earn">+₹${fmt(f.earn)}</b>`:''}${miniNote(f.job&&D.jobByKey[f.job])}${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`;
-        return feed.length?`<div class="ifeed allfeed">${dateGroups(feed,f=>f.at).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${l.map(one).join('')}</section>`).join('')}</div>`:empty('Comments, picks and payments show up here.')})()
+          :f.cinv||f.fb||f.mreq?`<div class="item notif ninv ${f.at>S.actSeenAt?'new':''}">${ring(f.who,38)}<span class="itext"><span class="ntext">${f.html} <span class="ntime">${shortAgo(f.at)}</span></span>${actBtns(f)}</span>${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</div>`
+          :`<button class="item notif ${f.at>S.actSeenAt?'new':''}${f.earn?' earned':''}" ${f.rev?`data-review="${esc(f.rev)}"`:f.job?`data-job="${esc(f.job)}"`:f.person?`data-person="${esc(f.person)}"`:`data-go="${f.go}"`}>${f.whos?.length>1?`<span class="avstack">${ring(f.whos[1],34)}${ring(f.whos[0],34)}</span>`:f.who==='tack'?tackFace(38):ring(f.who,38)}<span class="itext"><span class="ntext">${f.html} <span class="ntime">${shortAgo(f.at)}</span></span></span>${f.earn?`<b class="earn">+₹${fmt(f.earn)}</b>`:''}${miniNote(f.job&&D.jobByKey[f.job])}${f.at>S.actSeenAt?'<span class="udot" aria-label="New"></span>':''}</button>`;
+        const names=w=>{const b=u=>'<b>'+esc(firstName(u))+'</b>';return w.length===2?`${b(w[0])} and ${b(w[1])}`:`${b(w[0])}, ${b(w[1])} and ${w.length-2} ${w.length===3?'other':'others'}`};
+        const merge=l=>{const out=[],by={};for(const f of l){if(f.kind!=='n'||!f.agg){out.push(f);continue}const g=by[f.agg];if(g){if(!g.whos.includes(f.who))g.whos.push(f.who);continue}const x={...f,whos:[f.who]};by[f.agg]=x;out.push(x)}
+          for(const x of Object.values(by))if(x.whos.length>1)x.html=names(x.whos)+' '+x.tail;return out};
+        return feed.length?`<div class="ifeed allfeed">${dateGroups(feed,f=>f.at).map(([g,l])=>`<section class="igroup"><h2 class="ihead">${g}</h2>${merge(l).map(one).join('')}</section>`).join('')}</div>`:empty('Comments, picks and payments show up here.')})()
       :S.actTab==='jobs'?`${jobsNow.length?`<div class="ifeed"><section class="igroup">${jobsNow.map(j=>row(j,jobLine(j),j.price,me)).join('')}</section></div>`:empty('Nothing pinned right now.')}
 `
       :S.actTab==='bids'?(active.length||waiting.length||notPicked.length?`<div class="ifeed">${grp('Active',active)+grp('Waiting',waiting)+grp('Not picked',notPicked)}</div>`:empty('Comments you post on the board show up here.'))
@@ -1917,6 +1922,11 @@ function sheetHTML(D){
       ${admin&&r==='organiser'?`<button data-act="cRole" data-uid="${esc(u)}" data-r="member">${ic('shield',18)}<span class="rowtext"><span class="t1">Dismiss as organiser</span><span class="t2">${fn} stays on the board as a member.</span></span></button>`:''}
       ${admin&&r!=='owner'?`<button class="danger" data-act="cRemove" data-uid="${esc(u)}">${ic('x',18)}<span class="rowtext"><span class="t1">Remove from board</span><span class="t2">${fn} won\u2019t see this board any more.</span></span></button>`:''}
     </div>`;break}
+  case'notifset':{const on=pushOn(),blocked=!IOS_APP&&pushReady()&&Notification.permission==='denied';
+    b=`<h2 id="sheetT">Notifications</h2>
+    <div class="setcard"><button class="setrow" role="switch" aria-checked="${on}" data-act="${on?'pushOff':'pushOn'}" ${pushReady()&&!blocked?'':'disabled'}><span class="rowtext"><span class="t1">Notifications on this device</span><span class="t2">${!pushReady()?'This browser can\u2019t show notifications. Add tack to your home screen to get them.':blocked?'Turned off for tack in your browser or phone settings. Turn them on there first.':on?'You\u2019ll hear about these even when tack is closed.':'Turn on to hear about these even when tack is closed.'}</span></span><span class="switch ${on?'on':''}" aria-hidden="true"></span></button></div>
+    <div class="setcard"><div class="setrow static"><span class="rowtext"><span class="t1">What you hear about</span><span class="t2">Comments on your posts, getting picked, posts marked done, reviews, messages and message requests, and board invites. Everything also shows here in Activity.</span></span></div></div>
+    <button class="btn2" data-act="closeSheet">Done</button>`;break}
   case'cperm':{const k=s.about,c=S.coms[S.cid]||{},cur=k==='posts'?(c.whoPosts||'all'):k==='invites'?(c.whoInvites||'admins'):(c.whoEdits||'admins');
     const t={posts:'Who can add notes',invites:'Who can add people',edits:'Who can edit board info'}[k];
     b=`<h2 id="sheetT">${t}</h2><div class="menu" role="radiogroup" aria-label="${t}">${[['all','Everyone','Every member of the board.'],['admins','Only organisers','The owner and organisers.']].map(([v,l,d])=>`<button role="radio" aria-checked="${cur===v}" data-act="cPermSet" data-k="${k}" data-v="${v}">${ic(cur===v?'tick':'users',18)}<span class="rowtext"><span class="t1">${l}</span><span class="t2">${d}</span></span></button>`).join('')}</div>`;break}
