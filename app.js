@@ -169,7 +169,9 @@ const restricted=()=>arr(S.priv.restricted).filter(u=>typeof u==='string');
 // Theme: 'dark' (default for existing members), 'light' or 'system'. Kept on this device and in private settings.
 const THEMES=['dark','light','system'],lightMQ=matchMedia('(prefers-color-scheme: light)');
 const themePref=()=>{try{const t=localStorage.getItem('tack.theme');return THEMES.includes(t)?t:''}catch{return''}};
-function applyTheme(p){const t=p==='system'?(lightMQ.matches?'light':'dark'):p==='light'?'light':'dark';document.documentElement.dataset.theme=t;
+function applyTheme(p){const t=p==='system'?(lightMQ.matches?'light':'dark'):p==='light'?'light':'dark';
+  const calm=document.createElement('style');calm.textContent='*,*::before,*::after{transition:none!important}';document.head.append(calm);
+  document.documentElement.dataset.theme=t;void document.body?.offsetHeight;requestAnimationFrame(()=>requestAnimationFrame(()=>calm.remove()));
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content',t==='light'?'#F3F4F6':'#060608')}
 function setTheme(p,save=true){if(!THEMES.includes(p))return;try{localStorage.setItem('tack.theme',p)}catch{}applyTheme(p);if(save&&S.me)savePriv({theme:p});else render()}
 lightMQ.addEventListener?.('change',()=>{if(themePref()==='system')applyTheme('system')});
@@ -857,7 +859,7 @@ function mediaUrl(path){S.media=S.media||{};const v=S.media[path];if(v!==undefin
   S.sb.storage.from('chat').createSignedUrl(path,6*3600).then(({data})=>{S.media[path]=data?.signedUrl||'';if(data?.signedUrl)S.pics['m:'+path]=[data.signedUrl];if(S.view==='chat')render()}).catch(()=>{S.media[path]=''});return null}
 const mmss=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
 function msgBody(m){if(m.kind==='photo'){const u=mediaUrl(m.media);return u?`<button class="mphoto" data-pic="${esc('m:'+m.media)}" data-i="0" aria-label="Open photo"><img src="${esc(u)}" alt="Photo"></button>`:'<span class="mphoto wait"></span>'}
-  if(m.kind==='audio'){const u=mediaUrl(m.media),on=S.playing===m.media;return`<span class="maudio"><button class="mplay" data-act="playVoice" data-src="${esc(m.media)}" ${u?'':'disabled'} aria-label="${on?'Pause':'Play'} voice message">${ic(on?'pause':'play',16,2.2,'currentColor',on?'none':'currentColor')}</button><span class="mwave"><i style="width:${on?S.playPct||0:0}%"></i></span><span class="mdur">${mmss(m.dur)}</span></span>`}
+  if(m.kind==='audio'){const u=mediaUrl(m.media),on=S.playing===m.media;return`<span class="maudio"><button class="mplay" data-act="playVoice" data-src="${esc(m.media)}" ${u?'':'disabled'} aria-label="${on?'Pause':'Play'} voice message">${ic(on?'pause':'play',16,2.2,'currentColor',on?'none':'currentColor')}</button><span class="mwave"><i style="transform:scaleX(${(on?S.playPct||0:0)/100})"></i></span><span class="mdur">${mmss(m.dur)}</span></span>`}
   return esc(m.t)}
 // Replies, reactions and unsending, like Instagram: swipe a message to reply, hold it for reactions and more, double-tap to heart.
 const REACTS=['❤️','😂','😮','😢','👍','🔥'];
@@ -895,7 +897,7 @@ function recStop(send){const r=S.rec;if(!r)return;clearInterval(r.tick);S.rec=nu
   try{r.rec.stop()}catch{r.stream.getTracks().forEach(t=>t.stop())}render()}
 function playVoice(path){const u=S.media?.[path];if(!u)return;S.audio=S.audio||new Audio();const a=S.audio;
   if(S.playing===path&&!a.paused){a.pause();S.playing=null;render();return}
-  a.src=u;S.playing=path;S.playPct=0;a.ontimeupdate=()=>{S.playPct=a.duration?Math.round(a.currentTime/a.duration*100):0;const b=document.querySelector(`[data-src="${CSS.escape(path)}"]`)?.parentElement?.querySelector('.mwave i');if(b)b.style.width=S.playPct+'%'};
+  a.src=u;S.playing=path;S.playPct=0;a.ontimeupdate=()=>{S.playPct=a.duration?Math.round(a.currentTime/a.duration*100):0;const b=document.querySelector(`[data-src="${CSS.escape(path)}"]`)?.parentElement?.querySelector('.mwave i');if(b)b.style.transform=`scaleX(${S.playPct/100})`};
   a.onended=()=>{S.playing=null;S.playPct=0;render()};a.play().catch(()=>{S.playing=null;toast('Couldn\u2019t play that.')});render()}
 function markSeen(){
   const c=S.chat;if(!c.key||S.view!=='chat')return;const me=S.me.id,patch={};
@@ -2043,7 +2045,7 @@ function stepsCard(D){if(!S.priv.introSeen||S.priv.stepsHidden||S.priv.stepsDone
   // Once all three are done the card is gone for good, even if a step is undone later.
   if(n===steps.length){if(!S.stepsSaving){S.stepsSaving=true;setTimeout(()=>savePriv({stepsDone:Date.now()}))}return''}
   return`<section class="steps" aria-label="Your first steps"><div class="stepshead"><b>Your first steps</b><span>${n} of ${steps.length} done</span><button class="iconbtn" data-act="hideSteps" aria-label="Hide first steps">${ic('x',14,2.4)}</button></div>
-    <div class="stepbar"><span style="width:${Math.round(n/steps.length*100)}%"></span></div>
+    <div class="stepbar"><span style="transform:scaleX(${n/steps.length})"></span></div>
     ${steps.map(([done,t,h,at])=>`<button class="step ${done?'done':''}" ${done?'disabled':at}><span class="stepdot">${done?ic('tick',12,3.2):''}</span><span class="rowtext"><span class="t1">${t}</span><span class="t2">${done?'Done':h}</span></span>${done?'':`<span class="chev">${ic('chev',16)}</span>`}</button>`).join('')}</section>`}
 const NEED={
   signup:()=>S.form.name.trim().length>=2&&validEmail(S.form.email.trim())&&S.form.pw.length>=8,
