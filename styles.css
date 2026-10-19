@@ -713,7 +713,7 @@ a.cta{text-decoration:none}
   -webkit-mask:radial-gradient(circle at .235em .4em,transparent max(.048em,1.8px),#000 calc(max(.048em,1.8px) + .6px));
   mask:radial-gradient(circle at .235em .4em,transparent max(.048em,1.8px),#000 calc(max(.048em,1.8px) + .6px))}
 .mark::before{content:none;display:none}
-.tackav{border:0;background:url(icon-192.png?v=202610191558) center/cover}
+.tackav{border:0;background:url(icon-192.png?v=202610191809) center/cover}
 .bigpin{width:88px;height:88px;border-radius:24px;background:url(icon-192.png?v=202610050117) center/cover;filter:drop-shadow(0 14px 30px rgba(170,226,84,.45))}
 .appicon{width:76px;height:76px;border-radius:20px;display:block;box-shadow:0 14px 34px -10px rgba(170,226,84,.6)}
 
@@ -1809,6 +1809,13 @@ html[data-nav="board"]::view-transition-group(bbody){animation:none}
 /* tack logo: the pin t wordmark, drawn in the text colour */
 .mark{display:inline-block;flex-shrink:0;width:2.7em;height:.884em;overflow:hidden;white-space:nowrap;color:transparent;text-shadow:none;user-select:none;-webkit-user-select:none;
   background:var(--fg);-webkit-mask:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='77 318 226 74'%3E%3Cdefs%3E%3Cmask id='g' maskUnits='userSpaceOnUse' x='77' y='318' width='226' height='74'%3E%3Crect x='77' y='318' width='226' height='74' fill='%23fff'/%3E%3Crect x='76.7' y='334.6' width='52.6' height='18.8' rx='9.4' transform='rotate(-8.5 103 344)'/%3E%3C/mask%3E%3Cmask id='h' maskUnits='userSpaceOnUse' x='77' y='318' width='226' height='74'%3E%3Crect x='77' y='318' width='226' height='74' fill='%23fff'/%3E%3Ccircle cx='99' cy='345' r='4.5' fill='none' stroke='%23000' stroke-width='2.5'/%3E%3C/mask%3E%3C/defs%3E%3Cg fill='none' stroke='%23fff' stroke-width='13.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M99 325.7V370.3a14 14 0 0 0 14 14h7' mask='url(%23g)'/%3E%3Ccircle cx='161.5' cy='364.5' r='19.8'/%3E%3Cpath d='M181.3 345.7V384.3M239.1 352.31A19.8 19.8 0 1 0 238.67 377.23M261.5 325.7V384.3M292.5 345L268.5 366.5L286 384'/%3E%3C/g%3E%3Crect x='79.5' y='337.4' width='47' height='13.2' rx='6.6' fill='%23fff' transform='rotate(-8.5 103 344)' mask='url(%23h)'/%3E%3C/svg%3E");mask:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='77 318 226 74'%3E%3Cdefs%3E%3Cmask id='g' maskUnits='userSpaceOnUse' x='77' y='318' width='226' height='74'%3E%3Crect x='77' y='318' width='226' height='74' fill='%23fff'/%3E%3Crect x='76.7' y='334.6' width='52.6' height='18.8' rx='9.4' transform='rotate(-8.5 103 344)'/%3E%3C/mask%3E%3Cmask id='h' maskUnits='userSpaceOnUse' x='77' y='318' width='226' height='74'%3E%3Crect x='77' y='318' width='226' height='74' fill='%23fff'/%3E%3Ccircle cx='99' cy='345' r='4.5' fill='none' stroke='%23000' stroke-width='2.5'/%3E%3C/mask%3E%3C/defs%3E%3Cg fill='none' stroke='%23fff' stroke-width='13.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M99 325.7V370.3a14 14 0 0 0 14 14h7' mask='url(%23g)'/%3E%3Ccircle cx='161.5' cy='364.5' r='19.8'/%3E%3Cpath d='M181.3 345.7V384.3M239.1 352.31A19.8 19.8 0 1 0 238.67 377.23M261.5 325.7V384.3M292.5 345L268.5 366.5L286 384'/%3E%3C/g%3E%3Crect x='79.5' y='337.4' width='47' height='13.2' rx='6.6' fill='%23fff' transform='rotate(-8.5 103 344)' mask='url(%23h)'/%3E%3C/svg%3E")}
-.gate:has(> .loading){background:linear-gradient(170deg,#D7F473 0%,#CBEE6F 45%,#ABD982 82%,#92BC9F 100%)}
-.gate:has(> .loading)::before,.gate:has(> .loading)::after{content:none}
-.loading .mark{font-size:80px;background:#fff}
+/* tack sphere: the app icon as a logo on the loading, log in and sign up screens */
+.orb{display:block;flex-shrink:0;width:var(--orb,72px);aspect-ratio:1;background:url(icon-512.png?v=202610191809) center/contain no-repeat;filter:drop-shadow(0 12px 16px rgba(0,0,0,.5))}
+:root[data-theme="light"] .orb{filter:drop-shadow(0 12px 16px rgba(27,42,102,.2))}
+.loading .orb{--orb:112px;animation:orbfloat 2.8s ease-in-out infinite}
+@keyframes orbfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@media (prefers-reduced-motion:reduce){.loading .orb{animation:none}}
+.authlogo{display:flex;flex-direction:column;align-items:center;gap:14px}
+.authlogo .mark{align-self:center}
+.homeorb{--orb:40px;filter:drop-shadow(0 4px 7px rgba(0,0,0,.45))}
+:root[data-theme="light"] .homeorb{filter:drop-shadow(0 4px 7px rgba(27,42,102,.18))}

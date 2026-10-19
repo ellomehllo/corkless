@@ -5,7 +5,7 @@ self.addEventListener('push', e => {
   try { p = e.data ? e.data.json() : {}; } catch {}
   const n = p.notification || {}, d = p.data || {};
   e.waitUntil(self.registration.showNotification(d.title || n.title || 'tack', {
-    body: d.body || n.body || '', icon: 'icon-192.png?v=202610191558', badge: 'icon-192.png?v=202610191558', tag: 'tack-' + (d.tag || 'note'), renotify: true,
+    body: d.body || n.body || '', icon: 'icon-192.png?v=202610191809', badge: 'icon-192.png?v=202610191809', tag: 'tack-' + (d.tag || 'note'), renotify: true,
     data: { link: d.link || self.registration.scope }
   }));
 });

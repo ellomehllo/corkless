@@ -1027,17 +1027,17 @@ function authHTML(){
      ${S.authErr?`<p class="err" role="alert">${esc(S.authErr)}</p>`:''}${S.authMsg?`<p class="okmsg" role="status">${esc(S.authMsg)}</p>`:''}
      <button class="cta" type="submit" data-need="reset" ${S.busy?'disabled':''}>Send reset link</button>
      <button type="button" class="linkbtn" data-auth="login">Back to log in</button></form>`;
-  return`<div class="gatebox authbox"><div class="mark">tack</div>
+  return`<div class="gatebox authbox"><div class="authlogo"><span class="orb" aria-hidden="true"></span><div class="mark">tack</div></div>
     <div class="authcard">${m==='reset'?'<h1 class="authh">Reset your password</h1>':tabs}${body}</div></div>`;
 }
 function gateHTML(){
   const email=esc(S.user?.email||'');
   switch(S.phase){
-  case'loading':return`<div class="loading"><div class="mark">tack</div></div>`;
+  case'loading':return`<div class="loading"><span class="orb" role="img" aria-label="tack is loading"></span></div>`;
   case'setup':return`<div class="gatebox"><div class="mark">tack</div><h1>Almost ready</h1><p>This site isn't connected to its database yet. Add the Supabase project URL and key to <b>supabase-config.js</b> and reload.</p></div>`;
   case'offline':return`<div class="gatebox"><div class="mark">tack</div><h1>Can't reach tack</h1><p>Check your connection and reload the page.</p><button class="cta" data-act="reload">Reload</button></div>`;
   case'auth':return authHTML();
-  case'verify':return`<div class="gatebox"><div class="mark">tack</div><h1>Check your email</h1>
+  case'verify':return`<div class="gatebox"><div class="authlogo"><span class="orb" aria-hidden="true"></span><div class="mark">tack</div></div><h1>Check your email</h1>
     <p>We sent a 6-digit code to <b>${email}</b>. Type it here to get into tack. Check spam if it isn’t there in a minute.</p>
     <form class="stack" id="authForm" data-form="otp" novalidate style="gap:12px">
       <input id="fOtp" class="inp otpinp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" value="${esc(S.form.otp||'')}" data-bind="form.otp" aria-label="6-digit code">
@@ -1045,12 +1045,12 @@ function gateHTML(){
       <button class="cta" type="submit" ${S.busy?'disabled':''}>${S.busy?'Checking…':'Confirm'}</button></form>
     <button class="btn2" data-act="resendVerify">Send a new code</button>
     <button class="linkbtn" data-act="logout">Use a different email</button></div>`;
-  case'newpw':return`<div class="gatebox"><div class="mark">tack</div><h1>Set a new password</h1>
+  case'newpw':return`<div class="gatebox"><div class="authlogo"><span class="orb" aria-hidden="true"></span><div class="mark">tack</div></div><h1>Set a new password</h1>
     <form class="stack" id="authForm" data-form="newpw" novalidate style="gap:14px">
     <div class="stack gap8"><label class="formlabel" for="fNewPw">New password</label><span class="pwwrap"><input id="fNewPw" class="inp" type="${S.showPw?'text':'password'}" autocomplete="new-password" placeholder="At least 8 characters" value="${esc(S.pw.nw)}" data-bind="pw.nw"><button type="button" class="pwtoggle" data-act="togglePw" aria-label="${S.showPw?'Hide':'Show'} password">${S.showPw?'Hide':'Show'}</button></span></div>
     ${S.err.pw?`<p class="err" role="alert">${esc(S.err.pw)}</p>`:''}
     <button class="cta" type="submit" ${S.busy?'disabled':''}>${S.busy?'Saving…':'Save password'}</button></form></div>`;
-  case'campus':{const c=S.cpick;return`<div class="gatebox"><div class="mark">tack</div>
+  case'campus':{const c=S.cpick;return`<div class="gatebox"><div class="authlogo"><span class="orb" aria-hidden="true"></span><div class="mark">tack</div></div>
     <h1>${c.add?'Name your college':'Pick your campus'}</h1>
     ${c.add?`<p>You’re the first from <b>@${esc(c.dom)}</b>. Tell us your college and tack makes its board. Everyone with the same kind of email joins you there.</p>
       <div class="stack gap8"><input id="cpCol" class="inp" maxlength="60" placeholder="College name" value="${esc(c.ncol)}" data-bind="cpick.ncol">
@@ -1141,7 +1141,7 @@ async function tackStoryCard(j){
   const blob=(cx,cy,r,col)=>{const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(0,0,W,H)};
   blob(120,180,900,'rgba(198,242,78,.42)');blob(1040,520,900,'rgba(74,114,214,.55)');blob(420,1100,700,'rgba(159,219,116,.18)');
   x.fillStyle='rgba(255,255,255,.07)';for(let yy=22;yy<H;yy+=44)for(let xx=22;xx<W;xx+=44){x.beginPath();x.arc(xx,yy,2.4,0,7);x.fill()}
-  const icon=await new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(null);i.src='icon-512.png?v=202610191558'});
+  const icon=await new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(null);i.src='icon-512.png?v=202610191809'});
   let y=190;if(icon){x.save();x.shadowColor='rgba(198,242,78,.5)';x.shadowBlur=70;rrect(x,W/2-110,y,220,220,60);x.clip();x.drawImage(icon,W/2-110,y,220,220);x.restore()}y+=300;
   x.fillStyle='#fff';x.textAlign='center';x.font='800 84px Gabarito';const hl=wrapLines(x,j.text,900,5);for(const l of hl){x.fillText(l,W/2,y);y+=96}y+=40;
   const paras=str(j.more,600).split(/\n+/).map(t=>t.trim()).filter(Boolean);
@@ -1238,7 +1238,7 @@ function viewBoard(D){
   const all=boardJobs(D),list=findJobs(all),filtered=!!(S.find.q.trim()||fCount({...fState(),sort:SORT_DEFAULT})),online=onlinePeople(D);
   const cm=S.view==='cboard'&&S.cid&&S.coms[S.cid]&&S.cmine[S.cid]?S.cid:null,cnotes=cm?Object.entries(S.cnotes).map(([k,v])=>({...v,id:k})).sort((a,b)=>b.at-a.at):[],tk=cm?all.filter(j=>isOrg(j.owner)):[];
   return`<div class="boardpage${cm?' oncom':''}"><header class="top">
-    <div><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${cm?tk.length+cnotes.length:all.length} pinned</span></div></div>
+    <div><span class="orb homeorb" role="img" aria-label="tack"></span><div class="sub"><span class="dot"></span><span>${cm?tk.length+cnotes.length:all.length} pinned</span></div></div>
     <button data-go="me" aria-label="Your profile">${ring(S.me.id,48)}</button>
   </header>
   ${online.length?`<section class="stripwrap" aria-label="Online"><p class="label">Online</p>
@@ -2092,7 +2092,7 @@ function render(){
     lastView=S.view;CUR=snap();nbCheck(D);
     $('rail').innerHTML=railHTML(D);
     const navOn=v=>S.view===v||(v==='board'&&['job','person','cboard','cnote','cset'].includes(S.view))||(v==='chats'&&S.view==='chat')||(v==='me'&&['privacy','edit','settings','help'].includes(S.view))||(v==='invites'&&S.view==='invites');
-    $('sidebar').innerHTML=`<div style="padding:0 6px"><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${S.me.isOwner?`<button class="campbtn" data-sheet="campus">${esc(campus())}${ic('chev',12,2.4)}</button>`:esc(campus())} · ${boardJobs(D).length} pinned</span></div></div>
+    $('sidebar').innerHTML=`<div style="padding:0 6px"><span class="orb homeorb" role="img" aria-label="tack"></span><div class="sub"><span class="dot"></span><span>${S.me.isOwner?`<button class="campbtn" data-sheet="campus">${esc(campus())}${ic('chev',12,2.4)}</button>`:esc(campus())} · ${boardJobs(D).length} pinned</span></div></div>
       <button class="cta" data-go="post" style="padding:13px 10px;font-size:var(--t-16)">+ Pin a post</button>
       <nav style="display:flex;flex-direction:column;gap:3px" aria-label="Sections">${[['board','Board','board'],['bids','Activity','bids'],['chats','Chats','chat'],['saved','Saved','bookmark']].concat(S.me.isOwner?[['invites','Invites','users']]:[])
         .map(([v,l,i])=>`<button class="navitem ${navOn(v)?'on':''}" data-go="${v}" ${navOn(v)?'aria-current="page"':''}>${ic(i,18)} ${l}${v==='chats'&&D.unread?'<span class="udot" aria-label="Unread"></span>':''}${v==='bids'&&(D.toConfirm||D.offersWaiting||D.newNotes)?'<span class="udot" aria-label="New activity"></span>':''}</button>`).join('')}</nav>
