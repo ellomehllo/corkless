@@ -57,6 +57,7 @@ const I={
  link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/>',
  search:'<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
+ menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
  sliders:'<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
  x:'<path d="M6 6l12 12M18 6 6 18"/>',
  mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/>',
@@ -1066,10 +1067,10 @@ function onboardHTML(edit){
 function back(to){return`<button class="back" data-act="goBack" data-to="${to}" aria-label="Back">${ic('back',20)}</button>`}
 // One overflow menu (⋯) per page, top right. The page keeps its main action in view; everything else lives here.
 // Items: {i:icon,t:label,at:'data-… attributes',danger,v:value} · {sep:1} · {html}
-function kebab(id,items,label='More options',cls=''){
+function kebab(id,items,label='More options',cls='',icon='dots'){
   items=items.filter(Boolean).filter((x,i,a)=>!(x.sep&&(i===0||a[i-1].sep)));while(items.length&&items[items.length-1].sep)items.pop();
   if(!items.some(x=>x.at))return'';const open=S.omenu===id;
-  return`<div class="omenu${cls?' '+cls:''}${open?' open':''}"><button class="obtn" data-act="omenu" data-id="${id}" aria-haspopup="menu" aria-expanded="${open}" aria-label="${esc(label)}">${ic('dots',20,2.4)}</button>${open?`<div class="opop" role="menu" aria-label="${esc(label)}">${items.map(x=>x.sep?'<span class="osep" role="separator"></span>':x.html||`<button role="menuitem" class="oitem${x.danger?' danger':''}" ${x.at}>${ic(x.i,18)}<span class="ot">${x.t}</span>${x.v?`<span class="oval">${x.v}</span>`:''}</button>`).join('')}</div>`:''}</div>`}
+  return`<div class="omenu${cls?' '+cls:''}${open?' open':''}"><button class="obtn" data-act="omenu" data-id="${id}" aria-haspopup="menu" aria-expanded="${open}" aria-label="${esc(label)}">${icon==='menu'?ic('menu',22,2.2):ic('dots',20,2.4)}</button>${open?`<div class="opop" role="menu" aria-label="${esc(label)}">${items.map(x=>x.sep?'<span class="osep" role="separator"></span>':x.html||`<button role="menuitem" class="oitem${x.danger?' danger':''}" ${x.at}>${ic(x.i,18)}<span class="ot">${x.t}</span>${x.v?`<span class="oval">${x.v}</span>`:''}</button>`).join('')}</div>`:''}</div>`}
 const LOGO={
   wa:'<svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><path fill="#fff" d="M16 4.5A11.4 11.4 0 0 0 6.2 21.7L4.6 27.4l5.9-1.5A11.4 11.4 0 1 0 16 4.5Z"/><path fill="#25D366" d="M16 6.6a9.3 9.3 0 0 0-7.9 14.3l.2.4-1 3.4 3.5-.9.4.2A9.3 9.3 0 1 0 16 6.6Z"/><path fill="#fff" d="M12.5 10.6c-.2-.5-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0-1.1 2.7c0 1.6 1.2 3.1 1.3 3.3s2.3 3.6 5.6 4.9c2.8 1.1 3.3.9 4 .8s2-.8 2.2-1.6.3-1.5.2-1.6-.3-.2-.6-.4l-2.1-1c-.3-.1-.5-.2-.7.1l-1 1.2c-.2.2-.4.2-.7.1a7.6 7.6 0 0 1-2.2-1.4 8.4 8.4 0 0 1-1.5-1.9c-.2-.3 0-.5.1-.6l.5-.6.3-.5a.6.6 0 0 0 0-.5l-1-2.4Z"/></svg>',
   ig:'<svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><rect x="5.5" y="5.5" width="21" height="21" rx="6.5" fill="none" stroke="#fff" stroke-width="2.4"/><circle cx="16" cy="16" r="5" fill="none" stroke="#fff" stroke-width="2.4"/><circle cx="21.9" cy="10.1" r="1.5" fill="#fff"/></svg>'};
@@ -1542,8 +1543,8 @@ function viewPerson(uid,D){
      {html:`<div class="themerow orow">${ic('moon',18)} Appearance<span class="seg" role="group" aria-label="Appearance">${[['dark','Dark'],['light','Light'],['system','Auto']].map(([k,l])=>`<button data-act="setThemeTo" data-k="${k}" class="${(themePref()||'dark')===k?'on':''}" aria-pressed="${(themePref()||'dark')===k}"${k==='system'?' title="Match your phone"':''}>${l}</button>`).join('')}</span></div>`},
      S.me.isOwner?{i:'users',t:'Invites and members',at:'data-go="invites"'}:null,
      {sep:1},{i:'board',t:'How tack works',at:'data-act="replayIntro"'},{i:'shield',t:'Settings and privacy',at:'data-go="settings"'},{i:'flag',t:'Report or feedback',at:'data-go="help"'},
-     {sep:1},{i:'out',t:'Log out',at:'data-act="logout"',danger:true}],'Profile options')
-    :kebab('person',[{i:'eyeoff',t:'Restrict or block…',at:`data-sheet="who" data-about="${esc(uid)}"`},{i:'flag',t:'Report',at:`data-sheet="report" data-about="${esc(uid)}"`,danger:true}],'Options for '+shortName(uid));
+     {sep:1},{i:'out',t:'Log out',at:'data-act="logout"',danger:true}],'Menu','','menu')
+    :kebab('person',[{i:'eyeoff',t:'Restrict or block…',at:`data-sheet="who" data-about="${esc(uid)}"`},{i:'flag',t:'Report',at:`data-sheet="report" data-about="${esc(uid)}"`,danger:true}],'Options for '+shortName(uid),'','menu');
   loadProfileNotes(uid);
   const tab=isMe&&PTABS.includes(S.ptab)?S.ptab:'notes',c=S.pnotes[uid];
   const name=org?'tack':handleOf(uid)?'@'+handleOf(uid):shortName(uid);
