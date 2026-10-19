@@ -1248,9 +1248,10 @@ function viewBoard(D){
   ${comChips(cm)}
   <div class="bbody">${cm?comBody(cm,cnotes,tk,D):`${stepsCard(D)}
   
-  <div class="searchrow"><div class="search"><label class="sicon" for="q">${ic('search',17)}</label><input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search posts" value="${esc(S.find.q)}" data-bind="find.q" aria-label="Search posts">${S.find.q?`<button class="sclear" data-act="clearSearch" aria-label="Clear search">${ic('x',14,2.4)}</button>`:''}<span class="sdiv" aria-hidden="true"></span><button class="fbtn${fCount(fState())?' on':''}" data-act="openFilters" aria-label="Filters${fCount(fState())?`, ${fCount(fState())} on`:''}">${ic('sliders',18,2)}${fCount(fState())?`<span class="fbadge">${fCount(fState())}</span>`:''}</button></div></div>
+  <div class="searchrow"><div class="search"><label class="sicon" for="q">${ic('search',17)}</label><input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search posts or use filters" value="${esc(S.find.q)}" data-bind="find.q" aria-label="Search posts">${S.find.q?`<button class="sclear" data-act="clearSearch" aria-label="Clear search">${ic('x',14,2.4)}</button>`:''}<span class="sdiv" aria-hidden="true"></span><button class="fbtn${fCount(fState())?' on':''}" data-act="openFilters" aria-label="Filters${fCount(fState())?`, ${fCount(fState())} on`:''}">${ic('sliders',18,2)}${fCount(fState())?`<span class="fbadge">${fCount(fState())}</span>`:''}</button></div></div>
+  ${S.find.q.trim()&&!fCount(fState())?`<p class="shint">Narrow it down with <button class="linkbtn" data-act="openFilters">filters</button>: type, time, place and more.</p>`:''}
   ${fChips()}
-  <div class="wallzone ${S.dropping?'dropin':''}">${filtered&&!list.length&&all.length?`<div class="empty"><b>${S.near&&!S.find.q.trim()&&fCount(fState())===(S.sort!==SORT_DEFAULT?2:1)?'Nothing near you right now':'No posts match that'}</b><p>${S.near&&fCount(fState())===(S.sort!==SORT_DEFAULT?2:1)?'Only posts pinned with a location can show as near you.':'Try fewer filters or another word, like the place, the time or what you need.'}</p><button class="btn2" data-act="clearFind">Show all posts</button></div>`:list.length?wallHTML(list,D)+`<div class="boardend"><span class="endpin" aria-hidden="true"></span>${filtered?`<p>${list.length} of ${all.length} posts shown.</p>`:''}<button class="btn2" data-go="post">Pin a post</button></div>`
+  <div class="wallzone ${S.dropping?'dropin':''}">${filtered&&!list.length&&all.length?`<div class="empty"><b>${S.near&&!S.find.q.trim()&&fCount(fState())===(S.sort!==SORT_DEFAULT?2:1)?'Nothing near you right now':'No posts match that'}</b><p>${S.near&&fCount(fState())===(S.sort!==SORT_DEFAULT?2:1)?'Only posts pinned with a location can show as near you.':fCount(fState())?'Try fewer filters or another word, like the place, the time or what you need.':'Try another word, or use filters to browse by type, time or place.'}</p><button class="btn2" data-act="clearFind">Show all posts</button></div>`:list.length?wallHTML(list,D)+`<div class="boardend"><span class="endpin" aria-hidden="true"></span>${filtered?`<p>${list.length} of ${all.length} posts shown.</p>`:''}<button class="btn2" data-go="post">Pin a post</button></div>`
     :`<div class="empty"><b>Nothing pinned yet</b><p>Pin the first post: a xerox run, a lift down four floors, an hour of help before a submission.</p><button class="cta" data-go="post">Pin a post</button></div>`}</div>`}</div></div>`;
 }
 function viewTackNote(j){if(S.shareImg?.key!==j.key&&!S.shareBusy){S.shareBusy=true;noteCard(j).then(b=>{S.shareBusy=false;if(b)S.shareImg={key:j.key,blob:b,url:URL.createObjectURL(b)}}).catch(()=>{S.shareBusy=false})}const mine=j.owner===S.me.id,st=jobState(j),jp=j.pics?picsOf('j:'+j.key):null;
@@ -1258,7 +1259,7 @@ function viewTackNote(j){if(S.shareImg?.key!==j.key&&!S.shareBusy){S.shareBusy=t
   const enter=S.tkSeen!==j.key;S.tkSeen=j.key;
   return`<div class="tackpage${enter?' enter':''}">
    <div class="tkbg" style="--t:-${(Date.now()/1000%60).toFixed(2)}s" aria-hidden="true"><i class="tb1"></i><i class="tb2"></i><i class="tb3"></i></div>
-   <div class="tktop">${back('board')}<div class="jtools">${mine&&st==='open'?`<button class="jtool" data-act="editJob" data-key="${esc(j.key)}" aria-label="Edit">${ic('edit',18)}</button>`:''}<button class="jtool" data-act="openShare" data-key="${esc(j.key)}" aria-label="Share">${ic('share',18)}</button></div></div>
+   <div class="tktop">${back('board')}<div class="jtools">${mine&&st==='open'?`<button class="jtool" data-act="editJob" data-key="${esc(j.key)}" aria-label="Edit">${ic('edit',18)}</button>`:''}</div></div>
    <div class="tkhero">
      <span class="tkicon"></span>
      <h1 class="tkh">${esc(j.text)}</h1>
@@ -2502,8 +2503,13 @@ const ACT={
   tackFeedback(){S.help={kind:'feedback',job:null,why:'',note:'',sent:null};S.err={};go('help')},
   async shareTo(el,key){const j=derive().jobByKey[key||S.sheet?.key];if(!j)return;const to=el.dataset.to,text=jobShareText(j),img=S.shareImg?.key===j.key?S.shareImg:null;
     const f=img&&typeof File==='function'?new File([img.blob],'tack-job.png',{type:'image/png'}):null,files=f&&navigator.canShare?.({files:[f]})?[f]:null;
-    try{if(to==='wa'){if(files)await navigator.share({files,text});else window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener')}
-      else if(to==='ig'){if(files)await navigator.share({files});else{saveImg();toast(img?'Image saved. Add it to your Instagram story.':'Making the image, try again in a second.')}}
+    try{if(to==='wa')window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener');
+      else if(to==='ig'){if(!img){toast('Making the image, try again in a second.');return}
+        // Instagram has no web link into the story composer: copy the link for a link sticker, then hand Instagram the image.
+        try{await navigator.clipboard.writeText(jobLink(j))}catch{}
+        if(isIOS()&&files){toast('Tap Instagram, then Story. The link is copied for a link sticker.');await navigator.share({files})}
+        else if(/Android/i.test(navigator.userAgent)){saveImg();toast('Image saved and link copied. Pick it for your story and add a link sticker.');setTimeout(()=>{location.href='instagram://story-camera'},700)}
+        else{saveImg();toast('Image saved and link copied. Post it to your Instagram story from your phone.')}}
       else if(to==='sys')await navigator.share(files?{files,text}:{text,url:jobLink(j)});
       else if(to==='save'){if(img){saveImg();toast('Image saved')}else toast('Making the image, try again in a second.')}
       else if(to==='copy')navigator.clipboard.writeText(jobLink(j)).then(()=>toast('Link copied'),()=>toast('Couldn’t copy'))}catch{}},

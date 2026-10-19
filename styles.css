@@ -1832,3 +1832,7 @@ html[data-nav="board"]::view-transition-group(bbody){animation:none}
 .avstack>.ring:last-child{right:0;bottom:0;background:var(--bg);box-shadow:0 0 0 2px var(--bg)}
 .ifeed{gap:22px}
 .ifeed+.ifeed{margin-top:18px}
+.shint{margin:8px 16px 0;font-size:var(--t-12);line-height:1.4;color:var(--muted)}
+.shint .linkbtn{padding:0;font:inherit;font-weight:600;color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+@media (min-width:900px){.shint{margin:8px 28px 0}}
+
