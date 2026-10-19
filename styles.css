@@ -281,6 +281,8 @@ html[data-nav="tab"]::view-transition-new(main){animation:fadeIn .2s ease both}
 /* the board: everything above the notes stays put, only the notes scroll */
 .main[data-view="board"],.main[data-view="cboard"]{overflow:hidden;display:flex;flex-direction:column}
 .main[data-view="board"]>.boardpage,.main[data-view="cboard"]>.boardpage{flex:1;min-height:0}
+.bbody{flex:1;min-height:0;display:flex;flex-direction:column}
+.bbody>*{flex-shrink:0}
 .cinfo{display:flex;align-items:flex-start;gap:10px;padding:12px 16px 10px}
 .cinfo .rowtext{flex:1;min-width:0;gap:6px}
 .cinfo .cabout{font-size:var(--fs-c)}
@@ -288,7 +290,7 @@ html[data-nav="tab"]::view-transition-new(main){animation:fadeIn .2s ease both}
 .oncom .boardend .cadd{position:static;width:auto;padding-left:22px;padding-right:22px}
 @media (min-width:900px){.cinfo{padding:12px 28px 12px}}
 .boardpage>*{flex-shrink:0}
-.boardpage>.wallzone{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;background-attachment:local;-webkit-overflow-scrolling:touch}
+.bbody>.wallzone{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;background-attachment:local;-webkit-overflow-scrolling:touch}
 .boardend{display:flex;flex-direction:column;align-items:center;gap:10px;padding:6px 16px 36px;text-align:center}
 .boardend p{margin:0;font-size:var(--t-12);font-weight:500;color:var(--dim)}
 .boardend .btn2{width:auto;padding:10px 20px;font-size:var(--t-12)}
@@ -1307,7 +1309,9 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .comrow .comchip{scroll-snap-align:start}
 .comrow::-webkit-scrollbar{display:none}
 .comchip{flex-shrink:0;display:inline-flex;align-items:center;gap:5px;padding:2px 0 11px;background:none;color:var(--muted);font-size:var(--t-14);font-weight:600;white-space:nowrap}
-.comchip.on{color:var(--fg);box-shadow:inset 0 -2px 0 var(--fg)}
+.comchip{position:relative}
+.comchip.on{color:var(--fg)}
+.tabline{position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:2px;background:var(--fg)}
 .comchip.invited{color:var(--accent)}
 .comchip.cnewchip{font-weight:500}
 @media (min-width:900px){.comrow{margin:0 28px 6px}}
@@ -1709,7 +1713,7 @@ button.igstat:active b{opacity:.7}
 .fchip{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;padding:7px 10px 7px 13px;border-radius:999px;background:var(--surface2);color:var(--fg);font-size:var(--t-12);font-weight:600;white-space:nowrap}
 .fchip svg{opacity:.7}
 .fclear{flex-shrink:0;padding:7px 4px;color:var(--muted);font-size:var(--t-12);font-weight:500;white-space:nowrap}
-.boardpage>.wallzone{margin-top:12px}
+.bbody>.wallzone{margin-top:12px}
 .fhead{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .fhead .linkbtn{padding:0;color:var(--muted)}.fhead .linkbtn[disabled]{opacity:.4}
 .fsec{display:flex;flex-direction:column;gap:9px}
@@ -1722,3 +1726,66 @@ button.igstat:active b{opacity:.7}
 .ffoot{position:sticky;bottom:calc(-18px - env(safe-area-inset-bottom,0px));margin:4px -16px calc(-18px - env(safe-area-inset-bottom,0px));padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px));background:var(--rail);display:flex;flex-direction:column;gap:6px;text-align:center}
 .ffoot .note{text-align:center}
 @media (min-width:900px){.searchrow{margin:4px 28px 0}.fchips{padding:10px 28px 2px}.ffoot{bottom:-24px;margin:4px -24px -24px;padding:12px 24px 18px}}
+
+/* switching boards: the header and search stay still, the tabs slide into their new order, the underline glides to
+   the board you picked, and only the part under the tabs changes, with a soft cross-fade */
+html[data-nav="board"] .boardpage>.top{view-transition-name:btop}
+html[data-nav="board"] .comrow{view-transition-name:btabs}
+html[data-nav="board"] .comchip{view-transition-name:var(--vt,none)}
+html[data-nav="board"] .tabline{view-transition-name:btabline}
+html[data-nav="board"] .bbody{view-transition-name:bbody}
+html[data-nav="board"]::view-transition-old(main),html[data-nav="board"]::view-transition-new(main){animation:none}
+html[data-nav="board"]::view-transition-old(root),html[data-nav="board"]::view-transition-new(root){animation:none}
+html[data-nav="board"]::view-transition-group(*){animation-duration:.32s;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
+html[data-nav="board"]::view-transition-old(btop),html[data-nav="board"]::view-transition-new(btop),
+html[data-nav="board"]::view-transition-old(btabs),html[data-nav="board"]::view-transition-new(btabs){animation:none}
+html[data-nav="board"]::view-transition-old(bbody){animation:bbOut .16s ease both}
+html[data-nav="board"]::view-transition-new(bbody){animation:bbIn .3s cubic-bezier(.2,.8,.2,1) both}
+html[data-nav="board"]::view-transition-group(bbody){animation:none}
+@keyframes bbOut{to{opacity:0}}
+@keyframes bbIn{from{opacity:0;transform:translateY(10px)}}
+
+/* custom boards: settings gear, wall backgrounds, settings page */
+.cgear{flex-shrink:0;width:40px;height:40px;margin:-4px -8px 0 0;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--fg2)}
+.cgear:active{background:var(--surface)}
+.cinfo .cmembers{cursor:default}
+.oncom .searchrow{margin-top:4px}
+/* a board's background: a colour wash under the usual dot grid (cork and paper get their own texture) */
+.cbg-dots{}
+.cbg-cork{background-color:#3a2a1c;background-image:radial-gradient(circle,rgba(255,226,180,.12) 0 1.2px,transparent 1.8px),radial-gradient(circle,rgba(0,0,0,.25) 0 1px,transparent 1.6px);background-size:9px 9px,13px 13px}
+.cbg-paper{background-color:#ece6d8;background-image:linear-gradient(rgba(70,90,140,.13) 1px,transparent 1px);background-size:100% 26px}
+.cbg-lime{background-color:#1d2a10;background-image:radial-gradient(circle,rgba(198,242,78,.16) 0 1.2px,transparent 1.7px);background-size:22px 22px}
+.cbg-ocean{background-color:#0b1d36;background-image:radial-gradient(circle,rgba(120,180,255,.18) 0 1.2px,transparent 1.7px),linear-gradient(180deg,#0e2747,#07162b);background-size:22px 22px,100% 100%}
+.cbg-sunset{background-color:#2b1424;background-image:radial-gradient(circle,rgba(255,190,150,.16) 0 1.2px,transparent 1.7px),linear-gradient(180deg,#3a1830,#22101d);background-size:22px 22px,100% 100%}
+.cbg-berry{background-color:#24112f;background-image:radial-gradient(circle,rgba(230,160,255,.16) 0 1.2px,transparent 1.7px);background-size:22px 22px}
+.cbg-mint{background-color:#0f2622;background-image:radial-gradient(circle,rgba(140,255,215,.15) 0 1.2px,transparent 1.7px);background-size:22px 22px}
+:root[data-theme="light"] .cbg-lime{background-color:#eef7d8;background-image:radial-gradient(circle,rgba(70,110,0,.18) 0 1.2px,transparent 1.7px)}
+:root[data-theme="light"] .cbg-ocean{background-color:#dcebfb;background-image:radial-gradient(circle,rgba(20,70,140,.16) 0 1.2px,transparent 1.7px);background-size:22px 22px}
+:root[data-theme="light"] .cbg-sunset{background-color:#fbe4dc;background-image:radial-gradient(circle,rgba(150,60,40,.15) 0 1.2px,transparent 1.7px);background-size:22px 22px}
+:root[data-theme="light"] .cbg-berry{background-color:#f1e1f8;background-image:radial-gradient(circle,rgba(110,40,140,.15) 0 1.2px,transparent 1.7px)}
+:root[data-theme="light"] .cbg-mint{background-color:#dcf4ec;background-image:radial-gradient(circle,rgba(20,110,80,.15) 0 1.2px,transparent 1.7px)}
+:root[data-theme="light"] .cbg-cork{background-color:#c79a6b}
+.bbody>.wallzone[class*="cbg-"]:not(.cbg-dots){background-attachment:local}
+.cshero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px}
+.cshero .cabout{max-width:32em}
+.cshero .btn2{width:auto;margin-top:6px;padding:9px 16px;display:inline-flex;align-items:center;gap:7px}
+.csprev{width:120px;height:86px;border-radius:18px;margin-bottom:6px;position:relative;overflow:hidden;box-shadow:inset 0 0 0 1px var(--line)}
+.csprev i{position:absolute;width:34px;height:30px;border-radius:7px;background:var(--surface2);box-shadow:0 4px 10px rgba(0,0,0,.3)}
+.csprev i:nth-child(1){left:12px;top:14px;background:#C6F24E}.csprev i:nth-child(2){left:52px;top:22px;background:#7FA2FF}.csprev i:nth-child(3){left:30px;top:48px;background:#FF8FB1}
+.cbgs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.cbgsw{aspect-ratio:1/1;border-radius:16px;position:relative;overflow:hidden;box-shadow:inset 0 0 0 1px var(--line);display:flex;align-items:flex-end;justify-content:center;padding:6px}
+.cbgsw.cbg-dots,.csprev.cbg-dots{background-color:var(--surface);background-image:radial-gradient(circle,rgba(244,241,250,.12) 0 1.2px,transparent 1.7px);background-size:11px 11px}
+.cbgsw[class*="cbg-"],.csprev[class*="cbg-"]{background-size:11px 11px,100% 100%}
+.cbgsw.cbg-paper,.csprev.cbg-paper{background-size:100% 13px}
+.cbgsw span{font-size:var(--t-11);font-weight:600;color:var(--fg);background:rgba(0,0,0,.35);padding:2px 7px;border-radius:999px}
+:root[data-theme="light"] .cbgsw span{background:rgba(255,255,255,.75)}
+.cbgsw.on{box-shadow:inset 0 0 0 2px var(--accent)}
+.cbgsw.on::after{content:'';position:absolute;top:7px;right:7px;width:16px;height:16px;border-radius:50%;background:var(--grad)}
+.cmrow2 .rowtext{flex:1;min-width:0}
+.ctag2{flex-shrink:0;font-size:var(--t-11);font-weight:600;color:var(--accent);padding:3px 9px;border-radius:999px;background:rgba(198,242,78,.12)}
+.cadd2{flex-shrink:0;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:var(--grad);color:var(--on-grad)}
+.dangertxt{color:var(--danger)}
+.cmhead{display:flex;align-items:center;gap:12px}
+.cmhead h2{margin:0}
+.cmhead .t2{font-size:var(--t-12);color:var(--muted)}
+.cbgsw.cbg-paper span{background:rgba(255,255,255,.85);color:#1b1b20}

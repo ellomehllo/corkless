@@ -58,6 +58,7 @@ const I={
  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/>',
  search:'<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
  menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+ gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
  sliders:'<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
  x:'<path d="M6 6l12 12M18 6 6 18"/>',
  mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/>',
@@ -96,7 +97,7 @@ const S={
   view:'board', openJob:null, personOf:null, sort:'high', find:{q:'',tags:[],price:'',photos:false}, near:false, fd:null,
   draft:blankDraft(), bid:{key:null,amt:'',say:'',pics:[]}, pics:{}, revs:{}, allRevs:null, pw:{cur:'',nw:''}, pwOpen:false, help:{kind:null,job:null,why:'',note:'',sent:null}, actTab:'all', actSeenAt:0, intro:{on:false,i:0}, fresh:null, chatDraft:{text:''}, pay:{upi:null,ref:''},
   onb:{name:'',photo:'',year:'',branch:'',does:'',ring:'',banner:'',adult:false,rules:false},
-  inv:{email:'',campus:'',camp:''}, camp:{q:''}, coms:{}, cmine:{}, cinv:{}, cid:null, cnote:null, cnotes:{}, ccoms:{}, cmembers:{}, cdraft:{name:'',about:'',text:'',more:'',color:'#7FA2FF',handle:'',comment:''}, lastInvite:null, myCampus:null, campuses:{}, viewCampus:(()=>{try{return localStorage.getItem('tack.viewCampus')||''}catch{return''}})(),
+  inv:{email:'',campus:'',camp:''}, camp:{q:''}, coms:{}, cmine:{}, cinv:{}, cid:null, cnote:null, cnotes:{}, ccoms:{}, cfind:{q:''}, cpend:{}, cmembers:{}, cdraft:{name:'',about:'',text:'',more:'',color:'#7FA2FF',handle:'',comment:''}, lastInvite:null, myCampus:null, campuses:{}, viewCampus:(()=>{try{return localStorage.getItem('tack.viewCampus')||''}catch{return''}})(),
   picks:{}, repDocs:{},
   sheet:null, omenu:null, pnotes:{}, ptab:'notes', following:{}, followers:{}, ffeed:[], rate:{a:0,b:0,c:0,d:0,text:'',rev:'',pics:[]}, rep:{why:'',note:'',block:false}, erase:{pw:''},
   chat:{key:null}, err:{}
@@ -735,13 +736,14 @@ async function setNewPw(){if(!need(S.pw.nw.length>=8,'pw','Use a new password of
   S.recovery=false;S.pw={cur:'',nw:''};S.err={};toast('Password set');handleUser(userOf(data.user))}
 async function checkPw(pw){const {error}=await S.sb.auth.signInWithPassword({email:S.user.email,password:pw});if(error)throw authErr(error)}
 
-function closeCom(){(S.comSubs||[]).forEach(u=>{try{u()}catch{}});S.comSubs=[];S.cid=null;S.cnote=null;S.cnotes={};S.ccoms={};S.cmembers={}}
-function openCom(id){if(S.cid===id){go('cboard');return}closeCom();S.cid=id;const {collection,query,where,onSnapshot}=S.fb,db=S.db;
+function closeCom(){S.cnotesOk=false;(S.comSubs||[]).forEach(u=>{try{u()}catch{}});S.comSubs=[];S.cid=null;S.cnote=null;S.cnotes={};S.ccoms={};S.cmembers={}}
+function openCom(id){if(S.cid===id){go('cboard');return}const swap=S.view==='cboard';closeCom();S.cid=id;S.cnotes=(S.cnCache||{})[id]||{};S.cnotesOk=!!(S.cnCache||{})[id];S.cmembers=(S.cmCache||{})[id]||{};S.cfind={q:''};S.cpend={};const {collection,query,where,onSnapshot}=S.fb,db=S.db;
   const r=()=>{if(S.phase==='app')render()};
-  S.comSubs=[onSnapshot(query(collection(db,'cnotes'),where('community','==',id)),snap=>{const c={};snap.forEach(x=>{c[x.id]=x.data()});S.cnotes=c;r()},e=>console.warn(e)),
+  S.comSubs=[onSnapshot(query(collection(db,'cnotes'),where('community','==',id)),snap=>{const c={};snap.forEach(x=>{c[x.id]=x.data()});if(S.cid!==id)return;S.cnotes=c;S.cnotesOk=true;S.cnCache={...(S.cnCache||{}),[id]:c};r()},e=>console.warn(e)),
     onSnapshot(query(collection(db,'ccomments'),where('community','==',id)),snap=>{const c={};snap.forEach(x=>{c[x.id]=x.data()});S.ccoms=c;r()},e=>console.warn(e)),
-    onSnapshot(query(collection(db,'cmembers'),where('community','==',id)),snap=>{const c={};snap.forEach(x=>{const d=x.data();c[d.uid]=d.role});S.cmembers=c;r()},e=>console.warn(e))];
-  go('cboard')}
+    onSnapshot(query(collection(db,'cinvites'),where('community','==',id)),snap=>{const c={};snap.forEach(x=>{const d=x.data();c[d.uid]=d});if(S.cid!==id)return;S.cpend=c;r()},e=>console.warn(e)),
+    onSnapshot(query(collection(db,'cmembers'),where('community','==',id)),snap=>{const c={};snap.forEach(x=>{const d=x.data();c[d.uid]=d.role});if(S.cid!==id)return;S.cmembers=c;S.cmCache={...(S.cmCache||{}),[id]:c};r()},e=>console.warn(e))];
+  S.comSwap=swap;go('cboard')}
 // Username suggestions when inviting to a board: people you can already see (your campus, board mates, people you've worked with).
 // Matching usernames first, then people you've worked with, then whoever's online. Members and people you've blocked are left out.
 function ciSugs(){const q=S.cdraft.handle.trim().replace(/^@/,'').toLowerCase(),me=S.me.id,D=derive(),bl=new Set(arr(S.priv.blocked)),mem=S.cmembers||{},l=[];
@@ -755,6 +757,13 @@ function ciSugsHTML(){const l=ciSugs(),q=S.cdraft.handle.trim();
   return`${q?'':'<span class="formlabel">Suggested</span>'}<div class="menu hsugs">${l.map(x=>`<button data-act="comInviteH" data-h="${esc(x.h)}" aria-label="Invite @${esc(x.h)}">${ring(x.u,34)}<span class="rowtext"><span class="t1">@${esc(x.h)}</span><span class="t2">${esc(x.w?'Worked together':realNameOf(x.u)||campusName(campusOf(x.u)))}</span></span><span class="pick">Invite</span></button>`).join('')}</div>`}
 const comName=id=>str(S.coms[id]?.name,40)||'Board';
 const comOwner=id=>S.cmine[id]==='owner';
+// Board roles and settings (board-settings.sql): owner and organisers manage; each permission is 'all' or 'admins'.
+const comAdmin=id=>['owner','organiser'].includes(S.cmine[id]);
+const COM_DEF={post:'all',invite:'admins',edit:'admins'},COM_FIELD={post:'whoPosts',invite:'whoInvites',edit:'whoEdits'};
+const comCan=(id,what)=>!!S.cmine[id]&&(comAdmin(id)||((S.coms[id]||{})[COM_FIELD[what]]||COM_DEF[what])==='all');
+const COM_BGS=[['dots','Dots'],['cork','Cork'],['paper','Paper'],['lime','Lime'],['ocean','Ocean'],['sunset','Sunset'],['berry','Berry'],['mint','Mint']];
+const comBg=id=>{const b=(S.coms[id]||{}).bg;return COM_BGS.some(x=>x[0]===b)?b:'dots'};
+const roleName=r=>r==='owner'?'Owner':r==='organiser'?'Organiser':'';
 // The board tabs, like chats: the board you're on comes first, then the rest by when you last opened them (on this
 // device). Swipe the row sideways when they don't fit. Invites and New board stay at the end.
 const BSEEN_KEY='tack.boardsSeen';
@@ -763,20 +772,54 @@ function markBoardSeen(k){try{const o=boardsSeen();o[k]=Date.now();localStorage.
 function comChips(cm){const mine=Object.keys(S.cmine).filter(id=>S.coms[id]),inv=Object.keys(S.cinv).filter(id=>S.coms[id]);
   const cur=cm||'home';markBoardSeen(cur);const seen=boardsSeen();
   const order=['home',...mine].sort((a,b)=>(a===cur?-1:b===cur?1:0)||num(seen[b])-num(seen[a])||(a==='home'?-1:b==='home'?1:comName(a).localeCompare(comName(b))));
+  const vt=k=>` style="--vt:bt-${String(k).replace(/[^a-zA-Z0-9_-]/g,'')}"`,line='<i class="tabline" aria-hidden="true"></i>';
   const tab=k=>k==='home'
-    ?(cm?`<button class="comchip" data-go="board">${esc(campus())}</button>`:S.me.isOwner?`<button class="comchip on" data-sheet="campus" aria-current="page" aria-label="${esc(campus())}, switch campus">${esc(campus())}${ic('chev',12,2.4)}</button>`:`<button class="comchip on" aria-current="page">${esc(campus())}</button>`)
-    :k===cm?`<button class="comchip on" aria-current="page">${esc(comName(k))}</button>`:`<button class="comchip" data-com="${esc(k)}">${esc(comName(k))}</button>`;
+    ?(cm?`<button class="comchip" data-go="board"${vt(k)}>${esc(campus())}</button>`:S.me.isOwner?`<button class="comchip on" data-sheet="campus" aria-current="page" aria-label="${esc(campus())}, switch campus"${vt(k)}>${esc(campus())}${ic('chev',12,2.4)}${line}</button>`:`<button class="comchip on" aria-current="page"${vt(k)}>${esc(campus())}${line}</button>`)
+    :k===cm?`<button class="comchip on" aria-current="page"${vt(k)}>${esc(comName(k))}${line}</button>`:`<button class="comchip" data-com="${esc(k)}"${vt(k)}>${esc(comName(k))}</button>`;
   return`<div class="comrow" role="navigation" aria-label="Boards">${order.map(tab).join('')}${inv.map(id=>`<button class="comchip invited" data-sheet="cjoin" data-about="${esc(id)}">${ic('mail',13)} ${esc(comName(id))}</button>`).join('')}<button class="comchip cnewchip" data-sheet="cnew">${ic('plus',14)} New board</button></div>`}
 function cnoteTile(n,i){const c=COLOR_RE.test(n.color||'')?n.color:'#7FA2FF',k=Object.values(S.ccoms).filter(x=>x.note===n.id).length,ph=n.pics?(picsOf('c:'+n.id)||[])[0]:'',tags=[n.where,n.when].filter(Boolean).join(' · ');
   return`<button class="tile ntile cntile r${i%3}" data-cnote="${esc(n.id)}" style="--nc:${c};--i:${i};--d:0s"><span class="tbg ${ph?'ph':''}" aria-hidden="true">${ph?`<img src="${ph}" alt="">`:''}</span><span class="pin"></span>${n.pics?`<span class="tpics">${ic('camera',12,2.2)} ${n.pics} ${n.pics===1?'photo':'photos'}</span>`:''}<p>${esc(n.text)}</p>${tags?`<span class="where">${ic('place',12,2.2)}<span>${esc(tags)}</span></span>`:''}
     <span class="by">${face(n.by,22)}<span class="nm">${esc(firstName(n.by))}</span><span class="n">${ic('chat',12,2.2)} ${k}</span></span></button>`}
-// tk: tack's open posts, which go up on every board (first), then the board's own notes.
-function comBody(id,notes,tk,D){const c=S.coms[id],n=Object.keys(S.cmembers).length,owner=comOwner(id);
-  const cols=wideMQ.matches?3:2,col=Array.from({length:cols},()=>[]);tk.forEach((j,i)=>col[i%cols].push(tile(j,D,i)));notes.forEach((x,i)=>col[(i+tk.length)%cols].push(cnoteTile(x,i+tk.length)));
-  return`<div class="cinfo"><div class="rowtext">${c.about?`<p class="cabout">${esc(c.about)}</p>`:''}<button class="cmembers" data-sheet="cmembers">${ic('users',13,2.2)} ${n} ${n===1?'member':'members'}</button></div>
-    ${kebab('cboard',[{i:'users',t:'Members',v:String(n),at:'data-sheet="cmembers"'},owner?{i:'plus',t:'Invite people',at:'data-sheet="cinvite"'}:null],'Board options')}</div>
-  <div class="wallzone">${notes.length||tk.length?`<div class="wall">${col.map(x=>`<div class="wcol">${x.join('')}</div>`).join('')}</div>`:`<div class="empty"><b>No notes yet</b><p>Add the first note for ${esc(c.name)}.</p></div>`}
-    <div class="boardend"><button class="cta cadd" data-act="cnoteStart">${ic('plus',17,2.4,'var(--on-grad)')} Add a note</button></div></div>`}
+// tk: tack's open posts, which go up on every board (first), then the board's own notes. Search covers both.
+function comBody(id,notes,tk,D){const c=S.coms[id],n=Object.keys(S.cmembers).length,q=S.cfind.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const hit=h=>q.every(w=>h.toLowerCase().includes(w));
+  const tl=q.length?tk.filter(j=>hit([j.text,j.more,j.where,j.when].join(' '))):tk,nl=q.length?notes.filter(x=>hit([x.text,x.more,x.where,x.when,firstName(x.by)].join(' '))):notes;
+  const cols=wideMQ.matches?3:2,col=Array.from({length:cols},()=>[]);tl.forEach((j,i)=>col[i%cols].push(tile(j,D,i)));nl.forEach((x,i)=>col[(i+tl.length)%cols].push(cnoteTile(x,i+tl.length)));
+  return`<div class="searchrow"><div class="search"><label class="sicon" for="cq">${ic('search',17)}</label><input id="cq" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search ${esc(c.name)}" value="${esc(S.cfind.q)}" data-bind="cfind.q" aria-label="Search this board">${S.cfind.q?`<button class="sclear" data-act="clearCSearch" aria-label="Clear search">${ic('x',14,2.4)}</button>`:''}</div></div>
+  <div class="cinfo"><div class="rowtext">${c.about?`<p class="cabout">${esc(c.about)}</p>`:''}<span class="cmembers">${ic('users',13,2.2)} ${n} ${n===1?'member':'members'}</span></div>
+    <button class="cgear" data-go="cset" aria-label="Board settings">${ic('gear',20,1.8)}</button></div>
+  <div class="wallzone cbg-${comBg(id)}">${nl.length||tl.length?`<div class="wall">${col.map(x=>`<div class="wcol">${x.join('')}</div>`).join('')}</div>`
+    :q.length?`<div class="empty"><b>Nothing matches that</b><p>Try another word.</p><button class="btn2" data-act="clearCSearch">Show all notes</button></div>`
+    :!S.cnotesOk?'':`<div class="empty"><b>No notes yet</b><p>${comCan(id,'post')?`Add the first note for ${esc(c.name)}.`:'Only organisers can add notes here.'}</p></div>`}
+    ${comCan(id,'post')?`<div class="boardend"><button class="cta cadd" data-act="cnoteStart">${ic('plus',17,2.4,'var(--on-grad)')} Add a note</button></div>`:''}</div>`}
+// Board settings: name and description, background, members and their roles, invites, permissions, leave or delete.
+function viewCSet(D){const id=S.cid,c=S.coms[id];if(!id||!c||!S.cmine[id])return viewBoard(D);
+  const me=S.me.id,myRole=S.cmine[id],admin=comAdmin(id),canEdit=comCan(id,'edit'),canInvite=comCan(id,'invite');
+  const rank=r=>r==='owner'?0:r==='organiser'?1:2;
+  const mem=Object.entries(S.cmembers).sort((a,b)=>(a[0]===me?-1:b[0]===me?1:0)||rank(a[1])-rank(b[1])||shortName(a[0]).localeCompare(shortName(b[0])));
+  const pend=Object.values(S.cpend||{}).filter(x=>x&&x.uid&&!S.cmembers[x.uid]);
+  const who=v=>v==='all'?'Everyone':'Only organisers';
+  const row=(t1,t2,attrs,end='')=>`<button class="setrow" ${attrs}><span class="rowtext"><span class="t1">${t1}</span>${t2?`<span class="t2">${t2}</span>`:''}</span>${end||`<span class="chev">${ic('chev',16)}</span>`}</button>`;
+  const person=([u,r])=>`<button class="setrow cmrow2" data-act="cMember" data-uid="${esc(u)}">${ring(u,40)}<span class="rowtext"><span class="t1">${u===me?'You':esc(shortName(u))}</span><span class="t2">${esc(realNameOf(u)||metaOf(u)||'')}</span></span>${roleName(r)?`<span class="ctag2">${roleName(r)}</span>`:''}</button>`;
+  return`<div class="pad csetpage">${back('cboard')}<div class="stack narrow" style="margin-top:6px;gap:24px">
+   <div class="cshero"><div class="csprev cbg-${comBg(id)}" aria-hidden="true"><i></i><i></i><i></i></div>
+     <h1 class="pageh">${esc(c.name)}</h1>${c.about?`<p class="cabout">${esc(c.about)}</p>`:''}
+     <p class="muted">Board · ${mem.length} ${mem.length===1?'member':'members'}</p>
+     ${canEdit?`<button class="btn2" data-act="cEdit">${ic('edit',15)} Edit name and description</button>`:''}</div>
+   ${canEdit?`<section class="setsec"><h2 class="seth">Background</h2><div class="cbgs" role="radiogroup" aria-label="Board background">${COM_BGS.map(([k,l])=>`<button class="cbgsw cbg-${k}${comBg(id)===k?' on':''}" role="radio" aria-checked="${comBg(id)===k}" data-act="cBg" data-k="${k}"><span>${l}</span></button>`).join('')}</div></section>`:''}
+   <section class="setsec"><h2 class="seth">${mem.length} ${mem.length===1?'member':'members'}</h2><div class="setcard">
+     ${canInvite?`<button class="setrow cmrow2" data-sheet="cinvite"><span class="cadd2">${ic('plus',18,2.4)}</span><span class="rowtext"><span class="t1">Add people</span><span class="t2">Invite by their tack username</span></span><span class="chev">${ic('chev',16)}</span></button>`:''}
+     ${pend.map(x=>`<div class="setrow static cmrow2">${ring(x.uid,40)}<span class="rowtext"><span class="t1">${esc(shortName(x.uid))}</span><span class="t2">Invited · waiting to join</span></span>${admin?`<button class="ghostbtn" data-act="cUninvite" data-uid="${esc(x.uid)}">Cancel</button>`:''}</div>`).join('')}
+     ${mem.map(person).join('')}</div></section>
+   ${admin?`<section class="setsec"><h2 class="seth">Permissions</h2><div class="setcard">
+     ${row('Add notes',who(c.whoPosts||'all'),'data-sheet="cperm" data-about="posts"')}
+     ${row('Add people',who(c.whoInvites||'admins'),'data-sheet="cperm" data-about="invites"')}
+     ${row('Edit board info',who(c.whoEdits||'admins'),'data-sheet="cperm" data-about="edits"')}</div>
+     <p class="note" style="text-align:left">Organisers can always do all of these.</p></section>`:''}
+   <section class="setsec"><div class="setcard">${myRole==='owner'
+     ?row('<span class="dangertxt">Delete board</span>','Removes the board and all its notes for everyone.','data-sheet="cdelete"')
+     :row('<span class="dangertxt">Leave board</span>','You can join again if someone invites you.','data-sheet="cleave"')}</div></section>
+  </div></div>`}
 function viewCNote(D){const n0=S.cnotes[S.cnote];if(!S.cid||!n0)return viewBoard(D);const n={...n0,id:S.cnote},c=COLOR_RE.test(n.color||'')?n.color:'#7FA2FF',me=S.me.id,owner=comOwner(S.cid);
   const coms=Object.entries(S.ccoms).map(([k,v])=>({...v,id:k})).filter(x=>x.note===n.id).sort((a,b)=>a.at-b.at);
   return`<div class="pad cnotepage"><div class="ptop">${back('cboard')}${kebab('cnote',[n.by===me||owner?{i:'trash',t:n.by===me?'Delete this note':'Remove this note',at:'data-act="cnoteDel"',danger:true}:null],'Note options')}</div>
@@ -1196,12 +1239,12 @@ function viewBoard(D){
   ${online.length?`<section class="stripwrap" aria-label="Online"><p class="label">Online</p>
     <div class="strip">${online.map(u=>`<button class="person" data-person="${esc(u)}" data-hold="${esc(u)}" aria-label="${esc(firstName(u))} is online">${ring(u,50)}<span>${esc(firstName(u))}</span></button>`).join('')}</div></section>`:''}
   ${comChips(cm)}
-  ${cm?comBody(cm,cnotes,tk,D):`${stepsCard(D)}
+  <div class="bbody">${cm?comBody(cm,cnotes,tk,D):`${stepsCard(D)}
   <div class="dhead"><h1 class="h1">The board</h1><span class="muted">${all.length} pinned</span></div>
   <div class="searchrow"><div class="search"><label class="sicon" for="q">${ic('search',17)}</label><input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search posts" value="${esc(S.find.q)}" data-bind="find.q" aria-label="Search posts">${S.find.q?`<button class="sclear" data-act="clearSearch" aria-label="Clear search">${ic('x',14,2.4)}</button>`:''}<span class="sdiv" aria-hidden="true"></span><button class="fbtn${fCount(fState())?' on':''}" data-act="openFilters" aria-label="Filters${fCount(fState())?`, ${fCount(fState())} on`:''}">${ic('sliders',18,2)}${fCount(fState())?`<span class="fbadge">${fCount(fState())}</span>`:''}</button></div></div>
   ${fChips()}
   <div class="wallzone ${S.dropping?'dropin':''}">${filtered&&!list.length&&all.length?`<div class="empty"><b>${S.near&&!S.find.q.trim()&&fCount(fState())===(S.sort!==SORT_DEFAULT?2:1)?'Nothing near you right now':'No posts match that'}</b><p>${S.near&&fCount(fState())===(S.sort!==SORT_DEFAULT?2:1)?'Only posts pinned with a location can show as near you.':'Try fewer filters or another word, like the place, the time or what you need.'}</p><button class="btn2" data-act="clearFind">Show all posts</button></div>`:list.length?wallHTML(list,D)+`<div class="boardend"><span class="endpin" aria-hidden="true"></span>${filtered?`<p>${list.length} of ${all.length} posts shown.</p>`:''}<button class="btn2" data-go="post">Pin a post</button></div>`
-    :`<div class="empty"><b>Nothing pinned yet</b><p>Pin the first post: a xerox run, a lift down four floors, an hour of help before a submission.</p><button class="cta" data-go="post">Pin a post</button></div>`}</div>`}</div>`;
+    :`<div class="empty"><b>Nothing pinned yet</b><p>Pin the first post: a xerox run, a lift down four floors, an hour of help before a submission.</p><button class="cta" data-go="post">Pin a post</button></div>`}</div>`}</div></div>`;
 }
 function viewTackNote(j){if(S.shareImg?.key!==j.key&&!S.shareBusy){S.shareBusy=true;noteCard(j).then(b=>{S.shareBusy=false;if(b)S.shareImg={key:j.key,blob:b,url:URL.createObjectURL(b)}}).catch(()=>{S.shareBusy=false})}const mine=j.owner===S.me.id,st=jobState(j),jp=j.pics?picsOf('j:'+j.key):null;
   const paras=str(j.more,600).split(/\n+/).map(x=>x.trim()).filter(Boolean);
@@ -1857,6 +1900,25 @@ function sheetHTML(D){
     ${S.err.cinv?`<p class="err">${esc(S.err.cinv)}</p>`:''}<button class="cta" data-act="comInvite">Send invite</button>`;break;
   case'cjoin':{const c=S.coms[s.about],iv=S.cinv[s.about];b=`<h2 id="sheetT">${esc(c?.name||'Board')}</h2>${c?.about?`<p>${esc(c.about)}</p>`:''}<p>${esc(shortName(iv?.by))} invited you to this board.</p>
     <button class="cta" data-act="comJoin" data-id="${esc(s.about)}">Join board</button><button class="btn2" data-act="comDecline" data-id="${esc(s.about)}">Decline</button>`;break}
+  case'cedit':b=`<h2 id="sheetT">Edit board</h2>
+    <label class="formlabel" for="ceName">Name</label><input id="ceName" class="inp" maxlength="40" value="${esc(S.cdraft.name)}" data-bind="cdraft.name">
+    <label class="formlabel" for="ceAbout">Description</label><input id="ceAbout" class="inp" maxlength="200" placeholder="What it\u2019s for (optional)" value="${esc(S.cdraft.about)}" data-bind="cdraft.about">
+    ${S.err.cedit?`<p class="err">${esc(S.err.cedit)}</p>`:''}<button class="cta" data-act="cEditSave">Save</button><button class="linkbtn" data-act="closeSheet">Cancel</button>`;break;
+  case'cmember':{const u=s.about,r=S.cmembers[u],admin=comAdmin(S.cid),fn=esc(firstName(u));
+    b=`<div class="cmhead">${ring(u,52)}<span class="rowtext"><h2 id="sheetT">${esc(shortName(u))}</h2><span class="t2">${esc(roleName(r)||'Member')} · ${esc(comName(S.cid))}</span></span></div>
+    <div class="menu">
+      <button data-person="${esc(u)}">${ic('users',18)}<span class="rowtext"><span class="t1">View profile</span></span></button>
+      ${admin&&r==='member'?`<button data-act="cRole" data-uid="${esc(u)}" data-r="organiser">${ic('shield',18)}<span class="rowtext"><span class="t1">Make organiser</span><span class="t2">${fn} can manage members, settings and notes.</span></span></button>`:''}
+      ${admin&&r==='organiser'?`<button data-act="cRole" data-uid="${esc(u)}" data-r="member">${ic('shield',18)}<span class="rowtext"><span class="t1">Dismiss as organiser</span><span class="t2">${fn} stays on the board as a member.</span></span></button>`:''}
+      ${admin&&r!=='owner'?`<button class="danger" data-act="cRemove" data-uid="${esc(u)}">${ic('x',18)}<span class="rowtext"><span class="t1">Remove from board</span><span class="t2">${fn} won\u2019t see this board any more.</span></span></button>`:''}
+    </div>`;break}
+  case'cperm':{const k=s.about,c=S.coms[S.cid]||{},cur=k==='posts'?(c.whoPosts||'all'):k==='invites'?(c.whoInvites||'admins'):(c.whoEdits||'admins');
+    const t={posts:'Who can add notes',invites:'Who can add people',edits:'Who can edit board info'}[k];
+    b=`<h2 id="sheetT">${t}</h2><div class="menu" role="radiogroup" aria-label="${t}">${[['all','Everyone','Every member of the board.'],['admins','Only organisers','The owner and organisers.']].map(([v,l,d])=>`<button role="radio" aria-checked="${cur===v}" data-act="cPermSet" data-k="${k}" data-v="${v}">${ic(cur===v?'tick':'users',18)}<span class="rowtext"><span class="t1">${l}</span><span class="t2">${d}</span></span></button>`).join('')}</div>`;break}
+  case'cleave':b=`<h2 id="sheetT">Leave ${esc(comName(S.cid))}?</h2><p>You won\u2019t see its notes any more. Someone can invite you back.</p>
+    <button class="cta destructive" data-act="comLeave">Leave board</button><button class="linkbtn" data-act="closeSheet">Stay</button>`;break;
+  case'cdelete':b=`<h2 id="sheetT">Delete ${esc(comName(S.cid))}?</h2><p>The board and all its notes are removed for everyone. This can\u2019t be undone.</p>
+    <button class="cta destructive" data-act="comDelete">Delete board</button><button class="linkbtn" data-act="closeSheet">Keep it</button>`;break;
   case'cmembers':{const id=S.cid,owner=comOwner(id),me=S.me.id,l=Object.entries(S.cmembers).sort((a,b)=>(a[1]==='owner'?-1:1)-(b[1]==='owner'?-1:1));
     b=`<h2 id="sheetT">Members</h2><div class="menu cmlist">${l.map(([u,r])=>`<div class="cmrow">${face(u,30)}<span class="cn">${esc(shortName(u))}${r==='owner'?' <span class="muted">· organiser</span>':''}</span>${owner&&r!=='owner'?`<button class="ghostbtn" data-act="comKick" data-uid="${esc(u)}">Remove</button>`:''}</div>`).join('')}</div>
     ${owner?'<button class="linkbtn danger" data-act="comDelete">Delete this board</button>':'<button class="linkbtn" data-act="comLeave">Leave this board</button>'}`;break}
@@ -1889,7 +1951,7 @@ function sheetHTML(D){
   return`<div class="scrim" data-act="closeSheet"></div><div class="sheet sheet-${s.type}" role="dialog" aria-modal="true" aria-labelledby="sheetT">${b}</div>`;
 }
 
-const VIEWS={cboard:viewBoard,cnote:viewCNote,board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewSettings,settings:viewSettings,help:viewHelp,invites:viewInvites,saved:viewSaved,reviews:viewReviews,review:viewReview,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
+const VIEWS={cset:viewCSet,cboard:viewBoard,cnote:viewCNote,board:viewBoard,job:viewJob,post:viewPost,bids:viewBids,chats:viewChats,chat:viewChat,me:D=>viewPerson(S.me.id,D),person:D=>viewPerson(S.personOf,D),privacy:viewSettings,settings:viewSettings,help:viewHelp,invites:viewInvites,saved:viewSaved,reviews:viewReviews,review:viewReview,edit:()=>`<div class="pad">${onboardHTML(true)}</div>`};
 let lastView=null,lastSheet=null;const scrollMem={};
 const INTRO=[
   {k:'board',t:'This is the board.',b:'Classmates pin small posts here. A print run, a lift down four floors, an hour of help before a deadline. People you’ve made a deal with show up at the top when they’re online.'},
@@ -2024,7 +2086,7 @@ function render(){
     if(S.navScroll&&S.navScroll.v===S.view){scroller().scrollTop=S.navScroll.y;S.navScroll=null}
     lastView=S.view;CUR=snap();nbCheck(D);
     $('rail').innerHTML=railHTML(D);
-    const navOn=v=>S.view===v||(v==='board'&&['job','person','cboard','cnote'].includes(S.view))||(v==='chats'&&S.view==='chat')||(v==='me'&&['privacy','edit','settings','help'].includes(S.view))||(v==='invites'&&S.view==='invites');
+    const navOn=v=>S.view===v||(v==='board'&&['job','person','cboard','cnote','cset'].includes(S.view))||(v==='chats'&&S.view==='chat')||(v==='me'&&['privacy','edit','settings','help'].includes(S.view))||(v==='invites'&&S.view==='invites');
     $('sidebar').innerHTML=`<div style="padding:0 6px"><div class="mark">tack</div><div class="sub"><span class="dot"></span><span>${S.me.isOwner?`<button class="campbtn" data-sheet="campus">${esc(campus())}${ic('chev',12,2.4)}</button>`:esc(campus())} · ${boardJobs(D).length} pinned</span></div></div>
       <button class="cta" data-go="post" style="padding:13px 10px;font-size:var(--t-16)">+ Pin a post</button>
       <nav style="display:flex;flex-direction:column;gap:3px" aria-label="Sections">${[['board','Board','board'],['bids','Activity','bids'],['chats','Chats','chat'],['saved','Saved','bookmark']].concat(S.me.isOwner?[['invites','Invites','users']]:[])
@@ -2064,7 +2126,7 @@ function nbHide(now){const el=$('nbanners')?.firstChild;clearTimeout(NB.t);if(!e
   el.classList.add('out');el.addEventListener('animationend',()=>{el.remove();setTimeout(nbNext,250)},{once:true})}
 let toastT;
 function toast(msg){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},2800)}
-const DEPTH={cboard:0,cnote:2,board:0,bids:0,chats:0,me:0,saved:0,invites:1,post:1,job:1,person:1,chat:1,privacy:1,settings:1,help:2,edit:2,reviews:1,review:2};
+const DEPTH={cset:1,cboard:0,cnote:2,board:0,bids:0,chats:0,me:0,saved:0,invites:1,post:1,job:1,person:1,chat:1,privacy:1,settings:1,help:2,edit:2,reviews:1,review:2};
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
 const typingEl=e=>e&&(e.tagName==='TEXTAREA'||e.isContentEditable||(e.tagName==='INPUT'&&!['range','checkbox','radio','button','submit','file','color'].includes(e.type)));
 let kbT=null;document.addEventListener('focusin',e=>{if(typingEl(e.target)){clearTimeout(kbT);document.documentElement.classList.add('typing')}});
@@ -2096,9 +2158,10 @@ function go(v,keepThread){const restoring=!!S.navRestoring;
   if(v!=='chat'&&!keepThread)closeThread();
   const apply=()=>{if(v==='post'&&from!=='post'&&(S.draft.editId||S.draft.cid)&&!S.editEnter)S.draft=blankDraft();S.editEnter=false;if(v==='bids'&&from!=='bids'){S.actSeenAt=num(S.priv.actSeen);setTimeout(()=>savePriv({actSeen:Date.now()}),0)}if((v==='person'||v==='me')&&from!==v&&!restoring)S.ptab='notes';S.view=v;S.sheet=null;S.omenu=null;S.err={};if(v==='help'&&from!=='help')S.help={kind:null,job:null,why:'',note:'',sent:null};if(v==='settings'){S.pwOpen=false}if(v==='person'||v==='me'){delete S.revs[v==='me'?S.me.id:S.personOf];S.allRevs=null}if(v==='edit'){seedOnb();S.hcheck={h:handleOf(S.me.id),st:'mine'}}if(v==='invites')S.inv.campus='';render();
     if(v==='board'&&from==='job'&&S.openJob){const p=document.querySelector(`.tile[data-job="${CSS.escape(S.openJob)}"] .price`);if(p)p.style.viewTransitionName='jp'}};
-  if(from===v||S.phase!=='app'||!document.startViewTransition||reduceMotion.matches){apply();return}
+  const boardNav=['board','cboard'].includes(from)&&['board','cboard'].includes(v),swap=v==='cboard'&&S.comSwap;S.comSwap=false;
+  if((from===v&&!swap)||S.phase!=='app'||!document.startViewTransition||reduceMotion.matches){apply();return}
   const d=(DEPTH[v]??1)-(DEPTH[from]??1),root=document.documentElement;
-  root.dataset.nav=restoring?'back':d>0?'fwd':d<0?'back':'tab';
+  root.dataset.nav=boardNav?'board':restoring?'back':d>0?'fwd':d<0?'back':'tab';
   const t=document.startViewTransition(apply);
   t.ready.catch(()=>{});t.updateCallbackDone.catch(()=>{});
   t.finished.catch(()=>{}).finally(()=>{document.querySelectorAll('.tile .price').forEach(e=>{e.style.viewTransitionName=''});delete root.dataset.nav});
@@ -2201,7 +2264,22 @@ const ACT={
   comDecline(el){const id=el.dataset.id;S.fb.deleteDoc(S.fb.doc(S.db,'cinvites',id+'~'+S.me.id)).catch(()=>{});const v={...S.cinv};delete v[id];S.cinv=v;S.sheet=null;render()},
   comKick(el){const u=el.dataset.uid;S.fb.deleteDoc(S.fb.doc(S.db,'cmembers',S.cid+'~'+u)).then(()=>toast('Removed '+firstName(u))).catch(()=>toast('Couldn\u2019t remove them.'))},
   comLeave(){const id=S.cid;S.fb.deleteDoc(S.fb.doc(S.db,'cmembers',id+'~'+S.me.id)).then(()=>{S.sheet=null;closeCom();go('board');toast('You left the board')}).catch(()=>toast('Couldn\u2019t leave.'))},
-  comDelete(){if(!confirm('Delete '+comName(S.cid)+' and all its notes?'))return;const id=S.cid;S.fb.deleteDoc(S.fb.doc(S.db,'communities',id)).then(()=>{S.sheet=null;closeCom();go('board');toast('Board deleted')}).catch(()=>toast('Couldn\u2019t delete it.'))},
+  comDelete(){const id=S.cid;S.fb.deleteDoc(S.fb.doc(S.db,'communities',id)).then(()=>{S.sheet=null;closeCom();go('board');toast('Board deleted')}).catch(()=>toast('Couldn\u2019t delete it.'))},
+  clearCSearch(){S.cfind.q='';render();setTimeout(()=>$('cq')?.focus(),0)},
+  cEdit(){const c=S.coms[S.cid]||{};S.cdraft.name=c.name||'';S.cdraft.about=c.about||'';S.err={};S.sheet={type:'cedit'};render()},
+  async cEditSave(){const n=S.cdraft.name.trim(),a=S.cdraft.about.trim();if(n.length<2){S.err={cedit:'Give the board a name of at least 2 letters.'};render();return}if(modBlock('profile',n,a))return;
+    try{await S.fb.rpc('update_board',{p_id:S.cid,p_name:n,p_about:a,p_bg:null});S.coms={...S.coms,[S.cid]:{...S.coms[S.cid],name:n,about:a}};S.sheet=null;S.err={};toast('Saved')}
+    catch(e){console.warn(e);S.err={cedit:'Couldn\u2019t save. Only people allowed to edit this board can change it.'};render()}},
+  cBg(el){const k=el.dataset.k,id=S.cid,old=(S.coms[id]||{}).bg;S.coms={...S.coms,[id]:{...S.coms[id],bg:k}};render();
+    S.fb.rpc('update_board',{p_id:id,p_name:null,p_about:null,p_bg:k}).catch(e=>{console.warn(e);S.coms={...S.coms,[id]:{...S.coms[id],bg:old}};render();toast('Couldn\u2019t change the background.')})},
+  cMember(el){const u=el.dataset.uid;if(u===S.me.id){go('me');return}S.sheet={type:'cmember',about:u};render()},
+  cRole(el){const u=el.dataset.uid,r=el.dataset.r,id=S.cid;S.sheet=null;S.cmembers={...S.cmembers,[u]:r};render();
+    S.fb.rpc('board_set_role',{p_id:id,p_uid:u,p_role:r}).then(()=>toast(r==='organiser'?firstName(u)+' is now an organiser':firstName(u)+' is a member again')).catch(e=>{console.warn(e);toast('Couldn\u2019t change their role.')})},
+  cRemove(el){const u=el.dataset.uid,id=S.cid;S.sheet=null;const m={...S.cmembers};delete m[u];S.cmembers=m;render();
+    S.fb.rpc('board_remove',{p_id:id,p_uid:u}).then(()=>toast('Removed '+firstName(u))).catch(e=>{console.warn(e);toast('Couldn\u2019t remove them.')})},
+  cPermSet(el){const k=el.dataset.k,v=el.dataset.v,id=S.cid,f={posts:'whoPosts',invites:'whoInvites',edits:'whoEdits'}[k];S.coms={...S.coms,[id]:{...S.coms[id],[f]:v}};S.sheet=null;render();
+    S.fb.rpc('board_settings',{p_id:id,p_posts:k==='posts'?v:null,p_invites:k==='invites'?v:null,p_edits:k==='edits'?v:null}).catch(e=>{console.warn(e);toast('Couldn\u2019t change that setting.')})},
+  cUninvite(el){const u=el.dataset.uid,id=S.cid;const m={...S.cpend};delete m[u];S.cpend=m;render();S.fb.deleteDoc(S.fb.doc(S.db,'cinvites',id+'~'+u)).then(()=>toast('Invite cancelled')).catch(()=>toast('Couldn\u2019t cancel it.'))},
   cnoteStart(){S.draft={...blankDraft(),cid:S.cid,useLoc:false};S.editEnter=true;go('post')},
   cnoteColor(el){S.cdraft.color=el.dataset.c;render()},
   cnoteAdd(){const d=S.cdraft,t=d.text.trim();if(!t){S.err={cnote:'Write something first.'};render();return}if(modBlock('job',t,d.more))return;
@@ -2506,7 +2584,7 @@ document.addEventListener('submit',e=>{
   if(S.busy)return;({signup:doSignup,login:doLogin,reset:doReset,newpw:setNewPw,otp:doVerifyOtp})[f.dataset.form]?.();
 });
 function bind(e){const b=e.target.dataset?.bind;if(!b)return;const[o,k]=b.split('.');S[o][k]=e.target.type==='checkbox'?e.target.checked:e.target.value}
-document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ciIn'){const c=$('ciSugs');if(c)c.innerHTML=ciSugsHTML();return}if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='msg'){$('composer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='ccomIn'){$('ccomposer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='q'||e.target.id==='campQ')render();else if(e.target.id==='fCol'||e.target.id==='cpQ')paintCol();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jhue'&&S.draft.white){S.draft.white=false;$('jwhite')?.classList.remove('on')}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
+document.addEventListener('input',e=>{if(e.target.id==='cropZoom'&&S.crop){S.crop.z=+e.target.value;cropApply();return}bind(e);if(e.target.id==='ciIn'){const c=$('ciSugs');if(c)c.innerHTML=ciSugsHTML();return}if(e.target.id==='ohd'){checkHandle(e.target.value);paintHandle();return}if(e.target.id==='msg'){$('composer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='ccomIn'){$('ccomposer')?.classList.toggle('hastext',!!e.target.value.trim())}if(e.target.id==='q'||e.target.id==='campQ'||e.target.id==='cq')render();else if(e.target.id==='fCol'||e.target.id==='cpQ')paintCol();else{if(e.target.id==='bidSay'){const w=$('bidWc');if(w){w.textContent=sayCount(e.target.value);w.classList.toggle('over',sayOver(e.target.value))}}if(e.target.id==='jt'){const w=$('jtWc');if(w){const n=e.target.value.length;w.textContent=noteCount(e.target.value);if(n>=NOTE_MAX){if(!w.classList.contains('full')){void w.offsetWidth;w.classList.add('full')}}else w.classList.remove('full')}}if(e.target.id==='jhue'&&S.draft.white){S.draft.white=false;$('jwhite')?.classList.remove('on')}if(e.target.id==='jp'||e.target.id==='jhue')syncNoteTone();if(e.target.id==='jm'){const w=e.target.closest('.pitchbox')?.querySelector('.wc');if(w)w.textContent=e.target.value.length+' / 600'}syncNeed()}});
 document.addEventListener('change',async e=>{
   bind(e);syncNeed();
   if(e.target.dataset?.toggle==='memberInvites'){ACT.toggleMemberInvites(e.target);return}
