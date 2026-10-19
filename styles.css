@@ -279,8 +279,14 @@ html[data-nav="tab"]::view-transition-new(main){animation:fadeIn .2s ease both}
 .boardpage{display:flex;flex-direction:column;min-height:100%}
 .wallzone{flex:1;display:flex;flex-direction:column;background-image:radial-gradient(circle,rgba(244,241,250,.07) 0 1.2px,transparent 1.7px);background-size:22px 22px}
 /* the board: everything above the notes stays put, only the notes scroll */
-.main[data-view="board"]{overflow:hidden;display:flex;flex-direction:column}
-.main[data-view="board"]>.boardpage{flex:1;min-height:0}
+.main[data-view="board"],.main[data-view="cboard"]{overflow:hidden;display:flex;flex-direction:column}
+.main[data-view="board"]>.boardpage,.main[data-view="cboard"]>.boardpage{flex:1;min-height:0}
+.cinfo{display:flex;align-items:flex-start;gap:10px;padding:12px 16px 10px}
+.cinfo .rowtext{flex:1;min-width:0;gap:6px}
+.cinfo .cabout{font-size:var(--fs-c)}
+.cmembers{align-self:flex-start;display:inline-flex;align-items:center;gap:5px;padding:0;color:var(--muted);font-size:var(--t-12);font-weight:500}
+.oncom .boardend .cadd{position:static;width:auto;padding-left:22px;padding-right:22px}
+@media (min-width:900px){.cinfo{padding:12px 28px 12px}}
 .boardpage>*{flex-shrink:0}
 .boardpage>.wallzone{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;background-attachment:local;-webkit-overflow-scrolling:touch}
 .boardend{display:flex;flex-direction:column;align-items:center;gap:10px;padding:6px 16px 36px;text-align:center}
@@ -1296,8 +1302,9 @@ svg[aria-hidden="true"]{stroke-width:1.6}
 .tkshare .slogos{justify-content:space-between}
 
 /* community boards */
-/* boards are places, so they're tabs (filters below are pills) */
-.comrow{display:flex;gap:22px;overflow-x:auto;margin:14px 16px 4px;border-bottom:1px solid var(--line);scrollbar-width:none}
+/* boards are places, so they're tabs (filters below are pills); swipe sideways when they don't fit */
+.comrow{display:flex;gap:22px;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;margin:14px 16px 4px;border-bottom:1px solid var(--line);scrollbar-width:none}
+.comrow .comchip{scroll-snap-align:start}
 .comrow::-webkit-scrollbar{display:none}
 .comchip{flex-shrink:0;display:inline-flex;align-items:center;gap:5px;padding:2px 0 11px;background:none;color:var(--muted);font-size:var(--t-14);font-weight:600;white-space:nowrap}
 .comchip.on{color:var(--fg);box-shadow:inset 0 -2px 0 var(--fg)}
@@ -1689,3 +1696,27 @@ button.igstat:active b{opacity:.7}
 :root[data-theme="light"] .tile.ntile .pst{color:oklch(from var(--nc) .42 .06 h / .85)}
 :root[data-theme="light"] .tile.ntile .pst.on{color:var(--accent)}
 
+/* search + filter button; filters in use show as removable chips; the filter sheet */
+.searchrow{display:flex;align-items:center;gap:8px;margin:4px 16px 0}
+.searchrow .search{flex:1;min-width:0;margin:0}
+.fbtn{position:relative;flex-shrink:0;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--surface);color:var(--fg)}
+.fbtn.on{color:var(--accent)}
+.fbadge{position:absolute;top:2px;right:2px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:var(--grad);color:var(--on-grad);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.fchips{display:flex;gap:7px;overflow-x:auto;padding:10px 16px 2px;scrollbar-width:none}
+.fchips::-webkit-scrollbar{display:none}
+.fchip{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;padding:7px 10px 7px 13px;border-radius:999px;background:var(--surface2);color:var(--fg);font-size:var(--t-12);font-weight:600;white-space:nowrap}
+.fchip svg{opacity:.7}
+.fclear{flex-shrink:0;padding:7px 4px;color:var(--muted);font-size:var(--t-12);font-weight:500;white-space:nowrap}
+.boardpage>.wallzone{margin-top:12px}
+.fhead{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.fhead .linkbtn{padding:0;color:var(--muted)}.fhead .linkbtn[disabled]{opacity:.4}
+.fsec{display:flex;flex-direction:column;gap:9px}
+.fsec h3{margin:0;font-size:var(--t-12);font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.fopts{display:flex;flex-wrap:wrap;gap:8px}
+.fopt{display:inline-flex;align-items:center;gap:6px;padding:8px 13px 8px 11px;border-radius:999px;background:var(--surface2);color:var(--fg2);font-size:var(--t-13,13px);font-weight:500}
+.fopt.on{background:var(--grad);color:var(--on-grad);font-weight:600}
+.fopt.one:not(.on){padding-left:14px}
+.fopt .fn{font-size:var(--t-11);opacity:.6;font-variant-numeric:tabular-nums}
+.ffoot{position:sticky;bottom:calc(-18px - env(safe-area-inset-bottom,0px));margin:4px -16px calc(-18px - env(safe-area-inset-bottom,0px));padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px));background:var(--rail);display:flex;flex-direction:column;gap:6px;text-align:center}
+.ffoot .note{text-align:center}
+@media (min-width:900px){.searchrow{margin:4px 28px 0}.fchips{padding:10px 28px 2px}.ffoot{bottom:-24px;margin:4px -24px -24px;padding:12px 24px 18px}}

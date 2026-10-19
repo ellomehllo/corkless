@@ -10,18 +10,18 @@ export const PRIVACY=`
 <h2>2. Data we collect</h2>
 <p><b>Account data.</b> Your email address and a password. Your password is handled by our authentication provider and is never visible to us.</p>
 <p><b>Profile data.</b> Your name, profile photo, year, branch, the skills you list, your ring colour, and when you were last online (shown only to people you’ve made a deal with, and you can turn it off in Settings).</p>
-<p><b>Activity data.</b> Jobs you post, bids and pitches you place, favour requests, picks, payment confirmations, ratings, written reviews, reports and feedback you send, and the photos you attach to any of these.</p>
-<p><b>Messages.</b> Messages you send in job chats, and, if read receipts are on, the time you last read a chat.</p>
-<p><b>Location.</b> Only if you choose to tag a job with your location, that spot rounded to about 100 metres. When you bid, only whether you were near the job (yes or no), and only if you allow it in Settings. Your live location is used on your device to show jobs near you and is never sent to us.</p>
+<p><b>Activity data.</b> Posts you make, comments and pitches you leave, favour requests, picks, payment confirmations, ratings, written reviews, reports and feedback you send, and the photos you attach to any of these.</p>
+<p><b>Messages.</b> Messages you send in post chats, and, if read receipts are on, the time you last read a chat.</p>
+<p><b>Location.</b> Only if you choose to tag a post with your location, that spot rounded to about 100 metres. When you comment, only whether you were near the post (yes or no), and only if you allow it in Settings. Your live location is used on your device to show posts near you and is never sent to us.</p>
 <p><b>Settings and technical data.</b> Your settings, the people you block, which chats and notifications you have seen, and the version of the Terms you accepted. We do not use advertising trackers or analytics cookies.</p>
-<p><b>Notifications.</b> Only if you turn notifications on: a token for each device, issued by Google Firebase Cloud Messaging, so we can reach that device. When something happens for you (a bid, a pick, a message, a board invite or a review), the notification text passes through Firebase to your device. It contains the other person’s username, the job title or the start of the message, and nothing else. Turning notifications off or logging out on a device deletes its token.</p>
+<p><b>Notifications.</b> Only if you turn notifications on: a token for each device, issued by Google Firebase Cloud Messaging, so we can reach that device. When something happens for you (a comment, a pick, a message, a board invite or a review), the notification text passes through Firebase to your device. It contains the other person’s username, the post title or the start of the message, and nothing else. Turning notifications off or logging out on a device deletes its token.</p>
 <p>Photos are resized on your device before upload, which removes embedded data such as GPS location.</p>
 
 <h2>3. Why we use it</h2>
 <ul>
 <li>To create and secure your account and confirm you were invited.</li>
-<li>To show your jobs, bids, profile and reputation to the right members.</li>
-<li>To let you chat about a job and keep a record of what was agreed.</li>
+<li>To show your posts, comments, profile and reputation to the right members.</li>
+<li>To let you chat about a post and keep a record of what was agreed.</li>
 <li>To keep the community safe: handling reports, removing content that breaks the rules and preventing misuse.</li>
 <li>To answer your feedback and requests, and to meet our legal obligations.</li>
 </ul>
@@ -29,10 +29,10 @@ export const PRIVACY=`
 
 <h2>4. Who can see what</h2>
 <ul>
-<li><b>Members</b> see your name, photo, year, branch, skills, the jobs you post, your rating averages and the written reviews about you. They never see your email address.</li>
-<li><b>Bids</b> are visible only to you and the poster of that job. Other members cannot see who bid on a job or who was picked.</li>
+<li><b>Members</b> see your name, photo, year, branch, skills, the posts you make, your rating averages and the written reviews about you. They never see your email address.</li>
+<li><b>Comments</b> are visible only to you and the poster of that post. Other members cannot see who commented on a post or who was picked.</li>
 <li><b>Chats</b> are visible only to the people in them.</li>
-<li><b>Ratings and reviews</b> are shown as averages and anonymous reviews. They never show who wrote them or for which job.</li>
+<li><b>Ratings and reviews</b> are shown as averages and anonymous reviews. They never show who wrote them or for which post.</li>
 <li><b>The organiser</b> can access data where needed to run and moderate tack, including the messages and content connected to a report you or someone else files.</li>
 </ul>
 
@@ -40,7 +40,7 @@ export const PRIVACY=`
 <p>tack is built on Supabase (accounts and database), uses Google Firebase Cloud Messaging only to deliver notifications you turn on, and is hosted on GitHub Pages. These providers process data on our behalf under their own security and privacy terms, and their servers may be located outside India. We do not share your data with anyone else except where required by law, to protect someone's safety, or with your consent.</p>
 
 <h2>6. How long we keep it</h2>
-<p>We keep your data while your account is active. When you delete your account, your profile, jobs, bids, photos, the reviews you wrote and your messages are erased straight away. Anonymous rating totals and reviews written about you by others may remain because they cannot be linked back to the person who wrote them. Reports may be kept for as long as needed to keep the community safe or to meet legal obligations.</p>
+<p>We keep your data while your account is active. When you delete your account, your profile, posts, comments, photos, the reviews you wrote and your messages are erased straight away. Anonymous rating totals and reviews written about you by others may remain because they cannot be linked back to the person who wrote them. Reports may be kept for as long as needed to keep the community safe or to meet legal obligations.</p>
 
 <h2>7. Your rights</h2>
 <p>Under the Digital Personal Data Protection Act, 2023 you have the right to:</p>
@@ -71,7 +71,7 @@ export const TERMS=`
 <p class="lede">These Terms of Use are a binding agreement between you and the organiser of tack. By creating an account or using tack you confirm that you have read, understood and accept these Terms and the Privacy Policy. If you do not agree, do not use tack.</p>
 
 <h2>1. What tack is</h2>
-<p>tack is a private noticeboard where invited students post small jobs and other students offer to do them. tack only provides the space to post, bid and talk. tack is an intermediary under the Information Technology Act, 2000. It is not a party to any arrangement between members, does not employ, supervise or recommend anyone, and does not guarantee that any job will be done, done well, or paid for.</p>
+<p>tack is a private noticeboard where invited students post small asks and other students offer to help. tack only provides the space to post, comment and talk. tack is an intermediary under the Information Technology Act, 2000. It is not a party to any arrangement between members, does not employ, supervise or recommend anyone, and does not guarantee that anything posted will be done, done well, or paid for.</p>
 
 <h2>2. Who can use tack</h2>
 <ul>
@@ -81,7 +81,7 @@ export const TERMS=`
 </ul>
 
 <h2>3. Arrangements between members</h2>
-<p>Any job, favour, price, timing or meeting is agreed directly between the members involved, at their own discretion and risk. Members act independently. Nothing on tack creates an employment, agency, partnership or contractor relationship with tack or its organiser. You are responsible for deciding whether a job or a person is suitable for you.</p>
+<p>Any post, favour, price, timing or meeting is agreed directly between the members involved, at their own discretion and risk. Members act independently. Nothing on tack creates an employment, agency, partnership or contractor relationship with tack or its organiser. You are responsible for deciding whether a post or a person is suitable for you.</p>
 
 <h2>4. Payments</h2>
 <p>tack never handles, holds or transfers money. Payment is made directly between members in cash, UPI or any other method they choose. tack is not responsible for non-payment, late payment, wrong amounts, refunds, fraud or any dispute about money. Payment confirmations in the app only record what members say. Any tax arising from what you earn is your own responsibility.</p>
@@ -102,25 +102,25 @@ export const TERMS=`
 <p>tack does not run background checks or verify identities beyond the invite and your email address. Meet in public places on or near campus, tell a friend where you are going, never share passwords or one-time codes, and leave any situation that feels unsafe. In an emergency, contact local authorities first. You use tack and meet other members at your own risk.</p>
 
 <h2>7. Your content</h2>
-<p>You keep ownership of what you post, including jobs, bids, photos, messages and reviews. You give tack a non-exclusive, royalty-free licence to store and display that content to other members as needed to run the service. You confirm you have the right to share it and that it does not break these Terms or anyone else's rights.</p>
+<p>You keep ownership of what you post, including posts, comments, photos, messages and reviews. You give tack a non-exclusive, royalty-free licence to store and display that content to other members as needed to run the service. You confirm you have the right to share it and that it does not break these Terms or anyone else's rights.</p>
 
 <h2>8. Ratings and reviews</h2>
-<p>Ratings and reviews must be honest and based on your own experience of a real job. Do not offer or accept anything in exchange for a rating, and do not use reviews to harass anyone. We may remove ratings or reviews that break these rules.</p>
+<p>Ratings and reviews must be honest and based on your own experience of real work arranged on tack. Do not offer or accept anything in exchange for a rating, and do not use reviews to harass anyone. We may remove ratings or reviews that break these rules.</p>
 
 <h2>9. Moderation and ending access</h2>
-<p>The organiser may review reported content, remove jobs, bids, reviews, photos or messages, and suspend or remove any account, with or without notice, if we believe these Terms have been broken or a member's safety is at risk. You can stop using tack and delete your account at any time from Settings.</p>
+<p>The organiser may review reported content, remove posts, comments, reviews, photos or messages, and suspend or remove any account, with or without notice, if we believe these Terms have been broken or a member's safety is at risk. You can stop using tack and delete your account at any time from Settings.</p>
 
 <h2>10. No warranties</h2>
 <p>tack is provided free of charge, "as is" and "as available". To the fullest extent permitted by law, we make no promises about its availability, accuracy, reliability or fitness for any purpose, or about the conduct, identity, skills or reliability of any member.</p>
 
 <h2>11. Limitation of liability</h2>
-<p>To the fullest extent permitted by law, tack and its organiser are not liable for any loss, damage, injury, theft, non-payment, dispute or claim arising from jobs, favours, meetings, payments or any other dealings between members, or from content posted by members. tack and its organiser are also not liable for any indirect, incidental, special or consequential loss, including loss of data, income or opportunity. Where liability cannot be excluded, it is limited to ₹500 in total.</p>
+<p>To the fullest extent permitted by law, tack and its organiser are not liable for any loss, damage, injury, theft, non-payment, dispute or claim arising from posts, favours, meetings, payments or any other dealings between members, or from content posted by members. tack and its organiser are also not liable for any indirect, incidental, special or consequential loss, including loss of data, income or opportunity. Where liability cannot be excluded, it is limited to ₹500 in total.</p>
 
 <h2>12. Indemnity</h2>
 <p>You agree to indemnify and hold harmless tack and its organiser from any claim, loss, liability or expense, including reasonable legal fees, arising from your use of tack, your content, your dealings with other members, or your breach of these Terms or of any law.</p>
 
 <h2>13. Disputes between members</h2>
-<p>Disputes about a job are between the members involved, and you agree to try to settle them directly and in good faith. tack may help, for example by reviewing a report, but has no obligation to do so and does not decide who is right.</p>
+<p>Disputes about a post are between the members involved, and you agree to try to settle them directly and in good faith. tack may help, for example by reviewing a report, but has no obligation to do so and does not decide who is right.</p>
 
 <h2>14. Other services</h2>
 <p>Payment apps, messaging apps, email and other services you use alongside tack are governed by their own terms. tack is not responsible for them.</p>
